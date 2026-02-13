@@ -32,29 +32,27 @@ import studio.lunabee.compose.foundation.uifield.UiField
 import studio.lunabee.compose.foundation.uifield.UiFieldOption
 import studio.lunabee.compose.foundation.uifield.field.UiFieldError
 import studio.lunabee.compose.foundation.uifield.field.style.PasswordUiFieldData
-import studio.lunabee.compose.foundation.uifield.field.style.PasswordUiFieldDataImpl
-import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleData
-import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleDataImpl
+import studio.lunabee.compose.foundation.uifield.field.style.PasswordUiFieldDataDefault
 import studio.lunabee.compose.foundation.uifield.field.text.option.password.PasswordVisibilityFieldOption
 import studio.lunabee.compose.foundation.uifield.field.text.option.password.PasswordVisibilityOptionData
 import studio.lunabee.compose.foundation.uifield.field.text.option.password.PasswordVisibilityOptionHolder
 
 class PasswordUiTextField(
-    override var label: LbcTextSpec?,
+    val label: LbcTextSpec?,
     override val initialValue: String,
-    override var placeholder: LbcTextSpec?,
+    val placeholder: LbcTextSpec?,
     override val isFieldInError: (String) -> UiFieldError?,
     override val visibilityOptionData: PasswordVisibilityOptionData,
     override val id: String,
     override val savedStateHandle: SavedStateHandle,
-    private val passwordUiFieldData: PasswordUiFieldData = PasswordUiFieldDataImpl(),
+    private val passwordUiFieldData: PasswordUiFieldData = PasswordUiFieldDataDefault(),
     override val onValueChange: (String) -> Unit = {},
     override val readOnly: Boolean = false,
     override val enabled: Boolean = true,
     private val maxLine: Int = 1,
     private val keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     private val onKeyboardActions: KeyboardActionHandler = KeyboardActionHandler { /* no-op */ },
-) : UiField<String>(), PasswordVisibilityOptionHolder {
+) : UiField<String, String>(), PasswordVisibilityOptionHolder {
     private val mIsValueVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
     override val isValueVisible: StateFlow<Boolean> = mIsValueVisible.asStateFlow()
 
@@ -103,12 +101,11 @@ class PasswordUiTextField(
         )
     }
 
-    // Not used here ...
-    override val uiFieldStyleData: UiFieldStyleData = UiFieldStyleDataImpl()
+    override fun formToDisplay(value: String): String = value
 
-    override fun savedValueToData(value: String): String = value
+    override fun saveToSavedStateHandle(value: String, savedStateHandle: SavedStateHandle) {
+        savedStateHandle[id] = value
+    }
 
-    override fun valueToSavedString(value: String): String = value
-
-    override fun valueToDisplayedString(value: String): String = value
+    override fun restoreFromSavedStateHandle(savedStateHandle: SavedStateHandle): String? = savedStateHandle[id]
 }

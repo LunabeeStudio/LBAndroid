@@ -16,63 +16,29 @@
 
 package studio.lunabee.compose.foundation.uifield.field.text
 
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.ui.text.input.VisualTransformation
-import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.ui.text.input.TextFieldValue
+import studio.lunabee.compose.core.LbcTextSpec
 import studio.lunabee.compose.foundation.uifield.UiField
+import studio.lunabee.compose.foundation.uifield.field.style.DefaultUiFieldStyleData
+import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleData
 
-abstract class TextUiField : UiField<String>() {
-    abstract val visualTransformation: StateFlow<VisualTransformation>
-    abstract val keyboardOptions: KeyboardOptions
-    abstract val keyboardActions: KeyboardActions
-    abstract val maxLine: Int
+/**
+ * Base class for text-based uifields working with TextFieldValue
+ */
+abstract class TextUiField<T>(
+    private val uiFieldStyleData: UiFieldStyleData = DefaultUiFieldStyleData(),
+) : UiField<T, TextFieldValue>() {
+
+    abstract val placeholder: LbcTextSpec?
+    abstract val label: LbcTextSpec?
 
     @Composable
-    override fun Composable(modifier: Modifier) {
-        val collectedValue by mValue.collectAsState()
-        val collectedVisualTransformation by visualTransformation.collectAsState()
-        val collectedError by error.collectAsState()
-        uiFieldStyleData.ComposeTextField(
-            value = valueToDisplayedString(collectedValue),
-            onValueChange = {
-                value = it
-                dismissError()
-            },
-            modifier = modifier.onFocusEvent {
-                if (!it.hasFocus && hasBeenFocused) {
-                    checkAndDisplayError()
-                } else {
-                    hasBeenFocused = true
-                    dismissError()
-                }
-            },
-            placeholder = placeholder,
-            label = label,
-            trailingIcon = if (options.isNotEmpty()) {
-                { options.forEach { it.Composable(modifier = Modifier) } }
-            } else {
-                null
-            },
-            visualTransformation = collectedVisualTransformation,
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
-            maxLine = maxLine,
-            readOnly = readOnly,
-            enabled = enabled,
-            error = collectedError,
-            interactionSource = null,
-        )
+    final override fun Composable(modifier: Modifier) {
+        Composable(modifier, uiFieldStyleData)
     }
 
-    override fun valueToDisplayedString(value: String): String = value
-
-    override fun valueToSavedString(value: String): String = value
-
-    override fun savedValueToData(value: String): String = value
+    @Composable
+    abstract fun Composable(modifier: Modifier, uiFieldStyleData: UiFieldStyleData)
 }

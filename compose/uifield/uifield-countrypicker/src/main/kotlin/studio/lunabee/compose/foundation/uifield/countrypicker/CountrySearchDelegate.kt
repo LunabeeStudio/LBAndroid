@@ -17,6 +17,7 @@
 package studio.lunabee.compose.foundation.uifield.countrypicker
 
 import android.content.Context
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
 import com.hbb20.CCPCountry
 import com.hbb20.CountryCodePicker
@@ -38,7 +39,7 @@ class CountrySearchDelegate(
     searchFieldPlaceHolder: LbcTextSpec?,
     searchFieldStyleData: UiFieldStyleData,
     private val coroutineScope: CoroutineScope,
-    private val context: Context,
+    context: Context,
 ) {
 
     private var allCountryCodes: List<CountrySearchItem> =
@@ -71,14 +72,14 @@ class CountrySearchDelegate(
 
     val searchUiField: NormalUiTextField by lazy {
         NormalUiTextField(
-            id = SearchUiFieldId,
-            initialValue = "",
+            id = SearchString,
+            initialValue = TextFieldValue(),
             label = searchFieldLabel,
             placeholder = searchFieldPlaceHolder,
             isFieldInError = { null },
             savedStateHandle = savedStateHandle,
             uiFieldStyleData = searchFieldStyleData,
-            onValueChange = ::onSearchedTextChange,
+            onValueChange = { onSearchedTextChange(it.text) },
         )
     }
 
@@ -113,7 +114,7 @@ class CountrySearchDelegate(
                     )
                 }
 
-            updateUiStateWithSearch(searchUiField.value)
+            updateUiStateWithSearch(searchUiField.value.text)
         }
     }
 
@@ -133,7 +134,7 @@ class CountrySearchDelegate(
                     )
                 }
 
-            updateUiStateWithSearch(searchUiField.value)
+            updateUiStateWithSearch(searchUiField.value.text)
         }
     }
 
@@ -167,4 +168,4 @@ class CountrySearchDelegate(
         .orEmpty()
 }
 
-private const val SearchUiFieldId: String = "SearchUiField"
+private const val SearchString: String = "SearchUiField"

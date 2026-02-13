@@ -7,6 +7,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+```
+Lbcuifield 2.0.0
+LbcuifieldForm 0.9.0
+```
+
+- **break:** Make `UiField` more generic to be used without text field
+  - Move related text stuff to `TextUiField`
+  - Move default text Composable implementation to `NormalUiTextField`
+  - Use `TexFieldValue` instead of `String` for textfield based fields
+  - Change savedStateHandle related functions to allow any type of data instead of forcing `String`
+- **new:** `uifield-form` library to create simple form from uifields
+
 ## 2026-02-11
 
 ```

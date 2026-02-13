@@ -14,11 +14,28 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.foundation.uifield.phonepicker
+plugins {
+    id("lunabee.android-library-conventions")
+    id("lunabee.library-publish-conventions")
+}
 
-data class CountryCodeFieldData(
-    val phoneNumber: String,
-    val countryCode: String,
-) {
-    fun fullNumber(): String = "+$countryCode$phoneNumber"
+description = "Form library based on uifields"
+version = AndroidConfig.LBCUIFIELD_FORM_VERSION
+
+android {
+    namespace = "studio.lunabee.compose.uifield.form"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring(libs.desugarJdk)
+
+    implementation(platform(libs.kotlinxCoroutinesBom))
+
+    implementation(libs.kotlinxCoroutinesCore)
+
+    api(projects.compose.uifieldCore)
 }

@@ -17,14 +17,14 @@
 package studio.lunabee.compose.foundation.uifield.field.time
 
 import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SelectableDates
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
 import studio.lunabee.compose.core.LbcTextSpec
 import studio.lunabee.compose.foundation.uifield.UiFieldOption
 import studio.lunabee.compose.foundation.uifield.field.UiFieldError
+import studio.lunabee.compose.foundation.uifield.field.style.DefaultUiFieldStyleData
 import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleData
-import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleDataImpl
 import studio.lunabee.compose.foundation.uifield.field.time.option.date.DatePickerData
 import studio.lunabee.compose.foundation.uifield.field.time.option.date.DatePickerHolder
 import studio.lunabee.compose.foundation.uifield.field.time.option.date.DatePickerOption
@@ -33,7 +33,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 class DateUiField(
     override val initialValue: LocalDate?,
     override var label: LbcTextSpec?,
@@ -42,7 +41,7 @@ class DateUiField(
     override val savedStateHandle: SavedStateHandle,
     override val datePickerData: DatePickerData,
     override val isFieldInError: (LocalDate?) -> UiFieldError?,
-    override val uiFieldStyleData: UiFieldStyleData = UiFieldStyleDataImpl(),
+    uiFieldStyleData: UiFieldStyleData = DefaultUiFieldStyleData(),
     override val selectableDates: SelectableDates = DatePickerDefaults.AllDates,
     private val formatter: DateTimeFormatter = DateTimeFormatter
         .ofLocalizedDate(FormatStyle.SHORT)
@@ -50,14 +49,17 @@ class DateUiField(
     override val onValueChange: (LocalDate?) -> Unit = {},
     override val readOnly: Boolean = false,
     override val enabled: Boolean = true,
-) : TimeUiField<LocalDate?>(), DatePickerHolder {
+) : TimeUiField<LocalDate?>(uiFieldStyleData), DatePickerHolder {
     override val options: List<UiFieldOption> = listOf(DatePickerOption(enabled && !readOnly, this))
 
-    override fun savedValueToData(value: String): LocalDate = LocalDate.parse(value)
+    override fun saveToSavedStateHandle(value: LocalDate?, savedStateHandle: SavedStateHandle) {
+        savedStateHandle[id] = value?.toString().orEmpty()
+    }
 
-    override fun valueToSavedString(value: LocalDate?): String = value?.let(LocalDate::toString).orEmpty()
+    override fun restoreFromSavedStateHandle(savedStateHandle: SavedStateHandle): LocalDate? =
+        savedStateHandle.get<String>(id)?.let(LocalDate::parse)
 
-    override fun valueToDisplayedString(value: LocalDate?): String = value?.let(formatter::format).orEmpty()
+    override fun formToDisplay(value: LocalDate?): TextFieldValue = TextFieldValue(value?.let(formatter::format).orEmpty())
 
     override val date: LocalDate?
         get() = value

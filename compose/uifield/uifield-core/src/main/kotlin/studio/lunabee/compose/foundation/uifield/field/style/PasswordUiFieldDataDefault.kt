@@ -35,7 +35,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import studio.lunabee.compose.core.LbcTextSpec
 import studio.lunabee.compose.foundation.uifield.field.UiFieldError
 
-class PasswordUiFieldDataImpl : PasswordUiFieldData {
+class PasswordUiFieldDataDefault : PasswordUiFieldData {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable

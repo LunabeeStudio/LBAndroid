@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,17 +35,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineScope
 import studio.lunabee.compose.core.LbcTextSpec
-import studio.lunabee.compose.foundation.uifield.UiField
 import studio.lunabee.compose.foundation.uifield.UiFieldOption
 import studio.lunabee.compose.foundation.uifield.field.UiFieldError
+import studio.lunabee.compose.foundation.uifield.field.style.DefaultUiFieldStyleData
 import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleData
-import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleDataImpl
+import studio.lunabee.compose.foundation.uifield.field.text.TextUiField
 
 /**
  * A [UiField] implementation for selecting a country from a list presented in a bottom sheet.
@@ -63,7 +63,7 @@ import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleDataImp
  * @param savedStateHandle The [SavedStateHandle] used to persist the field's state across process death.
  * @param isFieldInError A lambda function that determines if the current value is in an error state. It should return a
  * [UiFieldError] if there is an error, or `null` otherwise.
- * @param uiFieldStyleData The styling data for the text field, implementing [UiFieldStyleData]. Defaults to [UiFieldStyleDataImpl].
+ * @param uiFieldStyleData The styling data for the text field, implementing [UiFieldStyleData]. Defaults to [DefaultUiFieldStyleData].
  * @param onValueChange A callback that is invoked when the selected country changes. The new value is the country's ISO code.
  * @param readOnly A boolean indicating whether the field is read-only. If `true`, the user cannot change the value.
  * @param enabled A boolean indicating whether the field is enabled. If `false`, the field is disabled and does not respond to
@@ -78,26 +78,30 @@ class CountryPickerUiField(
     override val id: String,
     override val savedStateHandle: SavedStateHandle,
     override val isFieldInError: (String?) -> UiFieldError?,
-    override val uiFieldStyleData: UiFieldStyleData = UiFieldStyleDataImpl(),
+    uiFieldStyleData: UiFieldStyleData = DefaultUiFieldStyleData(),
     override val onValueChange: (String) -> Unit,
     override val readOnly: Boolean = false,
     override val enabled: Boolean = true,
     private val coroutineScope: CoroutineScope,
     private val countryPickerBottomSheetRenderer: CountryPickerBottomSheetRenderer,
     private val trailingIcon: @Composable (() -> Unit)? = null,
-) : UiField<String>() {
+) : TextUiField<String>(uiFieldStyleData) {
 
     override val options: List<UiFieldOption> = emptyList()
 
-    override fun valueToDisplayedString(value: String): String = value
+    override fun formToDisplay(value: String): TextFieldValue = TextFieldValue(value)
 
-    override fun valueToSavedString(value: String): String = value
+    override fun saveToSavedStateHandle(value: String, savedStateHandle: SavedStateHandle) {
+        savedStateHandle[id] = value
+    }
 
-    override fun savedValueToData(value: String): String = value
+    override fun restoreFromSavedStateHandle(savedStateHandle: SavedStateHandle): String? = savedStateHandle.get<String>(id)
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    override fun Composable(modifier: Modifier) {
+    override fun Composable(
+        modifier: Modifier,
+        uiFieldStyleData: UiFieldStyleData,
+    ) {
         val context = LocalContext.current
         val delegate = remember {
             CountrySearchDelegate(
@@ -119,7 +123,7 @@ class CountryPickerUiField(
         val focusManager = LocalFocusManager.current
 
         uiFieldStyleData.ComposeTextField(
-            value = delegate.displayNameFromIso(value),
+            value = TextFieldValue(delegate.displayNameFromIso(value)),
             onValueChange = {
                 dismissError()
             },

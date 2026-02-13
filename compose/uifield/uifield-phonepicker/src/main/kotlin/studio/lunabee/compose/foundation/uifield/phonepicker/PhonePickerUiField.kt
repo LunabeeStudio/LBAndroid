@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,21 +34,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.serialization.json.Json
 import studio.lunabee.compose.core.LbcTextSpec
-import studio.lunabee.compose.foundation.uifield.UiField
 import studio.lunabee.compose.foundation.uifield.UiFieldOption
 import studio.lunabee.compose.foundation.uifield.countrypicker.CountryPickerBottomSheetRenderer
 import studio.lunabee.compose.foundation.uifield.countrypicker.CountrySearchDelegate
 import studio.lunabee.compose.foundation.uifield.countrypicker.CountrySearchUiState
 import studio.lunabee.compose.foundation.uifield.field.UiFieldError
+import studio.lunabee.compose.foundation.uifield.field.style.DefaultUiFieldStyleData
 import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleData
-import studio.lunabee.compose.foundation.uifield.field.style.UiFieldStyleDataImpl
+import studio.lunabee.compose.foundation.uifield.field.text.TextUiField
 
 @Suppress("LongParameterList")
 class PhonePickerUiField(
@@ -59,7 +58,7 @@ class PhonePickerUiField(
     override val id: String,
     override val savedStateHandle: SavedStateHandle,
     override val isFieldInError: (CountryCodeFieldData) -> UiFieldError?,
-    override val uiFieldStyleData: UiFieldStyleData = UiFieldStyleDataImpl(),
+    uiFieldStyleData: UiFieldStyleData = DefaultUiFieldStyleData(),
     override val onValueChange: (CountryCodeFieldData) -> Unit,
     override val readOnly: Boolean = false,
     override val enabled: Boolean = true,
@@ -68,21 +67,36 @@ class PhonePickerUiField(
     private val phoneFieldRenderer: PhoneFieldRenderer,
     private val coroutineScope: CoroutineScope,
     private val countryPickerBottomSheetRenderer: CountryPickerBottomSheetRenderer,
-) : UiField<CountryCodeFieldData>() {
-
-    private val json = Json.Default
+) : TextUiField<CountryCodeFieldData>(uiFieldStyleData) {
 
     override val options: List<UiFieldOption> = emptyList()
 
-    override fun valueToDisplayedString(value: CountryCodeFieldData): String = value.phoneNumber
+    override fun formToDisplay(value: CountryCodeFieldData): TextFieldValue = TextFieldValue(value.phoneNumber)
 
-    override fun valueToSavedString(value: CountryCodeFieldData): String = json.encodeToString(value)
+    override fun saveToSavedStateHandle(value: CountryCodeFieldData, savedStateHandle: SavedStateHandle) {
+        savedStateHandle["${id}_countryCode"] = value.countryCode
+        savedStateHandle["${id}_phoneNumber"] = value.phoneNumber
+    }
 
-    override fun savedValueToData(value: String): CountryCodeFieldData = json.decodeFromString(value)
+    override fun restoreFromSavedStateHandle(savedStateHandle: SavedStateHandle): CountryCodeFieldData? {
+        val countryCode = savedStateHandle.get<String>("${id}_countryCode")
+        val phoneNumber = savedStateHandle.get<String>("${id}_phoneNumber")
 
-    @OptIn(ExperimentalMaterial3Api::class)
+        return if (countryCode == null && phoneNumber == null) {
+            null
+        } else {
+            CountryCodeFieldData(
+                countryCode = savedStateHandle.get<String>("${id}_countryCode").orEmpty(),
+                phoneNumber = savedStateHandle.get<String>("${id}_phoneNumber").orEmpty(),
+            )
+        }
+    }
+
     @Composable
-    override fun Composable(modifier: Modifier) {
+    override fun Composable(
+        modifier: Modifier,
+        uiFieldStyleData: UiFieldStyleData,
+    ) {
         val context = LocalContext.current
         val delegate = remember {
             CountrySearchDelegate(
@@ -104,9 +118,9 @@ class PhonePickerUiField(
         phoneFieldRenderer.FieldContent(
             textField = { onFocusChange ->
                 uiFieldStyleData.ComposeTextField(
-                    value = valueToDisplayedString(collectedValue),
+                    value = formToDisplay(collectedValue),
                     onValueChange = {
-                        value = value.copy(phoneNumber = it)
+                        value = value.copy(phoneNumber = it.text)
                         dismissError()
                     },
                     modifier = modifier
@@ -226,7 +240,7 @@ class PhonePickerUiField(
                     phoneNumber = phoneNumber.nationalNumber.toString(),
                     countryCode = phoneNumber.countryCode.toString(),
                 )
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return CountryCodeFieldData(
                     phoneNumber = rawPhoneNumber,
                     countryCode = fallbackCountryCode.orEmpty(),
