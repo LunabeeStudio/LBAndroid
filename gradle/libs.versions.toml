@@ -38,7 +38,7 @@ composeBom = "2026.02.00"
 composeMultiplatform="1.10.1"
 composeNavigation = "2.9.2"
 core = "1.17.0"
-dagger = "2.59.1"
+dagger = "2.59.2"
 dokka = "2.2.0-Beta"
 googleAndroidMaterial = "1.13.0"
 hbb20Countrycodepicker = "2.7.3"
@@ -66,7 +66,7 @@ okhttp = "5.3.2"
 robolectric = "4.16.1"
 touchlabKermit = "2.0.8"
 touchlabSkie = "0.10.10"
-zoomable = "2.11.0"
+zoomable = "2.11.1"
 
 [libraries]
 
