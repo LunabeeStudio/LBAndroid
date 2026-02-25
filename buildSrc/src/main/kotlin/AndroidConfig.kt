@@ -48,7 +48,7 @@ object AndroidConfig {
     const val MinSdk: Int = BuildConfigs.MinSdk
 
     // ⚠️ Match module name in UPPER_CASE ('-' -> '_')
-    const val LBCCORE_VERSION: String = "1.12.0"
+    const val LBCCORE_VERSION: String = "1.12.1"
     const val LBCFOUNDATION_VERSION: String = "1.12.0"
     const val LBCANDROIDTEST_VERSION: String = "1.15.0"
     const val LBCACCESSIBILITY_VERSION: String = "1.14.0"
