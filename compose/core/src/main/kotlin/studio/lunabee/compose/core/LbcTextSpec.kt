@@ -111,11 +111,16 @@ sealed class LbcTextSpec {
             other as Raw
 
             if (value != other.value) return false
+            if (!args.contentEquals(other.args)) return false
 
             return true
         }
 
-        override fun hashCode(): Int = value.hashCode()
+        override fun hashCode(): Int {
+            var result = value.hashCode()
+            result = 31 * result + args.contentHashCode()
+            return result
+        }
 
         override fun toString(): String = "value = $value"
     }
