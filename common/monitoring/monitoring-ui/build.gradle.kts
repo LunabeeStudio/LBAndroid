@@ -27,7 +27,7 @@ version = AndroidConfig.MONITORING_UI_VERSION
 
 kotlin {
 
-    androidLibrary {
+    android {
         namespace = "studio.lunabee.monitoring.ui"
         experimentalProperties["android.experimental.kmp.enableAndroidResources"] = true
     }
@@ -61,9 +61,9 @@ kotlin {
 }
 
 compose.resources {
-    publicResClass = true
+    publicResClass = false
     packageOfResClass = "studio.lunabee.monitoring.ui.res"
-    generateResClass = auto
+    generateResClass = always
 
     customDirectory(
         sourceSetName = "iosMain",

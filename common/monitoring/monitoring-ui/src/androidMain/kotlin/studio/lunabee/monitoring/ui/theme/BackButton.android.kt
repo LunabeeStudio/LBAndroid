@@ -16,8 +16,8 @@
 
 package studio.lunabee.monitoring.ui.theme
 
-import studio.lunabee.monitoring.ui.res.CoreDrawable
 import org.jetbrains.compose.resources.DrawableResource
+import studio.lunabee.monitoring.ui.res.CoreDrawable
 import studio.lunabee.monitoring.ui.res.ic_android_back
 
 internal actual val BackButton: DrawableResource = CoreDrawable.ic_android_back
