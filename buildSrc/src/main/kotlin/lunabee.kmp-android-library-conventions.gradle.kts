@@ -20,7 +20,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         compileSdk = AndroidConfig.CompileSdk
         minSdk = AndroidConfig.MinSdk
     }

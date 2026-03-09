@@ -23,7 +23,7 @@ description = "Lunabee Studio Kotlin crashlytics for Kermit logger"
 version = AndroidConfig.LOGGER_KERMIT_VERSION
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "studio.lunabee.logger.kermit"
 
         androidResources {
