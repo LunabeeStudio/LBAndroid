@@ -25,7 +25,7 @@ description = "Room persistence layer implementation for monitoring"
 version = AndroidConfig.MONITORING_ROOM_VERSION
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "studio.lunabee.monitoring.room"
     }
 
