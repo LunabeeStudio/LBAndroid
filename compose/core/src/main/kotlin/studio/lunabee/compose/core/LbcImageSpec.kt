@@ -54,6 +54,11 @@ sealed interface LbcImageSpec {
         val byteArray: kotlin.ByteArray,
     ) : LbcImageSpec
 
+    /**
+     * @property url Image url to load
+     * @property allowCaching Enable image cache
+     * @property fallback Image to display in case of error
+     */
     @Stable
     class Url(
         val url: String,
@@ -61,6 +66,11 @@ sealed interface LbcImageSpec {
         val fallback: LbcImageSpec? = null,
     ) : LbcImageSpec
 
+    /**
+     * @property uri Image uri to load
+     * @property allowCaching Enable image cache
+     * @property fallback Image to display in case of error
+     */
     @Stable
     class Uri(
         val uri: android.net.Uri,
