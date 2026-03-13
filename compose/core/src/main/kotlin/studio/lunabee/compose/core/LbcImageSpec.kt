@@ -19,39 +19,62 @@ package studio.lunabee.compose.core
 import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
+@Stable
 sealed interface LbcImageSpec {
 
+    @Stable
     class Icon(
         @DrawableRes val drawableRes: Int,
         val tint: @Composable () -> Color = { Color.Unspecified },
     ) : LbcImageSpec
 
+    @Stable
     class KtImageVector(
         val icon: ImageVector,
         val tint: @Composable () -> Color = { Color.Unspecified },
     ) : LbcImageSpec
 
+    @Stable
     class ImageDrawable(
         @DrawableRes val drawableRes: Int,
         val uiMode: Int = Configuration.UI_MODE_TYPE_UNDEFINED,
     ) : LbcImageSpec
 
+    @Stable
     class Bitmap(
         val bitmap: android.graphics.Bitmap,
     ) : LbcImageSpec
 
+    @Stable
     class ByteArray(
         val byteArray: kotlin.ByteArray,
     ) : LbcImageSpec
 
+    /**
+     * @property url Image url to load
+     * @property allowCaching Enable image cache
+     * @property fallback Image to display in case of error
+     */
+    @Stable
     class Url(
         val url: String,
+        val allowCaching: Boolean = true,
+        val fallback: LbcImageSpec? = null,
     ) : LbcImageSpec
 
+    /**
+     * @property uri Image uri to load
+     * @property allowCaching Enable image cache
+     * @property fallback Image to display in case of error
+     */
+    @Stable
     class Uri(
         val uri: android.net.Uri,
+        val allowCaching: Boolean = true,
+        val fallback: LbcImageSpec? = null,
     ) : LbcImageSpec
 }

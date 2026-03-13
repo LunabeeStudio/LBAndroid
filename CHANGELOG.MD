@@ -5,13 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-13
+
+```
+Lbccore 1.13.0
+Lbcimage 1.9.0
+```
+
+- Add `allowCaching` in `LbcImageSpec.Url` and `LbcImageSpec.Uri` to toggle image caching (default enabled)
+- Add `fallback` in `LbcImageSpec.Url` and `LbcImageSpec.Uri` to fallback on another `LbcImage` in case of network failure
+
 ## 2026-02-25
 
 ```
 Lbccore 1.12.1
 ```
 
-- Fix `LbcTextSpec.Raw` equals & hashcode does not take args in account 
+- Fix `LbcTextSpec.Raw` equals & hashcode does not take args in account
 
 ## 2026-02-13
 
@@ -21,10 +31,10 @@ LbcuifieldForm 0.9.0
 ```
 
 - **break:** Make `UiField` more generic to be used without text field
-  - Move related text stuff to `TextUiField`
-  - Move default text Composable implementation to `NormalUiTextField`
-  - Use `TexFieldValue` instead of `String` for textfield based fields
-  - Change savedStateHandle related functions to allow any type of data instead of forcing `String`
+    - Move related text stuff to `TextUiField`
+    - Move default text Composable implementation to `NormalUiTextField`
+    - Use `TexFieldValue` instead of `String` for textfield based fields
+    - Change savedStateHandle related functions to allow any type of data instead of forcing `String`
 - **new:** `uifield-form` library to create simple form from uifields
 
 ## 2026-02-11

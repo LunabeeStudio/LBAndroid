@@ -48,7 +48,7 @@ object AndroidConfig {
     const val MinSdk: Int = BuildConfigs.MinSdk
 
     // ⚠️ Match module name in UPPER_CASE ('-' -> '_')
-    const val LBCCORE_VERSION: String = "1.12.1"
+    const val LBCCORE_VERSION: String = "1.13.0"
     const val LBCFOUNDATION_VERSION: String = "1.12.0"
     const val LBCANDROIDTEST_VERSION: String = "1.15.0"
     const val LBCACCESSIBILITY_VERSION: String = "1.14.0"
@@ -59,7 +59,7 @@ object AndroidConfig {
     const val LBCUIFIELD_PHONEPICKER_VERSION: String = LBCUIFIELD_CORE_VERSION
     const val LBCUIFIELD_COUNTRYPICKER_VERSION: String = LBCUIFIELD_CORE_VERSION
     const val LBCUIFIELD_FORM_VERSION: String = "0.9.0"
-    const val LBCIMAGE_VERSION: String = "1.8.0"
+    const val LBCIMAGE_VERSION: String = "1.9.0"
     const val LBCGLANCE_VERSION: String = "1.6.0"
     const val LBCPRESENTER_VERSION: String = "1.10.0"
     const val LBCPRESENTER_KOIN_VERSION: String = LBCPRESENTER_VERSION
