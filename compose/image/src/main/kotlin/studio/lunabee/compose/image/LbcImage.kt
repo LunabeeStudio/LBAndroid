@@ -147,7 +147,7 @@ private fun UrlImage(
     colorFilter: ColorFilter?,
     errorPainter: Painter?,
 ) {
-    var showFallback by remember { mutableStateOf(false) }
+    var showFallback by remember(imageSpec.url) { mutableStateOf(false) }
     if (showFallback) {
         imageSpec.fallback?.let { fallback ->
             LbcImage(
@@ -200,7 +200,7 @@ private fun UriImage(
     colorFilter: ColorFilter?,
     errorPainter: Painter?,
 ) {
-    var showFallback by remember { mutableStateOf(false) }
+    var showFallback by remember(imageSpec.uri) { mutableStateOf(false) }
     if (showFallback) {
         imageSpec.fallback?.let { fallback ->
             LbcImage(
@@ -223,7 +223,7 @@ private fun UriImage(
             builder.memoryCachePolicy(CachePolicy.DISABLED)
         }
         AsyncImage(
-            model = imageSpec.uri,
+            model = builder.build(),
             contentDescription = contentDescription?.string,
             modifier = modifier,
             alignment = alignment,
