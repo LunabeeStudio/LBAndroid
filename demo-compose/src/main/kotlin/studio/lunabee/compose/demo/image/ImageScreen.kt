@@ -20,9 +20,11 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import studio.lunabee.compose.R
 import studio.lunabee.compose.core.LbcImageSpec
@@ -41,5 +43,22 @@ fun ImageScreen() {
         LbcImage(LbcImageSpec.ImageDrawable(R.drawable.sun_moon, Configuration.UI_MODE_NIGHT_NO))
         Text("UI_MODE_NIGHT_YES")
         LbcImage(LbcImageSpec.ImageDrawable(R.drawable.sun_moon, Configuration.UI_MODE_NIGHT_YES))
+        Text("Fallback URL")
+        LbcImage(
+            LbcImageSpec.Url(
+                url = "https://picsum.photos/200/300",
+                allowCaching = false,
+                fallback = LbcImageSpec.ImageDrawable(R.drawable.oss117),
+            ),
+        )
+    }
+}
+
+@Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ImageScreenPreview() {
+    Surface(Modifier.fillMaxWidth()) {
+        ImageScreen()
     }
 }

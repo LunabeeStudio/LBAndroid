@@ -21,6 +21,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +39,7 @@ import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.decode.SvgDecoder
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import studio.lunabee.compose.core.LbcImageSpec
 import studio.lunabee.compose.core.LbcTextSpec
@@ -62,18 +67,16 @@ fun LbcImage(
             )
         }
 
-        is LbcImageSpec.ImageDrawable -> {
-            DrawableImage(
-                imageSpec = imageSpec,
-                contentDescription = contentDescription,
-                modifier = modifier,
-                contentScale = contentScale,
-                alignment = alignment,
-                colorFilter = colorFilter,
-                onState = onState,
-                errorPainter = errorPainter,
-            )
-        }
+        is LbcImageSpec.ImageDrawable -> DrawableImage(
+            imageSpec = imageSpec,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale,
+            alignment = alignment,
+            colorFilter = colorFilter,
+            onState = onState,
+            errorPainter = errorPainter,
+        )
 
         is LbcImageSpec.Icon -> {
             val tint = imageSpec.tint.invoke().takeIf { it != Color.Unspecified } ?: LocalContentColor.current
@@ -95,24 +98,16 @@ fun LbcImage(
             )
         }
 
-        is LbcImageSpec.Url -> {
-            AsyncImage(
-                model = ImageRequest
-                    .Builder(LocalContext.current)
-                    .data(imageSpec.url)
-                    .decoderFactory(SvgDecoder.Factory())
-                    .build(),
-                contentDescription = contentDescription?.string,
-                modifier = modifier,
-                alignment = alignment,
-                contentScale = contentScale,
-                error = errorPainter,
-                onError = onState,
-                onLoading = onState,
-                onSuccess = onState,
-                colorFilter = colorFilter,
-            )
-        }
+        is LbcImageSpec.Url -> UrlImage(
+            imageSpec = imageSpec,
+            modifier = modifier,
+            contentDescription = contentDescription,
+            onState = onState,
+            contentScale = contentScale,
+            alignment = alignment,
+            colorFilter = colorFilter,
+            errorPainter = errorPainter,
+        )
 
         is LbcImageSpec.ByteArray ->
             AsyncImage(
@@ -128,19 +123,121 @@ fun LbcImage(
                 colorFilter = colorFilter,
             )
 
-        is LbcImageSpec.Uri ->
-            AsyncImage(
-                model = imageSpec.uri,
-                contentDescription = contentDescription?.string,
+        is LbcImageSpec.Uri -> UriImage(
+            imageSpec = imageSpec,
+            modifier = modifier,
+            contentDescription = contentDescription,
+            onState = onState,
+            contentScale = contentScale,
+            alignment = alignment,
+            colorFilter = colorFilter,
+            errorPainter = errorPainter,
+        )
+    }
+}
+
+@Composable
+private fun UrlImage(
+    imageSpec: LbcImageSpec.Url,
+    modifier: Modifier,
+    contentDescription: LbcTextSpec?,
+    onState: ((AsyncImagePainter.State) -> Unit)?,
+    contentScale: ContentScale,
+    alignment: Alignment,
+    colorFilter: ColorFilter?,
+    errorPainter: Painter?,
+) {
+    var showFallback by remember(imageSpec.url) { mutableStateOf(false) }
+    if (showFallback) {
+        imageSpec.fallback?.let { fallback ->
+            LbcImage(
+                imageSpec = fallback,
                 modifier = modifier,
-                alignment = alignment,
+                contentDescription = contentDescription,
+                onState = onState,
                 contentScale = contentScale,
-                error = errorPainter,
-                onError = onState,
-                onLoading = onState,
-                onSuccess = onState,
+                alignment = alignment,
                 colorFilter = colorFilter,
+                errorPainter = errorPainter,
             )
+        }
+    } else {
+        val builder = ImageRequest
+            .Builder(LocalContext.current)
+            .data(imageSpec.url)
+            .decoderFactory(SvgDecoder.Factory())
+        if (!imageSpec.allowCaching) {
+            builder.diskCachePolicy(CachePolicy.DISABLED)
+            builder.memoryCachePolicy(CachePolicy.DISABLED)
+        }
+        AsyncImage(
+            model = builder.build(),
+            contentDescription = contentDescription?.string,
+            modifier = modifier,
+            alignment = alignment,
+            contentScale = contentScale,
+            error = errorPainter,
+            onError = {
+                @Suppress("AssignedValueIsNeverRead")
+                showFallback = imageSpec.fallback != null
+                onState?.invoke(it)
+            },
+            onLoading = onState,
+            onSuccess = onState,
+            colorFilter = colorFilter,
+        )
+    }
+}
+
+@Composable
+private fun UriImage(
+    imageSpec: LbcImageSpec.Uri,
+    modifier: Modifier,
+    contentDescription: LbcTextSpec?,
+    onState: ((AsyncImagePainter.State) -> Unit)?,
+    contentScale: ContentScale,
+    alignment: Alignment,
+    colorFilter: ColorFilter?,
+    errorPainter: Painter?,
+) {
+    var showFallback by remember(imageSpec.uri) { mutableStateOf(false) }
+    if (showFallback) {
+        imageSpec.fallback?.let { fallback ->
+            LbcImage(
+                imageSpec = fallback,
+                modifier = modifier,
+                contentDescription = contentDescription,
+                onState = onState,
+                contentScale = contentScale,
+                alignment = alignment,
+                colorFilter = colorFilter,
+                errorPainter = errorPainter,
+            )
+        }
+    } else {
+        val builder = ImageRequest
+            .Builder(LocalContext.current)
+            .data(imageSpec.uri)
+        if (!imageSpec.allowCaching) {
+            builder.diskCachePolicy(CachePolicy.DISABLED)
+            builder.memoryCachePolicy(CachePolicy.DISABLED)
+        }
+        AsyncImage(
+            model = builder.build(),
+            contentDescription = contentDescription?.string,
+            modifier = modifier,
+            alignment = alignment,
+            contentScale = contentScale,
+            error = errorPainter,
+            onError = {
+                @Suppress("AssignedValueIsNeverRead")
+                showFallback = imageSpec.fallback != null
+                onState?.invoke(it)
+            },
+            onLoading = onState,
+            onSuccess = onState,
+            colorFilter = colorFilter,
+        )
     }
 }
 
