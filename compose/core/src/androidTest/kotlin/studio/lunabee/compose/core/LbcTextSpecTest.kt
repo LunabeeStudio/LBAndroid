@@ -24,6 +24,8 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 
 class LbcTextSpecTest {
     @get:Rule
@@ -68,6 +70,24 @@ class LbcTextSpecTest {
         val textSpec = LbcTextSpec.Annotated(value = expected)
         assertEquals(expected, textSpec.annotated(resource))
         assertEquals(expected.text, textSpec.string(resource))
+        composeTestRule.setContent {
+            assertEquals(expected, textSpec.annotated)
+            assertEquals(expected.text, textSpec.string)
+        }
+    }
+
+    @Test
+    fun annotated_builder_test() {
+        val expected = AnnotatedString("test")
+        val textSpec = LbcTextSpec.AnnotatedBuilder(key = Unit) {
+            append(expected.text)
+        }
+        assertFailsWith<UnsupportedOperationException> {
+            assertEquals(expected, textSpec.annotated(resource))
+        }
+        assertFailsWith<UnsupportedOperationException> {
+            assertEquals(expected.text, textSpec.string(resource))
+        }
         composeTestRule.setContent {
             assertEquals(expected, textSpec.annotated)
             assertEquals(expected.text, textSpec.string)

@@ -159,6 +159,8 @@ sealed class LbcTextSpec {
     }
 
     /**
+     * Composable annotated string builder used to compute annotated string during composition
+     *
      * @property key Key used to ensure stable hashcode and equals implementation
      * @property builder Composable annotated string builder
      */
@@ -176,9 +178,13 @@ sealed class LbcTextSpec {
             @Composable
             get() = annotated.text
 
-        override fun string(resources: Resources): String = throw UnsupportedOperationException()
+        override fun string(resources: Resources): String {
+            throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
+        }
 
-        override fun annotated(resources: Resources): AnnotatedString = throw UnsupportedOperationException()
+        override fun annotated(resources: Resources): AnnotatedString {
+            throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
+        }
 
         override fun toString(): String {
             return "AnnotatedBuilder(key=$key)"

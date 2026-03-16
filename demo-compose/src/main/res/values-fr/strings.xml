@@ -58,4 +58,8 @@
     <!-- KtorScreen -->
     <string name="ktor_title">Ktor</string>
     <string name="ktor_description">Ktor surveillance.</string>
+
+    <!-- CoreStreen -->
+    <string name="core_title">Core</string>
+    <string name="core_description">Lunabee librairie core</string>
 </resources>
