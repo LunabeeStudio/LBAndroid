@@ -70,13 +70,13 @@ fun CoreScreen() {
                     placeholder = Placeholder(
                         width = 100.sp,
                         height = 16.sp,
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
+                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
                     ),
                     children = {
                         InlinedGradient()
-                    }
-                )
-            )
+                    },
+                ),
+            ),
         )
     }
 }
@@ -89,9 +89,9 @@ private fun InlinedGradient() {
         targetValue = 600f,
         animationSpec = infiniteRepeatable(
             animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "gradientOffset"
+        label = "gradientOffset",
     )
 
     Canvas(Modifier.fillMaxSize()) {
@@ -99,9 +99,9 @@ private fun InlinedGradient() {
             brush = Brush.linearGradient(
                 colors = listOf(Color.Red, Color.Blue),
                 start = Offset.Zero,
-                end = Offset(animatedOffset, 0f)
+                end = Offset(animatedOffset, 0f),
             ),
-            cornerRadius = CornerRadius(8.sp.toPx())
+            cornerRadius = CornerRadius(8.sp.toPx()),
         )
     }
 }
