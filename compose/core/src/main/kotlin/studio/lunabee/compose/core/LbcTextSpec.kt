@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.AnnotatedString.Builder
+import androidx.compose.ui.text.buildAnnotatedString
 
 @Stable
 sealed class LbcTextSpec {
@@ -154,6 +156,46 @@ sealed class LbcTextSpec {
         override fun hashCode(): Int = value.hashCode()
 
         override fun toString(): String = "value = ${value.text}"
+    }
+
+    /**
+     * @property key Key used to ensure stable hashcode and equals implementation
+     * @property builder Composable annotated string builder
+     */
+    class AnnotatedBuilder(
+        private val key: Any,
+        private val builder: @Composable Builder.() -> Unit,
+    ) : LbcTextSpec() {
+        override val annotated: AnnotatedString
+            @Composable
+            get() = buildAnnotatedString {
+                builder()
+            }
+
+        override val string: String
+            @Composable
+            get() = annotated.text
+
+        override fun string(resources: Resources): String = throw UnsupportedOperationException()
+
+        override fun annotated(resources: Resources): AnnotatedString = throw UnsupportedOperationException()
+
+        override fun toString(): String {
+            return "AnnotatedBuilder(key=$key)"
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as AnnotatedBuilder
+
+            return key == other.key
+        }
+
+        override fun hashCode(): Int {
+            return key.hashCode()
+        }
     }
 
     class StringResource(
