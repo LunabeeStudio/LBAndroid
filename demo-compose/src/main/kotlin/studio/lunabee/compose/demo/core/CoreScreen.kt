@@ -39,15 +39,17 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import studio.lunabee.compose.R
 import studio.lunabee.compose.core.LbcTextSpec
 
 private val textSpec = LbcTextSpec.AnnotatedBuilder(1) {
-    append("Hello inlined composable ")
+    append(stringResource(R.string.hello_inlined_composable))
     appendInlineContent("[compose]")
 }
 
