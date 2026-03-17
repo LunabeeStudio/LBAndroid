@@ -12,6 +12,7 @@ Lbccore 1.14.0
 ```
 
 - Add `LbcTextSpec` subclass `LbcTextSpec.AnnotatedBuilder` to build annotated string on the fly
+- Add `inlineContent` property to Annotated based text spec so it can be used to render text with composable inlined
 
 ## 2026-03-13
 

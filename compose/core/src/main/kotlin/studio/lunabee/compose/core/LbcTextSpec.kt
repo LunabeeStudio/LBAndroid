@@ -21,6 +21,7 @@ import android.content.res.Resources
 import androidx.annotation.Discouraged
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
@@ -127,7 +128,10 @@ sealed class LbcTextSpec {
         override fun toString(): String = "value = $value"
     }
 
-    class Annotated(private val value: AnnotatedString) : LbcTextSpec() {
+    class Annotated(
+        private val value: AnnotatedString,
+        override val inlineContent: Map<String, InlineTextContent>? = null,
+    ) : LbcTextSpec(), Inlinable {
         override val annotated: AnnotatedString
             @Composable
             @ReadOnlyComposable
@@ -142,6 +146,8 @@ sealed class LbcTextSpec {
 
         override fun annotated(resources: Resources): AnnotatedString = this.value
 
+        override fun toString(): String = "value = ${value.text}"
+
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (javaClass != other?.javaClass) return false
@@ -149,13 +155,16 @@ sealed class LbcTextSpec {
             other as Annotated
 
             if (value != other.value) return false
+            if (inlineContent != other.inlineContent) return false
 
             return true
         }
 
-        override fun hashCode(): Int = value.hashCode()
-
-        override fun toString(): String = "value = ${value.text}"
+        override fun hashCode(): Int {
+            var result = value.hashCode()
+            result = 31 * result + (inlineContent?.hashCode() ?: 0)
+            return result
+        }
     }
 
     /**
@@ -163,11 +172,14 @@ sealed class LbcTextSpec {
      *
      * @property key Key used to ensure stable hashcode and equals implementation
      * @property builder Composable annotated string builder
+     * @property inlineContent a map storing composables that replaces certain ranges of the text, used to
+     *  insert composables into text layout. See [InlineTextContent].
      */
     class AnnotatedBuilder(
         private val key: Any,
+        override val inlineContent: Map<String, InlineTextContent>? = null,
         private val builder: @Composable Builder.() -> Unit,
-    ) : LbcTextSpec() {
+    ) : LbcTextSpec(), Inlinable {
         override val annotated: AnnotatedString
             @Composable
             get() = buildAnnotatedString {
@@ -178,10 +190,18 @@ sealed class LbcTextSpec {
             @Composable
             get() = annotated.text
 
+        @Deprecated(
+            message = "Unsupported operation. Do not call this function.",
+            level = DeprecationLevel.ERROR,
+        )
         override fun string(resources: Resources): String {
             throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
         }
 
+        @Deprecated(
+            message = "Unsupported operation. Do not call this function.",
+            level = DeprecationLevel.ERROR,
+        )
         override fun annotated(resources: Resources): AnnotatedString {
             throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
         }
@@ -196,11 +216,16 @@ sealed class LbcTextSpec {
 
             other as AnnotatedBuilder
 
-            return key == other.key
+            if (key != other.key) return false
+            if (inlineContent != other.inlineContent) return false
+
+            return true
         }
 
         override fun hashCode(): Int {
-            return key.hashCode()
+            var result = key.hashCode()
+            result = 31 * result + (inlineContent?.hashCode() ?: 0)
+            return result
         }
     }
 
@@ -352,5 +377,9 @@ sealed class LbcTextSpec {
                 "string",
                 packageName,
             ).takeIf { id -> id != 0 }
+    }
+
+    interface Inlinable {
+        val inlineContent: Map<String, InlineTextContent>?
     }
 }

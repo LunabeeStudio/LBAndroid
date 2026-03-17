@@ -48,9 +48,25 @@ import androidx.compose.ui.unit.sp
 import studio.lunabee.compose.R
 import studio.lunabee.compose.core.LbcTextSpec
 
-private val textSpec = LbcTextSpec.AnnotatedBuilder(1) {
+private const val InlineTag = "[compose]"
+
+private val textSpec = LbcTextSpec.AnnotatedBuilder(
+    key = R.string.hello_inlined_composable,
+    inlineContent = mapOf(
+        InlineTag to InlineTextContent(
+            placeholder = Placeholder(
+                width = 100.sp,
+                height = 16.sp,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
+            ),
+            children = {
+                InlinedGradient()
+            },
+        ),
+    ),
+) {
     append(stringResource(R.string.hello_inlined_composable))
-    appendInlineContent("[compose]")
+    appendInlineContent(InlineTag)
 }
 
 @Composable
@@ -67,18 +83,7 @@ fun CoreScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-            inlineContent = mapOf(
-                "[compose]" to InlineTextContent(
-                    placeholder = Placeholder(
-                        width = 100.sp,
-                        height = 16.sp,
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
-                    ),
-                    children = {
-                        InlinedGradient()
-                    },
-                ),
-            ),
+            inlineContent = textSpec.inlineContent.orEmpty(),
         )
     }
 }
