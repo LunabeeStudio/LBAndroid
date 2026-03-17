@@ -111,5 +111,5 @@ fun Map<String, LbcInlineTextContent>?.toFoundation(
 private val DefaultPlaceHolder = Placeholder(
     width = 10.sp,
     height = 10.sp,
-    placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+    placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
 )
