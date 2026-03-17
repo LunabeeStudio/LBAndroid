@@ -21,7 +21,6 @@ import android.content.res.Resources
 import androidx.annotation.Discouraged
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
@@ -130,7 +129,7 @@ sealed class LbcTextSpec {
 
     class Annotated(
         private val value: AnnotatedString,
-        override val inlineContent: Map<String, InlineTextContent>? = null,
+        override val inlineContent: Map<String, LbcInlineTextContent>? = null,
     ) : LbcTextSpec(), Inlinable {
         override val annotated: AnnotatedString
             @Composable
@@ -173,11 +172,11 @@ sealed class LbcTextSpec {
      * @property key Key used to ensure stable hashcode and equals implementation
      * @property builder Composable annotated string builder
      * @property inlineContent a map storing composables that replaces certain ranges of the text, used to
-     *  insert composables into text layout. See [InlineTextContent].
+     *  insert composables into text layout. See [LbcInlineTextContent].
      */
     class AnnotatedBuilder(
         private val key: Any,
-        override val inlineContent: Map<String, InlineTextContent>? = null,
+        override val inlineContent: Map<String, LbcInlineTextContent>? = null,
         private val builder: @Composable Builder.() -> Unit,
     ) : LbcTextSpec(), Inlinable {
         override val annotated: AnnotatedString
@@ -380,6 +379,6 @@ sealed class LbcTextSpec {
     }
 
     interface Inlinable {
-        val inlineContent: Map<String, InlineTextContent>?
+        val inlineContent: Map<String, LbcInlineTextContent>?
     }
 }

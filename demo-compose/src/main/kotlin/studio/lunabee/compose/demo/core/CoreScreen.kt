@@ -25,10 +25,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,17 +47,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import studio.lunabee.compose.R
+import studio.lunabee.compose.core.LbcInlineTextContent
 import studio.lunabee.compose.core.LbcTextSpec
+import studio.lunabee.compose.core.toFoundation
 
 private const val InlineTag = "[compose]"
 
-private val textSpec = LbcTextSpec.AnnotatedBuilder(
+private val textSpec: LbcTextSpec = LbcTextSpec.AnnotatedBuilder(
     key = R.string.hello_inlined_composable,
     inlineContent = mapOf(
-        InlineTag to InlineTextContent(
+        InlineTag to LbcInlineTextContent(
             placeholder = Placeholder(
                 width = 100.sp,
-                height = 16.sp,
+                height = 30.sp,
                 placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
             ),
             children = {
@@ -76,14 +79,29 @@ fun CoreScreen() {
             .fillMaxWidth()
             .padding(16.dp),
     ) {
-        Text("LbcTextSpec.AnnotatedBuilder")
+        Text("LbcTextSpec.AnnotatedBuilder - use spec placeholder")
         Text(
             text = textSpec.annotated,
             fontSize = 16.sp,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-            inlineContent = textSpec.inlineContent.orEmpty(),
+            inlineContent = (textSpec as? LbcTextSpec.Inlinable)?.inlineContent.toFoundation(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("LbcTextSpec.AnnotatedBuilder - override spec placeholder")
+        Text(
+            text = textSpec.annotated,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            inlineContent = (textSpec as? LbcTextSpec.Inlinable)?.inlineContent.toFoundation {
+                it.withPlaceHolderParams(
+                    width = 30.sp,
+                    verticalAlign = PlaceholderVerticalAlign.AboveBaseline,
+                )
+            },
         )
     }
 }
