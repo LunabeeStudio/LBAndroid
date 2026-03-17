@@ -82,9 +82,11 @@ class LbcTextSpecTest {
             append(expected.text)
         }
         assertFailsWith<UnsupportedOperationException> {
+            @Suppress("DEPRECATION_ERROR")
             assertEquals(expected, textSpec.annotated(resource))
         }
         assertFailsWith<UnsupportedOperationException> {
+            @Suppress("DEPRECATION_ERROR")
             assertEquals(expected.text, textSpec.string(resource))
         }
         composeTestRule.setContent {
