@@ -24,7 +24,6 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class LbcTextSpecTest {
     @get:Rule
@@ -81,14 +80,10 @@ class LbcTextSpecTest {
         val textSpec = LbcTextSpec.AnnotatedBuilder(key = Unit) {
             append(expected.text)
         }
-        assertFailsWith<UnsupportedOperationException> {
-            @Suppress("DEPRECATION_ERROR")
-            assertEquals(expected, textSpec.annotated(resource))
-        }
-        assertFailsWith<UnsupportedOperationException> {
-            @Suppress("DEPRECATION_ERROR")
-            assertEquals(expected.text, textSpec.string(resource))
-        }
+        @Suppress("DEPRECATION_ERROR")
+        assertEquals(AnnotatedString(""), textSpec.annotated(resource))
+        @Suppress("DEPRECATION_ERROR")
+        assertEquals("", textSpec.string(resource))
         composeTestRule.setContent {
             assertEquals(expected, textSpec.annotated)
             assertEquals(expected.text, textSpec.string)

@@ -30,6 +30,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.AnnotatedString.Builder
 import androidx.compose.ui.text.buildAnnotatedString
+import studio.lunabee.logger.LBLogger
+import studio.lunabee.logger.e
+
+private val logger = LBLogger.get<LbcTextSpec>()
 
 @Stable
 sealed class LbcTextSpec {
@@ -194,7 +198,8 @@ sealed class LbcTextSpec {
             level = DeprecationLevel.ERROR,
         )
         override fun string(resources: Resources): String {
-            throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
+            logger.e(UnsupportedOperationException("AnnotatedBuilder only supports Composable access"))
+            return ""
         }
 
         @Deprecated(
@@ -202,7 +207,8 @@ sealed class LbcTextSpec {
             level = DeprecationLevel.ERROR,
         )
         override fun annotated(resources: Resources): AnnotatedString {
-            throw UnsupportedOperationException("AnnotatedBuilder only supports Composable access")
+            logger.e(UnsupportedOperationException("AnnotatedBuilder only supports Composable access"))
+            return AnnotatedString("")
         }
 
         override fun toString(): String {
