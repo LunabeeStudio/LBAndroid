@@ -28,6 +28,12 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.AnnotatedString.Builder
+import androidx.compose.ui.text.buildAnnotatedString
+import studio.lunabee.logger.LBLogger
+import studio.lunabee.logger.e
+
+private val logger = LBLogger.get<LbcTextSpec>()
 
 @Stable
 sealed class LbcTextSpec {
@@ -125,7 +131,10 @@ sealed class LbcTextSpec {
         override fun toString(): String = "value = $value"
     }
 
-    class Annotated(private val value: AnnotatedString) : LbcTextSpec() {
+    class Annotated(
+        private val value: AnnotatedString,
+        override val inlineContent: Map<String, LbcInlineTextContent>? = null,
+    ) : LbcTextSpec(), Inlinable {
         override val annotated: AnnotatedString
             @Composable
             @ReadOnlyComposable
@@ -140,6 +149,8 @@ sealed class LbcTextSpec {
 
         override fun annotated(resources: Resources): AnnotatedString = this.value
 
+        override fun toString(): String = "value = ${value.text}"
+
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (javaClass != other?.javaClass) return false
@@ -147,13 +158,80 @@ sealed class LbcTextSpec {
             other as Annotated
 
             if (value != other.value) return false
+            if (inlineContent != other.inlineContent) return false
 
             return true
         }
 
-        override fun hashCode(): Int = value.hashCode()
+        override fun hashCode(): Int {
+            var result = value.hashCode()
+            result = 31 * result + (inlineContent?.hashCode() ?: 0)
+            return result
+        }
+    }
 
-        override fun toString(): String = "value = ${value.text}"
+    /**
+     * Composable annotated string builder used to compute annotated string during composition
+     *
+     * @property key Key used to ensure stable hashcode and equals implementation
+     * @property builder Composable annotated string builder
+     * @property inlineContent a map storing composables that replaces certain ranges of the text, used to
+     *  insert composables into text layout. See [LbcInlineTextContent].
+     */
+    class AnnotatedBuilder(
+        private val key: Any,
+        override val inlineContent: Map<String, LbcInlineTextContent>? = null,
+        private val builder: @Composable Builder.() -> Unit,
+    ) : LbcTextSpec(), Inlinable {
+        override val annotated: AnnotatedString
+            @Composable
+            get() = buildAnnotatedString {
+                builder()
+            }
+
+        override val string: String
+            @Composable
+            get() = annotated.text
+
+        @Deprecated(
+            message = "Unsupported operation. Do not call this function.",
+            level = DeprecationLevel.ERROR,
+        )
+        override fun string(resources: Resources): String {
+            logger.e(UnsupportedOperationException("AnnotatedBuilder only supports Composable access"))
+            return ""
+        }
+
+        @Deprecated(
+            message = "Unsupported operation. Do not call this function.",
+            level = DeprecationLevel.ERROR,
+        )
+        override fun annotated(resources: Resources): AnnotatedString {
+            logger.e(UnsupportedOperationException("AnnotatedBuilder only supports Composable access"))
+            return AnnotatedString("")
+        }
+
+        override fun toString(): String {
+            return "AnnotatedBuilder(key=$key)"
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as AnnotatedBuilder
+
+            if (key != other.key) return false
+            if (inlineContent != other.inlineContent) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = key.hashCode()
+            result = 31 * result + (inlineContent?.hashCode() ?: 0)
+            return result
+        }
     }
 
     class StringResource(
@@ -304,5 +382,9 @@ sealed class LbcTextSpec {
                 "string",
                 packageName,
             ).takeIf { id -> id != 0 }
+    }
+
+    interface Inlinable {
+        val inlineContent: Map<String, LbcInlineTextContent>?
     }
 }

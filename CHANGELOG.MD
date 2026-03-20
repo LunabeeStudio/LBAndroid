@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-17
+
+```
+Lbccore 1.14.0
+```
+
+- Add `LbcTextSpec` subclass `LbcTextSpec.AnnotatedBuilder` to build annotated string on the fly
+- Add `inlineContent` property to Annotated based text spec so it can be used to render text with composable inlined
+
 ## 2026-03-13
 
 ```

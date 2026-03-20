@@ -21,6 +21,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import studio.lunabee.compose.MainScreen
+import studio.lunabee.compose.demo.core.CoreScreen
 import studio.lunabee.compose.demo.crop.CropScreen
 import studio.lunabee.compose.demo.foundation.TextScreen
 import studio.lunabee.compose.demo.glance.GlanceScreen
@@ -108,6 +109,12 @@ fun MainNavGraph(
             route = Destinations.KtorRoute,
         ) {
             KtorDemoScreen()
+        }
+
+        composable(
+            route = Destinations.CoreRoute,
+        ) {
+            CoreScreen()
         }
 
         SimpleExampleDestination.composable(this, object : SimpleExampleNavScope {})

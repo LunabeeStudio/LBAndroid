@@ -75,6 +75,22 @@ class LbcTextSpecTest {
     }
 
     @Test
+    fun annotated_builder_test() {
+        val expected = AnnotatedString("test")
+        val textSpec = LbcTextSpec.AnnotatedBuilder(key = Unit) {
+            append(expected.text)
+        }
+        @Suppress("DEPRECATION_ERROR")
+        assertEquals(AnnotatedString(""), textSpec.annotated(resource))
+        @Suppress("DEPRECATION_ERROR")
+        assertEquals("", textSpec.string(resource))
+        composeTestRule.setContent {
+            assertEquals(expected, textSpec.annotated)
+            assertEquals(expected.text, textSpec.string)
+        }
+    }
+
+    @Test
     fun stringRes_test() {
         val expectedTest = composeTestRule.activity.getString(studio.lunabee.compose.core.test.R.string.test)
         val actualTest = LbcTextSpec.StringResource(id = studio.lunabee.compose.core.test.R.string.test)

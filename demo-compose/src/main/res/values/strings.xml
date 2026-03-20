@@ -60,4 +60,9 @@
     <!-- KtorScreen -->
     <string name="ktor_title">Ktor</string>
     <string name="ktor_description">Ktor monitoring.</string>
+
+    <!-- CoreScreen -->
+    <string name="core_title">Core</string>
+    <string name="core_description">Lunabee core library</string>
+    <string name="hello_inlined_composable" translatable="false">"Hello inlined composable "</string>
 </resources>

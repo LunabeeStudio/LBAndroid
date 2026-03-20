@@ -42,6 +42,8 @@ dependencies {
 
     implementation(libs.composeFoundation)
 
+    implementation(projects.loggerKermit)
+
     debugImplementation(libs.composeUiTestManifest)
 
     androidTestImplementation(libs.androidxTestRunner)
