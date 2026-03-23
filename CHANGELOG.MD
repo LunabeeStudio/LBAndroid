@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-23
+
+```
+bom 4.11.0
+```
+
+- Change BoM artifact id and module name `studio.lunabee:lunabee-bom` -> `studio.lunabee:bom`. No version changes
+
 ## 2026-03-17
 
 ```
