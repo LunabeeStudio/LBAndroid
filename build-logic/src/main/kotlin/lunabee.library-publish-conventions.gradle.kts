@@ -158,7 +158,7 @@ fun PublishingExtension.setupPublication() {
  */
 private fun MavenPublication.setProjectDetails() {
     this.groupId = project.group.toString()
-    this.artifactId = if (publishType == PublishType.Bom) "lunabee-bom" else project.name
+    this.artifactId = project.name
     this.version = project.version.toString()
     logger.log(LogLevel.INFO, "Set publication details: groupId=$groupId, artifactId=$artifactId, version=$version")
 }

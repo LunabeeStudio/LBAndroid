@@ -103,7 +103,7 @@ addComposeModule(
 )
 
 addCommonModule(
-    "platform",
+    "bom",
     "logger/logger-kermit",
     "logger/logger-kermit-crashlytics",
     "core/core",
