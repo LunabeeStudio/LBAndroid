@@ -122,6 +122,23 @@ class LBSinglePresenterTest {
         assertTrue(reducer.usedRuntimeArgs, "Reducer should receive the presenter runtime args")
     }
 
+    @Test
+    fun reducer_can_use_presenter_computed_runtime_value_test(): TestResult = runTest {
+        val reducerFactory = ActivityRuntimeArgsReducerFactory()
+        val presenter = ActivitySharedRuntimePresenter(
+            reducerFactory = reducerFactory,
+            prefix = "shared",
+        )
+
+        presenter.getReducerByState(TestUiState)
+
+        assertEquals(
+            presenter.presenterRuntimeValue,
+            reducerFactory.runtimeArgs,
+            "Reducer should receive the runtime value computed and reused by the presenter",
+        )
+    }
+
     private class ActivityTestPresenter(
         reducerFactory: ActivityTestReducerFactory,
     ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
@@ -150,16 +167,33 @@ class LBSinglePresenterTest {
     }
 
     private class ActivityRuntimeArgsPresenter(
-        reducerFactory: ActivityRuntimeArgsReducerFactory,
-    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
-        reducerBuilder = { runtime ->
+        private val reducerFactory: ActivityRuntimeArgsReducerFactory,
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
+        override fun createReducer(runtime: LBReducerRuntime<TestAction>): ActivityRuntimeArgsReducer =
             reducerFactory.create(
                 runtime = runtime,
                 runtimeArgs = "runtime-value",
             )
-        },
-        verbose = true,
-    ) {
+
+        override val flows: List<Flow<TestAction>> = emptyList()
+
+        override fun getInitialState(): TestUiState = TestUiState
+
+        override val content: @Composable ((TestUiState) -> Unit) = {}
+    }
+
+    private class ActivitySharedRuntimePresenter(
+        private val reducerFactory: ActivityRuntimeArgsReducerFactory,
+        prefix: String,
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
+        val presenterRuntimeValue: String = "$prefix-runtime"
+
+        override fun createReducer(runtime: LBReducerRuntime<TestAction>): ActivityRuntimeArgsReducer =
+            reducerFactory.create(
+                runtime = runtime,
+                runtimeArgs = presenterRuntimeValue,
+            )
+
         override val flows: List<Flow<TestAction>> = emptyList()
 
         override fun getInitialState(): TestUiState = TestUiState

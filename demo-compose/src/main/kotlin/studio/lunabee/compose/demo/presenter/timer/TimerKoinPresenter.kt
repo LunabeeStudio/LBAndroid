@@ -21,21 +21,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import studio.lunabee.compose.presenter.LBReducerRuntime
 import studio.lunabee.compose.presenter.LBSinglePresenter
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 class TimerKoinPresenter(
     injectedParam: TimerInjectedParam,
-) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
-    reducerBuilder = { runtime ->
-        TimerReducerFactory(injectedParam).create(
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
+    private val reducerFactory: TimerReducerFactory = TimerReducerFactory(injectedParam)
+    private val currentTime = Clock.System.now()
+
+    override fun createReducer(runtime: LBReducerRuntime<TimerAction>): TimerReducer =
+        reducerFactory.create(
             runtime = runtime,
-            runtimeParam = TimerRuntimeParam(currentTime = Clock.System.now()),
+            runtimeParam = TimerRuntimeParam(currentTime = currentTime),
         )
-    },
-    verbose = true,
-) {
+
     private val timerFlow: Flow<TimerAction.NewTimerValue> = flow {
         var value = 0
         while (true) {
@@ -47,7 +49,7 @@ class TimerKoinPresenter(
     override val flows: List<Flow<TimerAction>> = listOf(timerFlow)
 
     override fun getInitialState(): TimerUiState = TimerUiState(
-        timer = "",
+        timer = "Initial time = $currentTime",
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }

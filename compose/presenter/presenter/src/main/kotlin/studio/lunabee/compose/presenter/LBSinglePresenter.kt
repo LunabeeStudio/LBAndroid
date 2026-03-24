@@ -21,14 +21,14 @@ import androidx.lifecycle.viewModelScope
 /**
  * Subclass of [LBPresenter] to implement a single state presenter
  *
- * Use [reducerBuilder] when reducer creation requires presenter-owned runtime values in addition to dependency
- * injected factory parameters.
+ * Override [createReducer] when reducer creation requires presenter-owned runtime values in addition to
+ * dependency-injected factory parameters.
  *
  * @param verbose enable verbose logs using kermit logger
  * @see LBPresenter
  */
 abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Action> protected constructor(
-    private val reducerBuilder: (LBReducerRuntime<Action>) -> LBSingleReducer<UiState, NavScope, Action>,
+    private val reducerBuilder: ((LBReducerRuntime<Action>) -> LBSingleReducer<UiState, NavScope, Action>)? = null,
     verbose: Boolean = false,
 ) : LBPresenter<UiState, NavScope, Action>(verbose = verbose) {
     protected constructor(
@@ -39,8 +39,19 @@ abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Act
         verbose = verbose,
     )
 
+    /**
+     * Creates the single reducer used by this presenter.
+     *
+     * Override this hook when the reducer depends on values computed from presenter constructor parameters or
+     * presenter-owned runtime state.
+     */
+    protected open fun createReducer(runtime: LBReducerRuntime<Action>): LBSingleReducer<UiState, NavScope, Action> =
+        checkNotNull(reducerBuilder) {
+            "Provide a reducerFactory in the constructor or override createReducer(runtime)"
+        }(runtime)
+
     private val reducer by lazy {
-        reducerBuilder(
+        createReducer(
             LBReducerRuntime(
                 coroutineScope = viewModelScope,
                 emitUserAction = ::emitUserAction,

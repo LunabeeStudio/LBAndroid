@@ -20,5 +20,6 @@
 
 - Fill the changelog for each feature, following the latest changelog format already used in the repository.
 - Bump the touched module version according to semantic versioning.
+- Do not bump the same module version twice on the same branch. When additional work lands before release, fold it into the existing unreleased branch version instead of creating another bump.
 - Reserve major version bumps for large API breaking changes.
 - Also bump the minor version of modules that depend on a touched module when the dependency version must move transitively.
