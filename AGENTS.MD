@@ -8,7 +8,7 @@
 
 ## Kotlin API Rules
 
-- Add KDoc to public functions.
+- Add KDoc to public functions (except in demo apps)
 
 ## Verification Rules
 
