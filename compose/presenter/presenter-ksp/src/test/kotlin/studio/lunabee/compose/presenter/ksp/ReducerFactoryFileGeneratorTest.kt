@@ -70,13 +70,13 @@ class ReducerFactoryFileGeneratorTest {
             ),
         )
 
-        val generatedSource = generator.generate(validSignature).toString()
+        val generatedSource = generator.render(generator.generate(validSignature))
 
         assertTrue(generatedSource.contains("data class TimerReducerRuntimeArgs"))
         assertTrue(generatedSource.contains("class TimerReducerFactory"))
-        assertTrue(generatedSource.contains("fun create("))
+        assertTrue(generatedSource.contains("    public val runtimeParam: TimerRuntimeParam,"))
+        assertTrue(generatedSource.contains("    public fun create(\n        runtime: LBReducerRuntime<TimerAction>,"))
         assertTrue(!generatedSource.contains("override fun create("))
-        assertTrue(generatedSource.contains("fun create("))
-        assertTrue(generatedSource.contains("runtimeParam: TimerRuntimeParam"))
+        assertTrue(generatedSource.contains("        runtimeParam: TimerRuntimeParam,"))
     }
 }

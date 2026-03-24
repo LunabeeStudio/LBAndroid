@@ -18,24 +18,52 @@ package studio.lunabee.compose.presenter.ksp
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
-import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 
 private val reducerRuntimeType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBReducerRuntime")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
+private const val RuntimeParam = "runtime"
+private const val RuntimeParamKdoc = "@param $RuntimeParam Properties owned by the presenter\n"
+private val createFunctionPattern: Regex =
+    Regex("""^(\s*)(public\s+)?(override\s+)?fun create\(([^)]*)\)(.*)$""", setOf(RegexOption.MULTILINE))
 
 internal class ReducerFactoryFileGenerator {
     fun generate(signature: ValidReducerSignature): FileSpec {
         val fileSpec = FileSpec.builder(signature.packageName, signature.factoryClassName.simpleName)
+            .indent("    ")
         signature.runtimeArgsClassName?.let { runtimeArgsClassName ->
             fileSpec.addType(generateRuntimeArgsType(signature, runtimeArgsClassName))
         }
         fileSpec.addType(generateFactoryType(signature))
         return fileSpec.build()
+    }
+
+    fun render(fileSpec: FileSpec): String = createFunctionPattern.replace(fileSpec.toString()) { result ->
+        val indent = result.groupValues[1]
+        val visibility = result.groupValues[2]
+        val overrideModifier = result.groupValues[3]
+        val parameters = result.groupValues[4]
+            .split(", ")
+            .filter(String::isNotBlank)
+            .joinToString(separator = "\n") { parameter -> "$indent    $parameter," }
+        val suffix = result.groupValues[5]
+
+        buildString {
+            append(indent)
+            append(visibility)
+            append(overrideModifier)
+            append("fun create(\n")
+            append(parameters)
+            append('\n')
+            append(indent)
+            append(')')
+            append(suffix)
+        }
     }
 
     private fun generateRuntimeArgsType(
@@ -96,9 +124,10 @@ internal class ReducerFactoryFileGenerator {
     private fun generateCreateOverride(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
             .returns(signature.reducerClassName)
+            .addKdoc(RuntimeParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    "runtime",
+                    RuntimeParam,
                     reducerRuntimeType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )
@@ -118,10 +147,10 @@ internal class ReducerFactoryFileGenerator {
     private fun generateConvenienceCreate(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
             .returns(signature.reducerClassName)
-            .addKdoc("@param runtime runtime owned by the presenter\n")
+            .addKdoc(RuntimeParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    "runtime",
+                    RuntimeParam,
                     reducerRuntimeType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )

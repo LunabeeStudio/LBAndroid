@@ -74,7 +74,9 @@ internal class ReducerFactoryProcessor(
                     dependencies = dependencies,
                     packageName = fileSpec.packageName,
                     fileName = fileSpec.name,
-                ).bufferedWriter().use(fileSpec::writeTo)
+                ).bufferedWriter().use { writer ->
+                    writer.write(fileGenerator.render(fileSpec))
+                }
             }
         return deferred
     }
