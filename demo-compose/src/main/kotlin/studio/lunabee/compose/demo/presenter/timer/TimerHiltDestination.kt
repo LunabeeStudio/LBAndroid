@@ -20,12 +20,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 
-data object TimerDestination {
-    val route = TimerDestination.javaClass.simpleName
+data object TimerHiltDestination {
+    val route = TimerHiltDestination.javaClass.simpleName
 
     fun composable(navGraphBuilder: NavGraphBuilder, navScope: TimerNavScope) {
         navGraphBuilder.composable(route) {
-            val presenter: TimerPresenter = hiltViewModel()
+            val presenter: TimerHiltPresenter = hiltViewModel()
             presenter(navScope)
         }
     }

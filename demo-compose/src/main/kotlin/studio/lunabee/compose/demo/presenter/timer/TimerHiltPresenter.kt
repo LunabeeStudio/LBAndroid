@@ -28,7 +28,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
-class TimerPresenter @Inject constructor(
+class TimerHiltPresenter @Inject constructor(
     injectedParam: TimerInjectedParam,
 ) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
     reducerBuilder = { runtime ->
