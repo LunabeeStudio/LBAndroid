@@ -8,26 +8,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-03-24
 
 ```
-Lbcpresenter 1.12.0
-LbcpresenterKoin 1.12.0
-LbcpresenterKsp 1.12.0
+Lbcpresenter 1.11.0
+LbcpresenterKoin 1.11.0
+LbcpresenterKsp 1.11.0
 ```
 
+- Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
+- **break:** Replace `LBSinglePresenter.initReducer()` with constructor-injected `LBSingleReducerFactory`
 - Add `@GenerateReducerFactory` and `@Runtime` to generate single reducer factories from reducer constructor signatures
 - Add `reducerBuilder` support in `LBSinglePresenter` for reducers needing extra runtime arguments
 - Add overridable `createReducer(runtime)` in `LBSinglePresenter` so presenters can reuse computed runtime values in both presenter logic and reducer creation
 - Keep constructor-injected `LBSingleReducerFactory` as the default `LBSinglePresenter` reducer creation path
 - Add new `lbcpresenter-ksp` module to publish the reducer factory KSP processor
-
-## 2026-03-24
-
-```
-Lbcpresenter 1.11.0
-LbcpresenterKoin 1.11.0
-```
-
-- Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
-- **break:** Replace `LBSinglePresenter.initReducer()` with constructor-injected `LBSingleReducerFactory`
 
 ## 2026-03-23
 

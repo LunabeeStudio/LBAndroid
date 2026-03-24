@@ -29,8 +29,6 @@ private val reducerRuntimeType: ClassName = ClassName("studio.lunabee.compose.pr
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
 private const val RuntimeParam = "runtime"
 private const val RuntimeParamKdoc = "@param $RuntimeParam Properties owned by the presenter\n"
-private val createFunctionPattern: Regex =
-    Regex("""^(\s*)(public\s+)?(override\s+)?fun create\(([^)]*)\)(.*)$""", setOf(RegexOption.MULTILINE))
 
 internal class ReducerFactoryFileGenerator {
     fun generate(signature: ValidReducerSignature): FileSpec {
@@ -43,28 +41,7 @@ internal class ReducerFactoryFileGenerator {
         return fileSpec.build()
     }
 
-    fun render(fileSpec: FileSpec): String = createFunctionPattern.replace(fileSpec.toString()) { result ->
-        val indent = result.groupValues[1]
-        val visibility = result.groupValues[2]
-        val overrideModifier = result.groupValues[3]
-        val parameters = result.groupValues[4]
-            .split(", ")
-            .filter(String::isNotBlank)
-            .joinToString(separator = "\n") { parameter -> "$indent    $parameter," }
-        val suffix = result.groupValues[5]
-
-        buildString {
-            append(indent)
-            append(visibility)
-            append(overrideModifier)
-            append("fun create(\n")
-            append(parameters)
-            append('\n')
-            append(indent)
-            append(')')
-            append(suffix)
-        }
-    }
+    fun render(fileSpec: FileSpec): String = fileSpec.toString()
 
     private fun generateRuntimeArgsType(
         signature: ValidReducerSignature,
