@@ -12,5 +12,6 @@
 
 ## Verification Rules
 
-- Run `./gradlew detekt` before finishing work.
+- Run `./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting` before finishing work when no `*.gradle*` or `*.toml` file changed.
+- Run `./gradlew detekt` before finishing work when a `*.gradle*` or `*.toml` file changed.
 - Fix detekt warnings instead of ignoring them.
