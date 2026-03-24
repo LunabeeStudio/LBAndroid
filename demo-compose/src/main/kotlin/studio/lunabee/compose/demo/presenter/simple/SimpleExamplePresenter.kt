@@ -17,18 +17,23 @@
 package studio.lunabee.compose.demo.presenter.simple
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import studio.lunabee.compose.presenter.LBSinglePresenter
 import javax.inject.Inject
 
 @HiltViewModel
-class SimpleExamplePresenter @Inject constructor() : LBSinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
+class SimpleExamplePresenter @Inject constructor(
+    reducerFactory: SimpleExampleReducerFactory,
+) : LBSinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
+    reducerFactory = reducerFactory,
     verbose = true,
 ) {
     override val flows: List<Flow<SimpleExampleAction>> = listOf()
 
+    /**
+     * Returns the initial state displayed before any action is reduced.
+     */
     override fun getInitialState(): SimpleExampleUiState = SimpleExampleUiState(
         onToggleClick = { emitUserAction(SimpleExampleAction.NewCheckValue(it)) },
         onNewValue = { emitUserAction(SimpleExampleAction.NewValue) },
@@ -36,11 +41,6 @@ class SimpleExamplePresenter @Inject constructor() : LBSinglePresenter<SimpleExa
         onShowCascadeToastClick = { emitUserAction(SimpleExampleAction.ShowCascadeToast1) },
         isChecked = false,
         text = "Init",
-    )
-
-    override fun initReducer(): SimpleExampleReducer = SimpleExampleReducer(
-        coroutineScope = viewModelScope,
-        emitUserAction = ::emitUserAction,
     )
 
     override val content: @Composable (SimpleExampleUiState) -> Unit = { SimpleExampleScreen(it) }

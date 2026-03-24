@@ -16,6 +16,8 @@
 
 package studio.lunabee.compose.presenter
 
+import androidx.lifecycle.viewModelScope
+
 /**
  * Subclass of [LBPresenter] to implement a single state presenter
  *
@@ -23,13 +25,19 @@ package studio.lunabee.compose.presenter
  * @see LBPresenter
  */
 abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Action>(
+    private val reducerFactory: LBSingleReducerFactory<UiState, NavScope, Action>,
     verbose: Boolean = false,
 ) : LBPresenter<UiState, NavScope, Action>(verbose = verbose) {
-    private val reducer by lazy { initReducer() }
+    private val reducer by lazy {
+        reducerFactory.create(
+            runtime = LBReducerRuntime(
+                coroutineScope = viewModelScope,
+                emitUserAction = ::emitUserAction,
+            ),
+        )
+    }
 
     final override fun getReducerByState(
         actualState: UiState,
     ): LBSingleReducer<UiState, NavScope, Action> = reducer
-
-    abstract fun initReducer(): LBSingleReducer<UiState, NavScope, Action>
 }

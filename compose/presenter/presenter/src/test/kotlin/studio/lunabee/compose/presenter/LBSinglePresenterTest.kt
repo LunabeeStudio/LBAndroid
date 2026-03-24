@@ -20,6 +20,7 @@ import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
@@ -30,11 +31,13 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
+import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import studio.lunabee.compose.robolectrictest.LbcInjectComponentActivityRule
-import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,8 +57,15 @@ class LBSinglePresenterTest {
 
     @Test
     fun multi_useActivity_call_test(): TestResult = runTest {
-        val presenter = ActivityTestPresenter(this)
+        val reducerFactory = ActivityTestReducerFactory()
+        val presenter = ActivityTestPresenter(reducerFactory)
+
+        assertEquals(0, reducerFactory.createCount, "Reducer factory should stay lazy until the reducer is requested")
+
         val reducer = presenter.getReducerByState(TestUiState) as ActivityTestReducer
+
+        assertEquals(1, reducerFactory.createCount, "Reducer factory should be invoked once")
+        assertSame(reducer, presenter.getReducerByState(TestUiState), "Reducer should be cached by the presenter")
 
         rule.setContent {
             presenter.invoke(Unit)
@@ -70,19 +80,53 @@ class LBSinglePresenterTest {
         assertTrue(reducer.action2, "action2 should be true")
     }
 
-    private class ActivityTestPresenter(private val scope: CoroutineScope) : LBSinglePresenter<TestUiState, Unit, TestAction>(
+    @Test
+    fun reducer_runtime_callback_test(): TestResult = runTest {
+        val reducerFactory = ActivityTestReducerFactory()
+        val presenter = ActivityTestPresenter(reducerFactory)
+        val reducer = presenter.getReducerByState(TestUiState) as ActivityTestReducer
+
+        assertSame(presenter.viewModelScope, reducerFactory.runtime.coroutineScope, "Factory should receive the presenter scope")
+
+        rule.setContent {
+            presenter.invoke(Unit)
+        }
+
+        reducerFactory.runtime.emitUserAction(TestAction.TestAction0)
+
+        rule.waitForIdle()
+        advanceUntilIdle()
+
+        assertSame(reducer, presenter.getReducerByState(TestUiState), "Reducer should still be reused")
+        assertTrue(reducer.action1, "action1 should be true when the runtime callback emits an action")
+        assertTrue(reducer.action2, "action2 should be true when the runtime callback emits an action")
+    }
+
+    private class ActivityTestPresenter(
+        reducerFactory: ActivityTestReducerFactory,
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
+        reducerFactory = reducerFactory,
         verbose = true,
     ) {
-        override fun initReducer(): ActivityTestReducer = ActivityTestReducer(
-            coroutineScope = scope,
-            emitUserAction = ::emitUserAction,
-        )
-
         override val flows: List<Flow<TestAction>> = emptyList()
 
         override fun getInitialState(): TestUiState = TestUiState
 
         override val content: @Composable ((TestUiState) -> Unit) = {}
+    }
+
+    private class ActivityTestReducerFactory : LBSingleReducerFactory<TestUiState, Unit, TestAction> {
+        var createCount: Int = 0
+        lateinit var runtime: LBReducerRuntime<TestAction>
+
+        override fun create(runtime: LBReducerRuntime<TestAction>): ActivityTestReducer {
+            createCount++
+            this.runtime = runtime
+            return ActivityTestReducer(
+                coroutineScope = runtime.coroutineScope,
+                emitUserAction = runtime.emitUserAction,
+            )
+        }
     }
 
     private class ActivityTestReducer(

@@ -17,19 +17,20 @@
 package studio.lunabee.compose.demo.presenter.timer
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import studio.lunabee.compose.presenter.LBSinglePresenter
-import studio.lunabee.compose.presenter.LBSingleReducer
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
-class TimerPresenter @Inject constructor() : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
+class TimerPresenter @Inject constructor(
+    reducerFactory: TimerReducerFactory,
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
+    reducerFactory = reducerFactory,
     verbose = true,
 ) {
     private val timerFlow: Flow<TimerAction.NewTimerValue> = flow {
@@ -42,13 +43,11 @@ class TimerPresenter @Inject constructor() : LBSinglePresenter<TimerUiState, Tim
 
     override val flows: List<Flow<TimerAction>> = listOf(timerFlow)
 
+    /**
+     * Returns the initial state displayed before any action is reduced.
+     */
     override fun getInitialState(): TimerUiState = TimerUiState(
         timer = 0,
-    )
-
-    override fun initReducer(): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> = TimerReducer(
-        coroutineScope = viewModelScope,
-        emitUserAction = ::emitUserAction,
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }

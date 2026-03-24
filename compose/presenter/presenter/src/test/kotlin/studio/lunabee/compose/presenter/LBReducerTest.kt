@@ -29,8 +29,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
+import org.junit.Test
 import kotlin.random.Random
-import kotlin.test.Test
 
 class LBReducerTest {
 
