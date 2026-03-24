@@ -24,20 +24,26 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import studio.lunabee.compose.presenter.LBSinglePresenter
 import javax.inject.Inject
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class TimerPresenter @Inject constructor(
-    reducerFactory: TimerReducerFactory,
+    injectedParam: TimerInjectedParam,
 ) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
-    reducerFactory = reducerFactory,
+    reducerBuilder = { runtime ->
+        TimerReducerFactory(injectedParam).create(
+            runtime = runtime,
+            runtimeParam = TimerRuntimeParam(currentTime = Clock.System.now()),
+        )
+    },
     verbose = true,
 ) {
     private val timerFlow: Flow<TimerAction.NewTimerValue> = flow {
-        var value: Int = 0
+        var value = 0
         while (true) {
-            delay(1.seconds)
             emit(value++)
+            delay(1.seconds)
         }
     }.map { TimerAction.NewTimerValue(it) }
 
@@ -47,7 +53,7 @@ class TimerPresenter @Inject constructor(
      * Returns the initial state displayed before any action is reduced.
      */
     override fun getInitialState(): TimerUiState = TimerUiState(
-        timer = 0,
+        timer = "",
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }

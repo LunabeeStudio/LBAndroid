@@ -86,6 +86,7 @@ dependencies {
     implementation(platform(libs.composeBom))
 
     ksp(libs.hiltAndroidCompiler)
+    ksp(projects.compose.presenterKsp)
 
     implementation(libs.androidxActivityCompose)
     implementation(libs.androidxAppcompat)

@@ -102,6 +102,26 @@ class LBSinglePresenterTest {
         assertTrue(reducer.action2, "action2 should be true when the runtime callback emits an action")
     }
 
+    @Test
+    fun reducer_runtime_args_factory_test(): TestResult = runTest {
+        val reducerFactory = ActivityRuntimeArgsReducerFactory()
+        val presenter = ActivityRuntimeArgsPresenter(reducerFactory)
+        val reducer = presenter.getReducerByState(TestUiState) as ActivityRuntimeArgsReducer
+
+        rule.setContent {
+            presenter.invoke(Unit)
+        }
+
+        presenter.emitUserAction(TestAction.TestAction0)
+
+        rule.waitForIdle()
+        advanceUntilIdle()
+
+        assertSame(presenter.viewModelScope, reducerFactory.runtime.coroutineScope, "Factory should receive the presenter scope")
+        assertEquals("runtime-value", reducerFactory.runtimeArgs, "Factory should receive runtime args from the presenter")
+        assertTrue(reducer.usedRuntimeArgs, "Reducer should receive the presenter runtime args")
+    }
+
     private class ActivityTestPresenter(
         reducerFactory: ActivityTestReducerFactory,
     ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
@@ -125,6 +145,42 @@ class LBSinglePresenterTest {
             return ActivityTestReducer(
                 coroutineScope = runtime.coroutineScope,
                 emitUserAction = runtime.emitUserAction,
+            )
+        }
+    }
+
+    private class ActivityRuntimeArgsPresenter(
+        reducerFactory: ActivityRuntimeArgsReducerFactory,
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
+        reducerBuilder = { runtime ->
+            reducerFactory.create(
+                runtime = runtime,
+                runtimeArgs = "runtime-value",
+            )
+        },
+        verbose = true,
+    ) {
+        override val flows: List<Flow<TestAction>> = emptyList()
+
+        override fun getInitialState(): TestUiState = TestUiState
+
+        override val content: @Composable ((TestUiState) -> Unit) = {}
+    }
+
+    private class ActivityRuntimeArgsReducerFactory {
+        lateinit var runtime: LBReducerRuntime<TestAction>
+        var runtimeArgs: String = ""
+
+        fun create(
+            runtime: LBReducerRuntime<TestAction>,
+            runtimeArgs: String,
+        ): ActivityRuntimeArgsReducer {
+            this.runtime = runtime
+            this.runtimeArgs = runtimeArgs
+            return ActivityRuntimeArgsReducer(
+                coroutineScope = runtime.coroutineScope,
+                emitUserAction = runtime.emitUserAction,
+                runtimeValue = runtimeArgs,
             )
         }
     }
@@ -156,6 +212,28 @@ class LBSinglePresenterTest {
                         action2 = true
                     }
                 }
+            }
+    }
+
+    private class ActivityRuntimeArgsReducer(
+        override val coroutineScope: CoroutineScope,
+        override val emitUserAction: (TestAction) -> Unit,
+        private val runtimeValue: String,
+    ) : LBSingleReducer<TestUiState, Unit, TestAction>(verbose = true) {
+        var usedRuntimeArgs: Boolean = false
+
+        override suspend fun reduce(
+            actualState: TestUiState,
+            action: TestAction,
+            performNavigation: (Unit.() -> Unit) -> Unit,
+            useActivity: (suspend (Activity) -> Unit) -> Unit,
+        ): ReduceResult<TestUiState> =
+            when (action) {
+                TestAction.TestAction0 -> actualState.withSideEffect {
+                    usedRuntimeArgs = runtimeValue == "runtime-value"
+                }
+
+                TestAction.TestAction1 -> actualState.asResult()
             }
     }
 

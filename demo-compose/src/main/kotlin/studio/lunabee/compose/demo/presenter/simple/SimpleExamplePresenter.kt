@@ -23,12 +23,11 @@ import studio.lunabee.compose.presenter.LBSinglePresenter
 import javax.inject.Inject
 
 @HiltViewModel
-class SimpleExamplePresenter @Inject constructor(
-    reducerFactory: SimpleExampleReducerFactory,
-) : LBSinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
-    reducerFactory = reducerFactory,
-    verbose = true,
-) {
+class SimpleExamplePresenter @Inject constructor() :
+    LBSinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
+        reducerFactory = SimpleExampleReducerFactory(),
+        verbose = true,
+    ) {
     override val flows: List<Flow<SimpleExampleAction>> = listOf()
 
     /**

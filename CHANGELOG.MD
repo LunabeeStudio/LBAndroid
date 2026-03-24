@@ -8,6 +8,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-03-24
 
 ```
+Lbcpresenter 1.12.0
+LbcpresenterKoin 1.12.0
+LbcpresenterKsp 1.12.0
+```
+
+- Add `@GenerateReducerFactory` and `@Runtime` to generate single reducer factories from reducer constructor signatures
+- Add `reducerBuilder` support in `LBSinglePresenter` for reducers needing extra runtime arguments
+- Add new `lbcpresenter-ksp` module to publish the reducer factory KSP processor
+
+## 2026-03-24
+
+```
 Lbcpresenter 1.11.0
 LbcpresenterKoin 1.11.0
 ```

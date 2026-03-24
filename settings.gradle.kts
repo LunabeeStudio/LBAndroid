@@ -96,6 +96,7 @@ addComposeModule(
     "test/robolectrictest",
     "presenter/presenter",
     "presenter/presenter-koin",
+    "presenter/presenter-ksp",
     "uifield/uifield-core",
     "uifield/uifield-countrypicker",
     "uifield/uifield-phonepicker",

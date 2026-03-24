@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.demo.presenter.timer
+plugins {
+    kotlin("jvm")
+    id("lunabee.java-library-conventions")
+    id("lunabee.library-publish-conventions")
+}
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+description = "KSP integration for LBPresenter"
+version = AndroidConfig.LBCPRESENTER_KSP_VERSION
 
-@Composable
-fun TimerScreen(
-    uiState: TimerUiState,
-) {
-    Text(
-        uiState.timer,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(16.dp),
-    )
+dependencies {
+    implementation(libs.kotlinPoet)
+    implementation(libs.kotlinPoetKsp)
+    implementation(libs.kspApi)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlinTest)
 }

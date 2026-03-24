@@ -14,22 +14,17 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.demo.presenter.timer
+package studio.lunabee.compose.demo.presenter
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
 
-@Composable
-fun TimerScreen(
-    uiState: TimerUiState,
-) {
-    Text(
-        uiState.timer,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(16.dp),
-    )
+@Module
+@InstallIn(SingletonComponent::class)
+object PresenterReducerFactoryModule {
+    @Provides
+    fun provideTimerInjectedParam(): TimerInjectedParam = TimerInjectedParam(prefix = "Current time = ")
 }
