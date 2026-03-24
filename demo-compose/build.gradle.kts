@@ -84,6 +84,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugarJdk)
 
     implementation(platform(libs.composeBom))
+    implementation(platform(libs.koinBom))
 
     ksp(libs.hiltAndroidCompiler)
     ksp(projects.compose.presenterKsp)
@@ -99,6 +100,8 @@ dependencies {
     implementation(libs.composeMaterialIconsExtended)
     implementation(libs.googleAndroidMaterial)
     implementation(libs.hiltAndroid)
+    implementation(libs.koinCompose)
+    implementation(libs.koinComposeViewmodel)
     implementation(libs.ktorClientAndroid)
     implementation(libs.ktorClientCore)
     implementation(libs.navigationCompose)

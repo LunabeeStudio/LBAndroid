@@ -27,6 +27,7 @@ import studio.lunabee.compose.demo.presenter.multistate.MultiStateDestination
 import studio.lunabee.compose.demo.presenter.pullToRefresh.PullToRefreshDestination
 import studio.lunabee.compose.demo.presenter.simple.SimpleExampleDestination
 import studio.lunabee.compose.demo.presenter.timer.TimerHiltDestination
+import studio.lunabee.compose.demo.presenter.timer.TimerKoinDestination
 
 @Composable
 fun PresenterDemoList(
@@ -42,6 +43,11 @@ fun PresenterDemoList(
             title = LbcTextSpec.Raw("Timer hilt"),
             subtitle = null,
             direction = { navigate(TimerHiltDestination.route) },
+        ),
+        MenuDescription(
+            title = LbcTextSpec.Raw("Timer koin"),
+            subtitle = null,
+            direction = { navigate(TimerKoinDestination.route) },
         ),
         MenuDescription(
             title = LbcTextSpec.Raw("Pull to refresh"),

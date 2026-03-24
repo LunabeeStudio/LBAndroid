@@ -42,8 +42,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import org.koin.core.context.startKoin
+import org.koin.core.module.dsl.viewModelOf
+import org.koin.dsl.module
 import studio.lunabee.compose.common.AppDemoTheme
 import studio.lunabee.compose.demo.monitoring.LBMonitoringDemo
+import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
+import studio.lunabee.compose.demo.presenter.timer.TimerKoinPresenter
 import studio.lunabee.compose.navigation.Destinations
 import studio.lunabee.compose.navigation.Directions
 import studio.lunabee.compose.navigation.MainNavGraph
@@ -56,6 +61,15 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         LBMonitoringDemo.init(context = this.applicationContext)
+
+        startKoin {
+            modules(
+                module {
+                    single { TimerInjectedParam(prefix = "Current time = ") }
+                    viewModelOf(::TimerKoinPresenter)
+                },
+            )
+        }
 
         setContent {
             val navController = rememberNavController()
