@@ -26,7 +26,7 @@ import studio.lunabee.extension.downscaleAndCrop
 import studio.lunabee.extension.downscaleAndCropPreR
 import org.junit.AfterClass
 import org.junit.BeforeClass
-import org.junit.Test
+import kotlin.test.Test
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

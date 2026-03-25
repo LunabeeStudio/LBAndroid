@@ -84,7 +84,7 @@ fun MainNavGraph(
             route = Destinations.UiFieldRoute,
         ) {
             UiFieldsScreen(
-                it.savedStateHandle,
+                savedStateHandle = it.savedStateHandle,
             )
         }
 

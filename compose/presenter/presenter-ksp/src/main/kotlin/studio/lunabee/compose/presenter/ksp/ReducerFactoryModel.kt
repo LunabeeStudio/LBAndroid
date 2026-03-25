@@ -112,7 +112,7 @@ internal class ReducerFactorySignatureValidator {
         val emitUserActionCount = validatedParameters.count { it.kind == ParameterKind.EmitUserAction }
         if (emitUserActionCount != 1) {
             throw InvalidReducerFactoryException(
-                "Reducer constructor must declare exactly one emitUserAction: (Action) -> Unit parameter",
+                message = "Reducer constructor must declare exactly one emitUserAction: (Action) -> Unit parameter",
             )
         }
 

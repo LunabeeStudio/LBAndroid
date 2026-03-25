@@ -39,7 +39,7 @@ abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Act
 
     private val reducer by lazy {
         createReducer(
-            LBPresenterContext(
+            context = LBPresenterContext(
                 coroutineScope = viewModelScope,
                 emitUserAction = ::emitUserAction,
             ),

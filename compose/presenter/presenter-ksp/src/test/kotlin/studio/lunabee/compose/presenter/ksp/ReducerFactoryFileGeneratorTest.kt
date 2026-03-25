@@ -19,8 +19,9 @@ package studio.lunabee.compose.presenter.ksp
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.LambdaTypeName
 import com.squareup.kotlinpoet.asTypeName
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ReducerFactoryFileGeneratorTest {
@@ -40,32 +41,32 @@ class ReducerFactoryFileGeneratorTest {
                 constructorVisibility = Visibility.Public,
                 constructorParameters = listOf(
                     RawReducerParameter(
-                        "coroutineScope",
-                        ClassName("kotlinx.coroutines", "CoroutineScope"),
-                        false,
-                        false,
-                        false,
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "emitUserAction",
-                        LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
-                        false,
-                        false,
-                        false,
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "injectedParam",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
-                        false,
-                        false,
-                        false,
+                        name = "injectedParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "runtimeParam",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
-                        true,
-                        false,
-                        false,
+                        name = "runtimeParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
+                        hasRuntimeAnnotation = true,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                 ),
             ),
@@ -77,11 +78,11 @@ class ReducerFactoryFileGeneratorTest {
         assertTrue(generatedSource.contains("class TimerReducerFactory"))
         assertTrue(generatedSource.contains("    public val runtimeParam: TimerRuntimeParam,"))
         assertTrue(generatedSource.contains("public fun create("))
-        assertTrue(!generatedSource.contains("override fun create("))
+        assertFalse(generatedSource.contains("override fun create("))
         assertTrue(generatedSource.contains("LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>"))
-        assertTrue(!generatedSource.contains("): TimerReducer"))
+        assertFalse(generatedSource.contains("): TimerReducer"))
         assertTrue(generatedSource.contains("runtimeParam: TimerRuntimeParam"))
-        assertTrue(!generatedSource.contains("\n    ,\n"))
+        assertFalse(generatedSource.contains("\n    ,\n"))
     }
 
     @Test
@@ -97,39 +98,39 @@ class ReducerFactoryFileGeneratorTest {
                 constructorVisibility = Visibility.Public,
                 constructorParameters = listOf(
                     RawReducerParameter(
-                        "coroutineScope",
-                        ClassName("kotlinx.coroutines", "CoroutineScope"),
-                        false,
-                        false,
-                        false,
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "emitUserAction",
-                        LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
-                        false,
-                        false,
-                        false,
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "context",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntime"),
-                        false,
-                        false,
-                        false,
+                        name = "context",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntime"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "factoryArgs",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntimeArgs"),
-                        false,
-                        false,
-                        false,
+                        name = "factoryArgs",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntimeArgs"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "external",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerExternalRuntimeArg"),
-                        true,
-                        false,
-                        false,
+                        name = "external",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerExternalRuntimeArg"),
+                        hasRuntimeAnnotation = true,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                 ),
             ),
@@ -155,32 +156,32 @@ class ReducerFactoryFileGeneratorTest {
                 constructorVisibility = Visibility.Public,
                 constructorParameters = listOf(
                     RawReducerParameter(
-                        "coroutineScope",
-                        ClassName("kotlinx.coroutines", "CoroutineScope"),
-                        false,
-                        false,
-                        false,
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "emitUserAction",
-                        LambdaTypeName.get(parameters = arrayOf(timerActionType), returnType = Unit::class.asTypeName()),
-                        false,
-                        false,
-                        false,
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(timerActionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "injectedParam",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
-                        false,
-                        false,
-                        false,
+                        name = "injectedParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "runtimeParam",
-                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
-                        true,
-                        false,
-                        false,
+                        name = "runtimeParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
+                        hasRuntimeAnnotation = true,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                 ),
             ),
@@ -196,18 +197,18 @@ class ReducerFactoryFileGeneratorTest {
                 constructorVisibility = Visibility.Public,
                 constructorParameters = listOf(
                     RawReducerParameter(
-                        "coroutineScope",
-                        ClassName("kotlinx.coroutines", "CoroutineScope"),
-                        false,
-                        false,
-                        false,
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                     RawReducerParameter(
-                        "emitUserAction",
-                        LambdaTypeName.get(parameters = arrayOf(simpleActionType), returnType = Unit::class.asTypeName()),
-                        false,
-                        false,
-                        false,
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(simpleActionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
                     ),
                 ),
             ),

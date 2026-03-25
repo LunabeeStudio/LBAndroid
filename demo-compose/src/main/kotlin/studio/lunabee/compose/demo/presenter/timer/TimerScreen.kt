@@ -28,7 +28,7 @@ fun TimerScreen(
     uiState: TimerUiState,
 ) {
     Text(
-        uiState.timer,
+        text = uiState.timer,
         style = MaterialTheme.typography.titleLarge,
         modifier = Modifier.padding(16.dp),
     )

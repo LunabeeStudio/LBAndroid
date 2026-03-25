@@ -31,7 +31,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
-import org.junit.Test
+import kotlin.test.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -133,9 +133,9 @@ class LBSinglePresenterTest {
         presenter.getReducerByState(TestUiState)
 
         assertEquals(
-            presenter.presenterRuntimeValue,
-            reducerFactory.factoryArg,
-            "Reducer should receive the runtime value computed and reused by the presenter",
+            expected = presenter.presenterRuntimeValue,
+            actual = reducerFactory.factoryArg,
+            message = "Reducer should receive the runtime value computed and reused by the presenter",
         )
     }
 

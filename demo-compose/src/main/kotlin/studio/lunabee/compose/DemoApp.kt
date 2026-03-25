@@ -36,8 +36,8 @@ class DemoApp : Application() {
                     single { TimerInjectedParam(prefix = "Current time = ") }
                     viewModelOf(::TimerKoinPresenter)
                 },
-                generatedReducerFactoryModule,
             )
+            modules(generatedReducerFactoryModule)
         }
     }
 }

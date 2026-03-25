@@ -55,8 +55,8 @@ internal class ReducerFactoryFileGenerator {
 
         val sortedSignatures = signatures.sortedBy { it.factoryClassName.canonicalName }
         return FileSpec.builder(
-            commonPackageName(sortedSignatures.map { it.packageName }),
-            GeneratedKoinModuleFileName,
+            packageName = commonPackageName(sortedSignatures.map { it.packageName }),
+            fileName = GeneratedKoinModuleFileName,
         ).indent("    ")
             .addProperty(
                 PropertySpec.builder(GeneratedKoinModulePropertyName, koinModuleType)
@@ -106,9 +106,11 @@ internal class ReducerFactoryFileGenerator {
         if (signature.factoryArgsClassName == null) {
             typeBuilder.addSuperinterface(
                 reducerFactoryType.parameterizedBy(
-                    signature.uiStateTypeName,
-                    signature.navScopeTypeName,
-                    signature.actionTypeName,
+                    typeArguments = arrayOf(
+                        signature.uiStateTypeName,
+                        signature.navScopeTypeName,
+                        signature.actionTypeName,
+                    ),
                 ),
             )
         }
@@ -127,8 +129,8 @@ internal class ReducerFactoryFileGenerator {
             .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    ContextParam,
-                    presenterContextType.parameterizedBy(signature.actionTypeName),
+                    name = ContextParam,
+                    type = presenterContextType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )
 
@@ -150,8 +152,8 @@ internal class ReducerFactoryFileGenerator {
             .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    ContextParam,
-                    presenterContextType.parameterizedBy(signature.actionTypeName),
+                    name = ContextParam,
+                    type = presenterContextType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )
 
@@ -160,34 +162,33 @@ internal class ReducerFactoryFileGenerator {
             functionBuilder.addParameter(parameter.name, parameter.typeName)
         }
 
-        functionBuilder.addCode(
-            CodeBlock.builder()
-                .add("return create(\n")
-                .indent()
-                .add("$ContextParam = $ContextParam,\n")
-                .add(
-                    "$FactoryArgsParam = %T(\n",
-                    requireNotNull(signature.factoryArgsClassName),
-                )
-                .indent()
-                .apply {
-                    signature.factoryArgParameters.forEach { parameter ->
-                        add("%L = %L,\n", parameter.name, parameter.name)
-                    }
-                }.unindent()
-                .add("),\n")
-                .unindent()
-                .add(")\n")
-                .build(),
-        )
+        val factoryArgsClassName = requireNotNull(signature.factoryArgsClassName)
+        val convenienceCreateCode = CodeBlock.builder()
+            .add("return create(\n")
+            .indent()
+            .add("$ContextParam = $ContextParam,\n")
+            .add("$FactoryArgsParam = %T(\n", factoryArgsClassName)
+            .indent()
+            .apply {
+                signature.factoryArgParameters.forEach { parameter ->
+                    add("%L = %L,\n", parameter.name, parameter.name)
+                }
+            }.unindent()
+            .add("),\n")
+            .unindent()
+            .add(")\n")
+            .build()
+        functionBuilder.addCode(convenienceCreateCode)
         return functionBuilder.build()
     }
 
     private fun publicReducerReturnType(signature: ValidReducerSignature) =
         singleReducerType.parameterizedBy(
-            signature.uiStateTypeName,
-            signature.navScopeTypeName,
-            signature.actionTypeName,
+            typeArguments = arrayOf(
+                signature.uiStateTypeName,
+                signature.navScopeTypeName,
+                signature.actionTypeName,
+            ),
         )
 
     private fun buildKoinModuleInitializer(signatures: List<ValidReducerSignature>): CodeBlock =

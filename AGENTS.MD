@@ -9,6 +9,8 @@
 ## Kotlin API Rules
 
 - Add KDoc to public functions (except in demo apps)
+- When a call spans multiple lines, use named arguments for the arguments on those lines whenever the API supports it.
+- Always prefer Kotlin libraries over Java libraries when Kotlin equivalents exist, such as for time and test APIs.
 
 ## Verification Rules
 
