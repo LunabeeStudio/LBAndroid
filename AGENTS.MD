@@ -15,6 +15,7 @@
 - Run `./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting` before finishing work when no `*.gradle*` or `*.toml` file changed.
 - Run `./gradlew detekt` before finishing work when a `*.gradle*` or `*.toml` file changed.
 - Fix detekt warnings instead of ignoring them.
+- When validating changes against another local project, publish the updated artifacts first with `./gradlew publishToMavenLocal` so it can be found by other project.
 
 ## Release Rules
 
