@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 2026-03-24
+## 2026-03-25
 
 ```
-Lbcpresenter 1.11.0
-LbcpresenterKoin 1.11.0
-LbcpresenterKsp 1.11.0
+Lbcpresenter 2.0.0
+LbcpresenterKoin 2.0.0
+LbcpresenterKsp 2.0.0
 ```
 
 - Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
