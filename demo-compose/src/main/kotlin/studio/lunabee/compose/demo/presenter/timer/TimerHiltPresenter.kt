@@ -39,7 +39,7 @@ class TimerHiltPresenter @Inject constructor(
     override fun createReducer(context: LBPresenterContext<TimerAction>): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> =
         reducerFactory.create(
             context = context,
-            runtimeParam = TimerRuntimeParam(currentTime = currentTime),
+            currentTime = currentTime,
         )
 
     private val timerFlow: Flow<TimerAction.NewTimerValue> = flow {
