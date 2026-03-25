@@ -80,4 +80,62 @@ class ReducerFactoryFileGeneratorTest {
         assertTrue(generatedSource.contains("runtimeParam: TimerRuntimeParam"))
         assertTrue(!generatedSource.contains("\n    ,\n"))
     }
+
+    @Test
+    fun generate_runtime_factory_qualifies_injected_properties_test() {
+        val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+        val validSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "CollisionReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                actionTypeName = actionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        "coroutineScope",
+                        ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "emitUserAction",
+                        LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "runtime",
+                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntime"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "runtimeArgs",
+                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntimeArgs"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "external",
+                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerExternalRuntimeArg"),
+                        true,
+                        false,
+                        false,
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = generator.render(generator.generate(validSignature))
+
+        assertTrue(generatedSource.contains("runtime = this.runtime"))
+        assertTrue(generatedSource.contains("runtimeArgs = this.runtimeArgs"))
+        assertTrue(generatedSource.contains("external = runtimeArgs.external"))
+    }
 }

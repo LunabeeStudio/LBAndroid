@@ -111,4 +111,38 @@ class ReducerFactorySignatureValidatorTest {
 
         assertEquals("@Runtime cannot be applied to coroutineScope or emitUserAction", exception.message)
     }
+
+    @Test
+    fun validate_protected_constructor_signature_test() {
+        val exception = assertFailsWith<InvalidReducerFactoryException> {
+            validator.validate(
+                RawReducerSignature(
+                    packageName = "studio.lunabee.compose.demo.presenter.timer",
+                    reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "ProtectedReducer"),
+                    uiStateTypeName = uiStateType,
+                    navScopeTypeName = navScopeType,
+                    actionTypeName = actionType,
+                    constructorVisibility = Visibility.Protected,
+                    constructorParameters = listOf(
+                        RawReducerParameter(
+                            "coroutineScope",
+                            ClassName("kotlinx.coroutines", "CoroutineScope"),
+                            false,
+                            false,
+                            false,
+                        ),
+                        RawReducerParameter(
+                            "emitUserAction",
+                            LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                            false,
+                            false,
+                            false,
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        assertEquals("Reducer factory generation only supports public or internal constructors", exception.message)
+    }
 }

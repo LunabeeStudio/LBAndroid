@@ -83,8 +83,11 @@ internal class InvalidReducerFactoryException(
 
 internal class ReducerFactorySignatureValidator {
     fun validate(signature: RawReducerSignature): ValidReducerSignature {
-        if (signature.constructorVisibility == Visibility.Private) {
-            throw InvalidReducerFactoryException("Reducer factory generation does not support private constructors")
+        if (
+            signature.constructorVisibility == Visibility.Private ||
+            signature.constructorVisibility == Visibility.Protected
+        ) {
+            throw InvalidReducerFactoryException("Reducer factory generation only supports public or internal constructors")
         }
 
         val factoryClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}Factory")

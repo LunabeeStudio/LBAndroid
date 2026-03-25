@@ -176,7 +176,7 @@ internal class ReducerFactoryFileGenerator {
     private fun constructorValueExpression(parameter: ValidatedReducerParameter): CodeBlock = when (parameter.kind) {
         ParameterKind.CoroutineScope -> CodeBlock.of("runtime.coroutineScope")
         ParameterKind.EmitUserAction -> CodeBlock.of("runtime.emitUserAction")
-        ParameterKind.Injected -> CodeBlock.of("%L", parameter.name)
+        ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.Runtime -> CodeBlock.of("runtimeArgs.%L", parameter.name)
     }
 }
