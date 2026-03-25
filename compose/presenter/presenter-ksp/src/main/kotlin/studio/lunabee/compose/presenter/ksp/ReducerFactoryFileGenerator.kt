@@ -27,6 +27,7 @@ import com.squareup.kotlinpoet.TypeSpec
 
 private val reducerRuntimeType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBReducerRuntime")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
+private val singleReducerType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducer")
 private const val RuntimeParam = "runtime"
 private const val RuntimeParamKdoc = "@param $RuntimeParam Properties owned by the presenter\n"
 
@@ -100,7 +101,7 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateCreateOverride(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
-            .returns(signature.reducerClassName)
+            .returns(publicReducerReturnType(signature))
             .addKdoc(RuntimeParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
@@ -123,7 +124,7 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateConvenienceCreate(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
-            .returns(signature.reducerClassName)
+            .returns(publicReducerReturnType(signature))
             .addKdoc(RuntimeParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
@@ -159,6 +160,13 @@ internal class ReducerFactoryFileGenerator {
         )
         return functionBuilder.build()
     }
+
+    private fun publicReducerReturnType(signature: ValidReducerSignature) =
+        singleReducerType.parameterizedBy(
+            signature.uiStateTypeName,
+            signature.navScopeTypeName,
+            signature.actionTypeName,
+        )
 
     private fun buildReducerCall(signature: ValidReducerSignature): CodeBlock {
         return CodeBlock.builder()

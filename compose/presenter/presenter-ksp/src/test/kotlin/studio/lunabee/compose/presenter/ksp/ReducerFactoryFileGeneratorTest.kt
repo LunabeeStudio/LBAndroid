@@ -77,6 +77,8 @@ class ReducerFactoryFileGeneratorTest {
         assertTrue(generatedSource.contains("    public val runtimeParam: TimerRuntimeParam,"))
         assertTrue(generatedSource.contains("public fun create("))
         assertTrue(!generatedSource.contains("override fun create("))
+        assertTrue(generatedSource.contains("LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>"))
+        assertTrue(!generatedSource.contains("): TimerReducer"))
         assertTrue(generatedSource.contains("runtimeParam: TimerRuntimeParam"))
         assertTrue(!generatedSource.contains("\n    ,\n"))
     }
