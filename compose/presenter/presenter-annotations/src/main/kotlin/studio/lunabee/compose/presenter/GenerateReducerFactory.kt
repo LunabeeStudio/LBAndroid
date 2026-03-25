@@ -17,7 +17,7 @@
 package studio.lunabee.compose.presenter
 
 /**
- * Marks a [LBSingleReducer] for reducer factory generation.
+ * Marks a reducer type for reducer factory generation.
  */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.BINARY)

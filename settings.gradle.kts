@@ -95,6 +95,7 @@ addComposeModule(
     "theme",
     "test/robolectrictest",
     "presenter/presenter",
+    "presenter/presenter-annotations",
     "presenter/presenter-koin",
     "presenter/presenter-ksp",
     "uifield/uifield-core",

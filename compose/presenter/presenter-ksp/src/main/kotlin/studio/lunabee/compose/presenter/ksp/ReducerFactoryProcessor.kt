@@ -31,9 +31,11 @@ import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import studio.lunabee.compose.presenter.GenerateReducerFactory
+import studio.lunabee.compose.presenter.Runtime
 
-private const val GenerateReducerFactoryAnnotation = "studio.lunabee.compose.presenter.GenerateReducerFactory"
-private const val RuntimeAnnotation = "studio.lunabee.compose.presenter.Runtime"
+private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
+private val runtimeAnnotation: String = checkNotNull(Runtime::class.qualifiedName)
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
@@ -55,7 +57,7 @@ internal class ReducerFactoryProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val deferred = mutableListOf<KSAnnotated>()
-        resolver.getSymbolsWithAnnotation(GenerateReducerFactoryAnnotation)
+        resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
             .forEach { symbol ->
                 if (!symbol.validate()) {
                     deferred += symbol
@@ -121,7 +123,7 @@ internal class ReducerFactoryProcessor(
                         ?: throw InvalidReducerFactoryException("Reducer constructor parameters must be named"),
                     typeName = parameter.type.toTypeName(),
                     hasRuntimeAnnotation = parameter.annotations.any {
-                        it.annotationType.resolve().declaration.qualifiedName?.asString() == RuntimeAnnotation
+                        it.annotationType.resolve().declaration.qualifiedName?.asString() == runtimeAnnotation
                     },
                     hasDefault = parameter.hasDefault,
                     isVararg = parameter.isVararg,

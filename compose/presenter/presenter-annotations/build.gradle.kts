@@ -20,16 +20,5 @@ plugins {
     id("lunabee.library-publish-conventions")
 }
 
-description = "KSP integration for LBPresenter"
-version = AndroidConfig.LBCPRESENTER_KSP_VERSION
-
-dependencies {
-    implementation(libs.kotlinPoet)
-    implementation(libs.kotlinPoetKsp)
-    implementation(libs.kspApi)
-
-    implementation(projects.compose.presenterAnnotations)
-
-    testImplementation(libs.junit4)
-    testImplementation(libs.kotlinTest)
-}
+description = "Annotations shared by LBPresenter runtime and KSP integration"
+version = AndroidConfig.LBCPRESENTER_ANNOTATIONS_VERSION

@@ -12,6 +12,7 @@
 | `studio.lunabee.compose:material-color-utilities` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose/material-color-utilities?style=for-the-badge) |
 | `studio.lunabee.compose:theme` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose/theme?style=for-the-badge) |
 | `studio.lunabee.compose.presenter:presenter` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter?style=for-the-badge) |
+| `studio.lunabee.compose.presenter:presenter-annotations` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-annotations?style=for-the-badge) |
 | `studio.lunabee.compose.presenter:presenter-koin` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-koin?style=for-the-badge) |
 | `studio.lunabee.compose.test:androidtest` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.test/androidtest?style=for-the-badge) |
 | `studio.lunabee.compose.test:robolectrictest` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.test/robolectrictest?style=for-the-badge) |
@@ -79,4 +80,3 @@ If you'd like to contribute, please fork the repository and use a feature branch
 ## Licensing
 
 Lunabee Compose is available under the Apache 2.0 license. See the LICENSE file for more info.
-

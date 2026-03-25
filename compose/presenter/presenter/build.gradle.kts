@@ -43,6 +43,7 @@ dependencies {
 
     implementation(projects.compose.core)
     implementation(projects.compose.image)
+    api(projects.compose.presenterAnnotations)
 
     androidTestImplementation(libs.kotlinTest)
     androidTestImplementation(libs.kotlinxCoroutinesTest)

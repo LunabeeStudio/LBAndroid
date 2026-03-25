@@ -9,6 +9,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ```
 Lbcpresenter 2.0.0
+LbcpresenterAnnotations 2.0.0
 LbcpresenterKoin 2.0.0
 LbcpresenterKsp 2.0.0
 ```
@@ -19,6 +20,7 @@ LbcpresenterKsp 2.0.0
 - Add `reducerBuilder` support in `LBSinglePresenter` for reducers needing extra runtime arguments
 - Add overridable `createReducer(runtime)` in `LBSinglePresenter` so presenters can reuse computed runtime values in both presenter logic and reducer creation
 - Keep constructor-injected `LBSingleReducerFactory` as the default `LBSinglePresenter` reducer creation path
+- Add new `lbcpresenter-annotations` module to share reducer factory annotations between runtime and KSP processor
 - Add new `lbcpresenter-ksp` module to publish the reducer factory KSP processor
 
 ## 2026-03-23
