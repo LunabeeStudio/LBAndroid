@@ -145,4 +145,45 @@ class ReducerFactorySignatureValidatorTest {
 
         assertEquals("Reducer factory generation only supports public or internal constructors", exception.message)
     }
+
+    @Test
+    fun validate_runtime_annotation_on_reserved_runtime_parameter_name_test() {
+        val exception = assertFailsWith<InvalidReducerFactoryException> {
+            validator.validate(
+                RawReducerSignature(
+                    packageName = "studio.lunabee.compose.demo.presenter.timer",
+                    reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "ReservedRuntimeReducer"),
+                    uiStateTypeName = uiStateType,
+                    navScopeTypeName = navScopeType,
+                    actionTypeName = actionType,
+                    constructorVisibility = Visibility.Public,
+                    constructorParameters = listOf(
+                        RawReducerParameter(
+                            "coroutineScope",
+                            ClassName("kotlinx.coroutines", "CoroutineScope"),
+                            false,
+                            false,
+                            false,
+                        ),
+                        RawReducerParameter(
+                            "emitUserAction",
+                            LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                            false,
+                            false,
+                            false,
+                        ),
+                        RawReducerParameter(
+                            "runtime",
+                            ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
+                            true,
+                            false,
+                            false,
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        assertEquals("@Runtime parameter name 'runtime' is reserved by generated factory methods", exception.message)
+    }
 }

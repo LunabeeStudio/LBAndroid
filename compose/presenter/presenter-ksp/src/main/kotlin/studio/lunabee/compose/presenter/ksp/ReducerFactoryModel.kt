@@ -142,6 +142,10 @@ internal class ReducerFactorySignatureValidator {
             condition = !(parameter.hasRuntimeAnnotation && (isCoroutineScope || isEmitUserAction)),
             message = "@Runtime cannot be applied to coroutineScope or emitUserAction",
         )
+        ensureValid(
+            condition = !(parameter.hasRuntimeAnnotation && parameter.name == "runtime"),
+            message = "@Runtime parameter name 'runtime' is reserved by generated factory methods",
+        )
 
         return when {
             isCoroutineScope -> {
