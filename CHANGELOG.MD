@@ -19,6 +19,7 @@ LbcpresenterKsp 2.0.0
 - **break:** Rename `LBReducerRuntime` to `LBPresenterContext`
 - **break:** Rename reducer factory annotation `@Runtime` to `@FactoryArg` and generated `*RuntimeArgs` types to `*FactoryArgs`
 - Add `@GenerateReducerFactory` and `@FactoryArg` to generate single reducer factories from reducer constructor signatures
+- Add optional `studio.lunabee.presenter.generateKoinModule=true` KSP flag to generate a per-module Koin reducer factory module
 - Add overridable `createReducer(context)` in `LBSinglePresenter` so presenters can reuse computed context values in both presenter logic and reducer creation
 - Keep constructor-injected `LBSingleReducerFactory` available through `LBFactorySinglePresenter`
 - Add new `lbcpresenter-annotations` module to share reducer factory annotations between runtime and KSP processor

@@ -57,6 +57,11 @@ internal data class ValidReducerSignature(
     val factoryArgParameters: List<ValidatedReducerParameter> = constructorParameters.filter { it.kind == ParameterKind.FactoryArg }
 }
 
+internal data class GeneratedReducerFactoryFiles(
+    val signature: ValidReducerSignature,
+    val fileSpec: com.squareup.kotlinpoet.FileSpec,
+)
+
 internal data class ValidatedReducerParameter(
     val name: String,
     val typeName: TypeName,

@@ -74,6 +74,10 @@ android {
     }
 }
 
+ksp {
+    arg("studio.lunabee.presenter.generateKoinModule", "true")
+}
+
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")

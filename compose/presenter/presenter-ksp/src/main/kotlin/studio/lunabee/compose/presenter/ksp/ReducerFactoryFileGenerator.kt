@@ -21,6 +21,7 @@ import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
@@ -28,9 +29,13 @@ import com.squareup.kotlinpoet.TypeSpec
 private val presenterContextType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBPresenterContext")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
 private val singleReducerType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducer")
+private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
+private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
 private const val ContextParam = "context"
 private const val FactoryArgsParam = "factoryArgs"
 private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
+private const val GeneratedKoinModuleFileName = "GeneratedReducerFactoryModule"
+private const val GeneratedKoinModulePropertyName = "generatedReducerFactoryModule"
 
 internal class ReducerFactoryFileGenerator {
     fun generate(signature: ValidReducerSignature): FileSpec {
@@ -44,6 +49,22 @@ internal class ReducerFactoryFileGenerator {
     }
 
     fun render(fileSpec: FileSpec): String = fileSpec.toString()
+
+    fun generateKoinModule(signatures: List<ValidReducerSignature>): FileSpec {
+        require(signatures.isNotEmpty()) { "Koin module generation requires at least one reducer signature" }
+
+        val sortedSignatures = signatures.sortedBy { it.factoryClassName.canonicalName }
+        return FileSpec.builder(
+            commonPackageName(sortedSignatures.map { it.packageName }),
+            GeneratedKoinModuleFileName,
+        ).indent("    ")
+            .addProperty(
+                PropertySpec.builder(GeneratedKoinModulePropertyName, koinModuleType)
+                    .initializer(buildKoinModuleInitializer(sortedSignatures))
+                    .build(),
+            )
+            .build()
+    }
 
     private fun generateFactoryArgsType(
         signature: ValidReducerSignature,
@@ -169,6 +190,23 @@ internal class ReducerFactoryFileGenerator {
             signature.actionTypeName,
         )
 
+    private fun buildKoinModuleInitializer(signatures: List<ValidReducerSignature>): CodeBlock =
+        CodeBlock.builder()
+            .add("%M {\n", koinModuleMember)
+            .indent()
+            .apply {
+                signatures.forEach { signature ->
+                    add("factory { %T(", signature.factoryClassName)
+                    signature.injectedParameters.forEachIndexed { index, _ ->
+                        if (index > 0) add(", ")
+                        add("get()")
+                    }
+                    add(") }\n")
+                }
+            }.unindent()
+            .add("}")
+            .build()
+
     private fun buildReducerCall(signature: ValidReducerSignature): CodeBlock {
         return CodeBlock.builder()
             .add("return %T(\n", signature.reducerClassName)
@@ -187,5 +225,16 @@ internal class ReducerFactoryFileGenerator {
         ParameterKind.EmitUserAction -> CodeBlock.of("$ContextParam.emitUserAction")
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
+    }
+
+    private fun commonPackageName(packageNames: List<String>): String {
+        val firstPackageSegments = packageNames.first().split('.')
+        val commonSegments = firstPackageSegments.indices.takeWhile { index ->
+            packageNames.drop(1).all { candidate ->
+                candidate.split('.').getOrNull(index) == firstPackageSegments[index]
+            }
+        }.map { firstPackageSegments[it] }
+
+        return commonSegments.joinToString(".").ifEmpty { packageNames.first() }
     }
 }

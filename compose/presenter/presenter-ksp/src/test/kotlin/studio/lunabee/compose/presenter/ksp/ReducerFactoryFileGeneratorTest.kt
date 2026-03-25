@@ -20,6 +20,7 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.LambdaTypeName
 import com.squareup.kotlinpoet.asTypeName
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ReducerFactoryFileGeneratorTest {
@@ -139,5 +140,85 @@ class ReducerFactoryFileGeneratorTest {
         assertTrue(generatedSource.contains("context = this.context"))
         assertTrue(generatedSource.contains("factoryArgs = this.factoryArgs"))
         assertTrue(generatedSource.contains("external = factoryArgs.external"))
+    }
+
+    @Test
+    fun generate_koin_module_file_test() {
+        val timerActionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+        val timerSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                actionTypeName = timerActionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        "coroutineScope",
+                        ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "emitUserAction",
+                        LambdaTypeName.get(parameters = arrayOf(timerActionType), returnType = Unit::class.asTypeName()),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "injectedParam",
+                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "runtimeParam",
+                        ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
+                        true,
+                        false,
+                        false,
+                    ),
+                ),
+            ),
+        )
+        val simpleActionType = ClassName("studio.lunabee.compose.demo.presenter.simple", "SimpleAction")
+        val simpleSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.simple",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.simple", "SimpleReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.simple", "SimpleUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.simple", "SimpleNavScope"),
+                actionTypeName = simpleActionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        "coroutineScope",
+                        ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        false,
+                        false,
+                        false,
+                    ),
+                    RawReducerParameter(
+                        "emitUserAction",
+                        LambdaTypeName.get(parameters = arrayOf(simpleActionType), returnType = Unit::class.asTypeName()),
+                        false,
+                        false,
+                        false,
+                    ),
+                ),
+            ),
+        )
+
+        val fileSpec = generator.generateKoinModule(listOf(timerSignature, simpleSignature))
+        val generatedSource = generator.render(fileSpec)
+
+        assertEquals("studio.lunabee.compose.demo.presenter", fileSpec.packageName)
+        assertTrue(generatedSource.contains("public val generatedReducerFactoryModule: Module = module {"))
+        assertTrue(generatedSource.contains("factory { SimpleReducerFactory() }"))
+        assertTrue(generatedSource.contains("factory { TimerReducerFactory(get()) }"))
     }
 }

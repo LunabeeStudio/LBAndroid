@@ -26,6 +26,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.validate
@@ -37,6 +38,7 @@ import studio.lunabee.compose.presenter.FactoryArg
 private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
 private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
+private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
@@ -45,48 +47,108 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor = ReducerFactoryProcessor(
         codeGenerator = environment.codeGenerator,
         logger = environment.logger,
+        generateKoinModule = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true,
     )
 }
 
 internal class ReducerFactoryProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
+    private val generateKoinModule: Boolean,
 ) : SymbolProcessor {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
     private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
+    private var hasGeneratedKoinModule: Boolean = false
+    private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
+    private val koinModuleDependenciesFiles: LinkedHashSet<KSFile> = linkedSetOf()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
-            .forEach { symbol ->
-                if (!symbol.validate()) {
-                    deferred += symbol
-                    return@forEach
-                }
+            .forEach { symbol -> processSymbol(symbol, deferred) }
 
-                val declaration = symbol as? KSClassDeclaration
-                if (declaration == null) {
-                    logger.error("@GenerateReducerFactory can only target classes", symbol)
-                    return@forEach
-                }
-
-                val fileSpec = buildFileSpec(declaration) ?: return@forEach
-                val dependencies = declaration.containingFile?.let { Dependencies(false, it) } ?: Dependencies(false)
-                codeGenerator.createNewFile(
-                    dependencies = dependencies,
-                    packageName = fileSpec.packageName,
-                    fileName = fileSpec.name,
-                ).bufferedWriter().use { writer ->
-                    writer.write(fileGenerator.render(fileSpec))
-                }
-            }
+        generateKoinModuleIfReady(deferred)
         return deferred
+    }
+
+    private fun processSymbol(
+        symbol: KSAnnotated,
+        deferred: MutableList<KSAnnotated>,
+    ) {
+        if (!symbol.validate()) {
+            deferred += symbol
+            return
+        }
+
+        val declaration = symbol as? KSClassDeclaration
+        if (declaration == null) {
+            logger.error("@GenerateReducerFactory can only target classes", symbol)
+            return
+        }
+
+        val generatedFactoryFiles = buildFileSpec(declaration) ?: return
+        writeGeneratedFile(generatedFactoryFiles.fileSpec, declaration.containingFile)
+
+        if (generateKoinModule) {
+            koinModuleSignatures[generatedFactoryFiles.signature.factoryClassName.canonicalName] = generatedFactoryFiles.signature
+            declaration.containingFile?.let(koinModuleDependenciesFiles::add)
+        }
+    }
+
+    private fun generateKoinModuleIfReady(deferred: List<KSAnnotated>) {
+        if (!shouldGenerateKoinModule(deferred)) return
+
+        val fileSpec = fileGenerator.generateKoinModule(koinModuleSignatures.values.toList())
+        writeGeneratedFile(fileSpec, koinModuleDependenciesFiles.toList())
+        hasGeneratedKoinModule = true
+    }
+
+    private fun shouldGenerateKoinModule(deferred: List<KSAnnotated>): Boolean {
+        if (!generateKoinModule) return false
+        if (deferred.isNotEmpty()) return false
+        if (hasGeneratedKoinModule) return false
+        return koinModuleSignatures.isNotEmpty()
+    }
+
+    private fun writeGeneratedFile(
+        fileSpec: com.squareup.kotlinpoet.FileSpec,
+        dependenciesFile: KSFile?,
+    ) {
+        val dependencies = dependenciesFile?.let { Dependencies(false, it) } ?: Dependencies(false)
+        writeGeneratedFile(fileSpec, dependencies)
+    }
+
+    private fun writeGeneratedFile(
+        fileSpec: com.squareup.kotlinpoet.FileSpec,
+        dependenciesFiles: List<KSFile>,
+    ) {
+        val dependencies = dependenciesFiles.takeIf { it.isNotEmpty() }
+            ?.toTypedArray()
+            ?.let { Dependencies(false, *it) }
+            ?: Dependencies(false)
+        writeGeneratedFile(fileSpec, dependencies)
+    }
+
+    private fun writeGeneratedFile(
+        fileSpec: com.squareup.kotlinpoet.FileSpec,
+        dependencies: Dependencies,
+    ) {
+        codeGenerator.createNewFile(
+            dependencies = dependencies,
+            packageName = fileSpec.packageName,
+            fileName = fileSpec.name,
+        ).bufferedWriter().use { writer ->
+            writer.write(fileGenerator.render(fileSpec))
+        }
     }
 
     private fun buildFileSpec(declaration: KSClassDeclaration) =
         runCatching {
             val signature = validator.validate(declaration.toRawSignature())
-            fileGenerator.generate(signature)
+            GeneratedReducerFactoryFiles(
+                signature = signature,
+                fileSpec = fileGenerator.generate(signature),
+            )
         }.getOrElse { throwable ->
             logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
             null
