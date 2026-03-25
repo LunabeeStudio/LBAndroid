@@ -141,7 +141,7 @@ class LBSinglePresenterTest {
 
     private class ActivityTestPresenter(
         reducerFactory: ActivityTestReducerFactory,
-    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(
+    ) : LBFactorySinglePresenter<TestUiState, Unit, TestAction>(
         reducerFactory = reducerFactory,
         verbose = true,
     ) {

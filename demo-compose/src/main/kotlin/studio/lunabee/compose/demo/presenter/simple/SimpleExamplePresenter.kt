@@ -19,12 +19,12 @@ package studio.lunabee.compose.demo.presenter.simple
 import androidx.compose.runtime.Composable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import studio.lunabee.compose.presenter.LBSinglePresenter
+import studio.lunabee.compose.presenter.LBFactorySinglePresenter
 import javax.inject.Inject
 
 @HiltViewModel
 class SimpleExamplePresenter @Inject constructor() :
-    LBSinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
+    LBFactorySinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
         reducerFactory = SimpleExampleReducerFactory(),
         verbose = true,
     ) {

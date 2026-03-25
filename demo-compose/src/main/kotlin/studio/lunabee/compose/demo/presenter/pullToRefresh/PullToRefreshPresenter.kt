@@ -19,13 +19,13 @@ package studio.lunabee.compose.demo.presenter.pullToRefresh
 import androidx.compose.runtime.Composable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import studio.lunabee.compose.presenter.LBSinglePresenter
+import studio.lunabee.compose.presenter.LBFactorySinglePresenter
 import javax.inject.Inject
 
 @HiltViewModel
 class PullToRefreshPresenter @Inject constructor(
     reducerFactory: PullToRefreshReducerFactory,
-) : LBSinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction>(
+) : LBFactorySinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction>(
     reducerFactory = reducerFactory,
     verbose = true,
 ) {
