@@ -86,13 +86,13 @@ class LBSinglePresenterTest {
         val presenter = ActivityTestPresenter(reducerFactory)
         val reducer = presenter.getReducerByState(TestUiState) as ActivityTestReducer
 
-        assertSame(presenter.viewModelScope, reducerFactory.runtime.coroutineScope, "Factory should receive the presenter scope")
+        assertSame(presenter.viewModelScope, reducerFactory.context.coroutineScope, "Factory should receive the presenter scope")
 
         rule.setContent {
             presenter.invoke(Unit)
         }
 
-        reducerFactory.runtime.emitUserAction(TestAction.TestAction0)
+        reducerFactory.context.emitUserAction(TestAction.TestAction0)
 
         rule.waitForIdle()
         advanceUntilIdle()
@@ -117,9 +117,9 @@ class LBSinglePresenterTest {
         rule.waitForIdle()
         advanceUntilIdle()
 
-        assertSame(presenter.viewModelScope, reducerFactory.runtime.coroutineScope, "Factory should receive the presenter scope")
-        assertEquals("runtime-value", reducerFactory.runtimeArgs, "Factory should receive runtime args from the presenter")
-        assertTrue(reducer.usedRuntimeArgs, "Reducer should receive the presenter runtime args")
+        assertSame(presenter.viewModelScope, reducerFactory.context.coroutineScope, "Factory should receive the presenter scope")
+        assertEquals("runtime-value", reducerFactory.factoryArg, "Factory should receive factory args from the presenter")
+        assertTrue(reducer.usedFactoryArg, "Reducer should receive the presenter factory args")
     }
 
     @Test
@@ -134,7 +134,7 @@ class LBSinglePresenterTest {
 
         assertEquals(
             presenter.presenterRuntimeValue,
-            reducerFactory.runtimeArgs,
+            reducerFactory.factoryArg,
             "Reducer should receive the runtime value computed and reused by the presenter",
         )
     }
@@ -154,14 +154,14 @@ class LBSinglePresenterTest {
 
     private class ActivityTestReducerFactory : LBSingleReducerFactory<TestUiState, Unit, TestAction> {
         var createCount: Int = 0
-        lateinit var runtime: LBReducerRuntime<TestAction>
+        lateinit var context: LBPresenterContext<TestAction>
 
-        override fun create(runtime: LBReducerRuntime<TestAction>): ActivityTestReducer {
+        override fun create(context: LBPresenterContext<TestAction>): ActivityTestReducer {
             createCount++
-            this.runtime = runtime
+            this.context = context
             return ActivityTestReducer(
-                coroutineScope = runtime.coroutineScope,
-                emitUserAction = runtime.emitUserAction,
+                coroutineScope = context.coroutineScope,
+                emitUserAction = context.emitUserAction,
             )
         }
     }
@@ -169,10 +169,10 @@ class LBSinglePresenterTest {
     private class ActivityRuntimeArgsPresenter(
         private val reducerFactory: ActivityRuntimeArgsReducerFactory,
     ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
-        override fun createReducer(runtime: LBReducerRuntime<TestAction>): ActivityRuntimeArgsReducer =
+        override fun createReducer(context: LBPresenterContext<TestAction>): ActivityRuntimeArgsReducer =
             reducerFactory.create(
-                runtime = runtime,
-                runtimeArgs = "runtime-value",
+                context = context,
+                factoryArg = "runtime-value",
             )
 
         override val flows: List<Flow<TestAction>> = emptyList()
@@ -188,10 +188,10 @@ class LBSinglePresenterTest {
     ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
         val presenterRuntimeValue: String = "$prefix-runtime"
 
-        override fun createReducer(runtime: LBReducerRuntime<TestAction>): ActivityRuntimeArgsReducer =
+        override fun createReducer(context: LBPresenterContext<TestAction>): ActivityRuntimeArgsReducer =
             reducerFactory.create(
-                runtime = runtime,
-                runtimeArgs = presenterRuntimeValue,
+                context = context,
+                factoryArg = presenterRuntimeValue,
             )
 
         override val flows: List<Flow<TestAction>> = emptyList()
@@ -202,19 +202,19 @@ class LBSinglePresenterTest {
     }
 
     private class ActivityRuntimeArgsReducerFactory {
-        lateinit var runtime: LBReducerRuntime<TestAction>
-        var runtimeArgs: String = ""
+        lateinit var context: LBPresenterContext<TestAction>
+        var factoryArg: String = ""
 
         fun create(
-            runtime: LBReducerRuntime<TestAction>,
-            runtimeArgs: String,
+            context: LBPresenterContext<TestAction>,
+            factoryArg: String,
         ): ActivityRuntimeArgsReducer {
-            this.runtime = runtime
-            this.runtimeArgs = runtimeArgs
+            this.context = context
+            this.factoryArg = factoryArg
             return ActivityRuntimeArgsReducer(
-                coroutineScope = runtime.coroutineScope,
-                emitUserAction = runtime.emitUserAction,
-                runtimeValue = runtimeArgs,
+                coroutineScope = context.coroutineScope,
+                emitUserAction = context.emitUserAction,
+                runtimeValue = factoryArg,
             )
         }
     }
@@ -254,7 +254,7 @@ class LBSinglePresenterTest {
         override val emitUserAction: (TestAction) -> Unit,
         private val runtimeValue: String,
     ) : LBSingleReducer<TestUiState, Unit, TestAction>(verbose = true) {
-        var usedRuntimeArgs: Boolean = false
+        var usedFactoryArg: Boolean = false
 
         override suspend fun reduce(
             actualState: TestUiState,
@@ -264,7 +264,7 @@ class LBSinglePresenterTest {
         ): ReduceResult<TestUiState> =
             when (action) {
                 TestAction.TestAction0 -> actualState.withSideEffect {
-                    usedRuntimeArgs = runtimeValue == "runtime-value"
+                    usedFactoryArg = runtimeValue == "runtime-value"
                 }
 
                 TestAction.TestAction1 -> actualState.asResult()

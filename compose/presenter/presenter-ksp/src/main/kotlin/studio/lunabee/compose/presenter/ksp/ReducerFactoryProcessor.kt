@@ -32,10 +32,10 @@ import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import studio.lunabee.compose.presenter.GenerateReducerFactory
-import studio.lunabee.compose.presenter.Runtime
+import studio.lunabee.compose.presenter.FactoryArg
 
 private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
-private val runtimeAnnotation: String = checkNotNull(Runtime::class.qualifiedName)
+private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
@@ -123,7 +123,7 @@ internal class ReducerFactoryProcessor(
                         ?: throw InvalidReducerFactoryException("Reducer constructor parameters must be named"),
                     typeName = parameter.type.toTypeName(),
                     hasRuntimeAnnotation = parameter.annotations.any {
-                        it.annotationType.resolve().declaration.qualifiedName?.asString() == runtimeAnnotation
+                        it.annotationType.resolve().declaration.qualifiedName?.asString() == factoryArgAnnotation
                     },
                     hasDefault = parameter.hasDefault,
                     isVararg = parameter.isVararg,

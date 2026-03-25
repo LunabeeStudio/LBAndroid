@@ -21,7 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import studio.lunabee.compose.presenter.GenerateReducerFactory
 import studio.lunabee.compose.presenter.LBSingleReducer
 import studio.lunabee.compose.presenter.ReduceResult
-import studio.lunabee.compose.presenter.Runtime
+import studio.lunabee.compose.presenter.FactoryArg
 import studio.lunabee.compose.presenter.asResult
 import kotlin.time.Instant
 
@@ -38,7 +38,7 @@ class TimerReducer(
     override val coroutineScope: CoroutineScope,
     override val emitUserAction: (TimerAction) -> Unit,
     private val injectedParam: TimerInjectedParam,
-    @Runtime private val runtimeParam: TimerRuntimeParam,
+    @FactoryArg private val runtimeParam: TimerRuntimeParam,
 ) : LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
     override suspend fun reduce(
         actualState: TimerUiState,

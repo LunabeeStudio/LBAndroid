@@ -73,9 +73,9 @@ class ReducerFactorySignatureValidatorTest {
         )
 
         assertEquals("TimerReducerFactory", signature.factoryClassName.simpleName)
-        assertEquals("TimerReducerRuntimeArgs", signature.runtimeArgsClassName?.simpleName)
+        assertEquals("TimerReducerFactoryArgs", signature.factoryArgsClassName?.simpleName)
         assertEquals(1, signature.injectedParameters.size)
-        assertEquals(1, signature.runtimeParameters.size)
+        assertEquals(1, signature.factoryArgParameters.size)
     }
 
     @Test
@@ -109,7 +109,7 @@ class ReducerFactorySignatureValidatorTest {
             )
         }
 
-        assertEquals("@Runtime cannot be applied to coroutineScope or emitUserAction", exception.message)
+        assertEquals("@FactoryArg cannot be applied to coroutineScope or emitUserAction", exception.message)
     }
 
     @Test
@@ -147,7 +147,7 @@ class ReducerFactorySignatureValidatorTest {
     }
 
     @Test
-    fun validate_runtime_annotation_on_reserved_runtime_parameter_name_test() {
+    fun validate_factory_arg_annotation_on_reserved_context_parameter_name_test() {
         val exception = assertFailsWith<InvalidReducerFactoryException> {
             validator.validate(
                 RawReducerSignature(
@@ -173,7 +173,7 @@ class ReducerFactorySignatureValidatorTest {
                             false,
                         ),
                         RawReducerParameter(
-                            "runtime",
+                            "context",
                             ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
                             true,
                             false,
@@ -184,6 +184,6 @@ class ReducerFactorySignatureValidatorTest {
             )
         }
 
-        assertEquals("@Runtime parameter name 'runtime' is reserved by generated factory methods", exception.message)
+        assertEquals("@FactoryArg parameter name 'context' is reserved by generated factory methods", exception.message)
     }
 }

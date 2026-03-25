@@ -16,17 +16,17 @@
 
 package studio.lunabee.compose.demo.presenter.pullToRefresh
 
-import studio.lunabee.compose.presenter.LBReducerRuntime
+import studio.lunabee.compose.presenter.LBPresenterContext
 import studio.lunabee.compose.presenter.LBSingleReducerFactory
 import javax.inject.Inject
 
 class PullToRefreshReducerFactory @Inject constructor() :
     LBSingleReducerFactory<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction> {
     /**
-     * Creates the reducer instance using the runtime owned by the presenter.
+     * Creates the reducer instance using the context owned by the presenter.
      */
-    override fun create(runtime: LBReducerRuntime<PullToRefreshAction>): PullToRefreshReducer = PullToRefreshReducer(
-        coroutineScope = runtime.coroutineScope,
-        emitUserAction = runtime.emitUserAction,
+    override fun create(context: LBPresenterContext<PullToRefreshAction>): PullToRefreshReducer = PullToRefreshReducer(
+        coroutineScope = context.coroutineScope,
+        emitUserAction = context.emitUserAction,
     )
 }

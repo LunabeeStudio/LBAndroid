@@ -19,7 +19,7 @@ package studio.lunabee.compose.presenter
 /**
  * Factory-backed [LBSinglePresenter] that keeps reducer wiring enforced at compile time.
  *
- * Use this base class when the reducer only depends on [LBReducerRuntime] values supplied by the presenter and on
+ * Use this base class when the reducer only depends on [LBPresenterContext] values supplied by the presenter and on
  * dependencies already captured by the injected [LBSingleReducerFactory]. Use [LBSinglePresenter] directly when
  * reducer creation also needs presenter-owned runtime values computed in the presenter itself.
  *
@@ -30,6 +30,6 @@ abstract class LBFactorySinglePresenter<UiState : PresenterUiState, NavScope : A
     private val reducerFactory: LBSingleReducerFactory<UiState, NavScope, Action>,
     verbose: Boolean = false,
 ) : LBSinglePresenter<UiState, NavScope, Action>(verbose = verbose) {
-    final override fun createReducer(runtime: LBReducerRuntime<Action>): LBSingleReducer<UiState, NavScope, Action> =
-        reducerFactory.create(runtime)
+    final override fun createReducer(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action> =
+        reducerFactory.create(context)
 }

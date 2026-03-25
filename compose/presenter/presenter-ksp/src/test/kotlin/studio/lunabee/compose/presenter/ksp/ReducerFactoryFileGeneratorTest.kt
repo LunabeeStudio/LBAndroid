@@ -72,7 +72,7 @@ class ReducerFactoryFileGeneratorTest {
 
         val generatedSource = generator.render(generator.generate(validSignature))
 
-        assertTrue(generatedSource.contains("data class TimerReducerRuntimeArgs"))
+        assertTrue(generatedSource.contains("data class TimerReducerFactoryArgs"))
         assertTrue(generatedSource.contains("class TimerReducerFactory"))
         assertTrue(generatedSource.contains("    public val runtimeParam: TimerRuntimeParam,"))
         assertTrue(generatedSource.contains("public fun create("))
@@ -110,14 +110,14 @@ class ReducerFactoryFileGeneratorTest {
                         false,
                     ),
                     RawReducerParameter(
-                        "runtime",
+                        "context",
                         ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntime"),
                         false,
                         false,
                         false,
                     ),
                     RawReducerParameter(
-                        "runtimeArgs",
+                        "factoryArgs",
                         ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedRuntimeArgs"),
                         false,
                         false,
@@ -136,8 +136,8 @@ class ReducerFactoryFileGeneratorTest {
 
         val generatedSource = generator.render(generator.generate(validSignature))
 
-        assertTrue(generatedSource.contains("runtime = this.runtime"))
-        assertTrue(generatedSource.contains("runtimeArgs = this.runtimeArgs"))
-        assertTrue(generatedSource.contains("external = runtimeArgs.external"))
+        assertTrue(generatedSource.contains("context = this.context"))
+        assertTrue(generatedSource.contains("factoryArgs = this.factoryArgs"))
+        assertTrue(generatedSource.contains("external = factoryArgs.external"))
     }
 }

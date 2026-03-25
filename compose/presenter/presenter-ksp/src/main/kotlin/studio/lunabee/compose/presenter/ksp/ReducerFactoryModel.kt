@@ -50,11 +50,11 @@ internal data class ValidReducerSignature(
     val navScopeTypeName: TypeName,
     val actionTypeName: TypeName,
     val factoryClassName: ClassName,
-    val runtimeArgsClassName: ClassName?,
+    val factoryArgsClassName: ClassName?,
     val constructorParameters: List<ValidatedReducerParameter>,
 ) {
     val injectedParameters: List<ValidatedReducerParameter> = constructorParameters.filter { it.kind == ParameterKind.Injected }
-    val runtimeParameters: List<ValidatedReducerParameter> = constructorParameters.filter { it.kind == ParameterKind.Runtime }
+    val factoryArgParameters: List<ValidatedReducerParameter> = constructorParameters.filter { it.kind == ParameterKind.FactoryArg }
 }
 
 internal data class ValidatedReducerParameter(
@@ -67,7 +67,7 @@ internal enum class ParameterKind {
     CoroutineScope,
     EmitUserAction,
     Injected,
-    Runtime,
+    FactoryArg,
 }
 
 internal enum class Visibility {
@@ -91,7 +91,7 @@ internal class ReducerFactorySignatureValidator {
         }
 
         val factoryClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}Factory")
-        val runtimeArgsClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}RuntimeArgs")
+        val factoryArgsClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}FactoryArgs")
         val validatedParameters = signature.constructorParameters.map { parameter ->
             validateParameter(
                 parameter = parameter,
@@ -118,7 +118,7 @@ internal class ReducerFactorySignatureValidator {
             navScopeTypeName = signature.navScopeTypeName,
             actionTypeName = signature.actionTypeName,
             factoryClassName = factoryClassName,
-            runtimeArgsClassName = runtimeArgsClassName.takeIf { validatedParameters.any { it.kind == ParameterKind.Runtime } },
+            factoryArgsClassName = factoryArgsClassName.takeIf { validatedParameters.any { it.kind == ParameterKind.FactoryArg } },
             constructorParameters = validatedParameters,
         )
     }
@@ -140,11 +140,11 @@ internal class ReducerFactorySignatureValidator {
         val isEmitUserAction = parameter.name == "emitUserAction"
         ensureValid(
             condition = !(parameter.hasRuntimeAnnotation && (isCoroutineScope || isEmitUserAction)),
-            message = "@Runtime cannot be applied to coroutineScope or emitUserAction",
+            message = "@FactoryArg cannot be applied to coroutineScope or emitUserAction",
         )
         ensureValid(
-            condition = !(parameter.hasRuntimeAnnotation && parameter.name == "runtime"),
-            message = "@Runtime parameter name 'runtime' is reserved by generated factory methods",
+            condition = !(parameter.hasRuntimeAnnotation && parameter.name == "context"),
+            message = "@FactoryArg parameter name 'context' is reserved by generated factory methods",
         )
 
         return when {
@@ -167,7 +167,7 @@ internal class ReducerFactorySignatureValidator {
                 ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.EmitUserAction)
             }
 
-            parameter.hasRuntimeAnnotation -> ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.Runtime)
+            parameter.hasRuntimeAnnotation -> ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.FactoryArg)
 
             else -> ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.Injected)
         }

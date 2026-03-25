@@ -15,10 +15,11 @@ LbcpresenterKsp 2.0.0
 ```
 
 - Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
-- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(runtime)` and add `LBFactorySinglePresenter` for constructor-injected `LBSingleReducerFactory`
-- Add `@GenerateReducerFactory` and `@Runtime` to generate single reducer factories from reducer constructor signatures
-- Add `reducerBuilder` support in `LBSinglePresenter` for reducers needing extra runtime arguments
-- Add overridable `createReducer(runtime)` in `LBSinglePresenter` so presenters can reuse computed runtime values in both presenter logic and reducer creation
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for constructor-injected `LBSingleReducerFactory`
+- **break:** Rename `LBReducerRuntime` to `LBPresenterContext`
+- **break:** Rename reducer factory annotation `@Runtime` to `@FactoryArg` and generated `*RuntimeArgs` types to `*FactoryArgs`
+- Add `@GenerateReducerFactory` and `@FactoryArg` to generate single reducer factories from reducer constructor signatures
+- Add overridable `createReducer(context)` in `LBSinglePresenter` so presenters can reuse computed context values in both presenter logic and reducer creation
 - Keep constructor-injected `LBSingleReducerFactory` available through `LBFactorySinglePresenter`
 - Add new `lbcpresenter-annotations` module to share reducer factory annotations between runtime and KSP processor
 - Add new `lbcpresenter-ksp` module to publish the reducer factory KSP processor

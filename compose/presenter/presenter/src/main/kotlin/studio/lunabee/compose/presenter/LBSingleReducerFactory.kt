@@ -17,11 +17,11 @@
 package studio.lunabee.compose.presenter
 
 /**
- * Creates a single reducer from presenter runtime values.
+ * Creates a single reducer from presenter context values.
  */
 fun interface LBSingleReducerFactory<UiState : PresenterUiState, NavScope : Any, Action> {
     /**
      * Builds the reducer used by a single-state presenter.
      */
-    fun create(runtime: LBReducerRuntime<Action>): LBSingleReducer<UiState, NavScope, Action>
+    fun create(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action>
 }

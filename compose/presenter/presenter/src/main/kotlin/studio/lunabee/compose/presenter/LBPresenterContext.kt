@@ -19,9 +19,9 @@ package studio.lunabee.compose.presenter
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * Runtime values owned by a presenter and needed to build a reducer.
+ * Context values owned by a presenter and needed to build a reducer.
  */
-data class LBReducerRuntime<Action>(
+data class LBPresenterContext<Action>(
     val coroutineScope: CoroutineScope,
     val emitUserAction: (Action) -> Unit,
 )

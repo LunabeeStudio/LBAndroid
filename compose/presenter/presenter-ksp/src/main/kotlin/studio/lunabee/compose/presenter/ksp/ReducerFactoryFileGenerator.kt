@@ -25,18 +25,19 @@ import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 
-private val reducerRuntimeType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBReducerRuntime")
+private val presenterContextType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBPresenterContext")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
 private val singleReducerType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducer")
-private const val RuntimeParam = "runtime"
-private const val RuntimeParamKdoc = "@param $RuntimeParam Properties owned by the presenter\n"
+private const val ContextParam = "context"
+private const val FactoryArgsParam = "factoryArgs"
+private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
 
 internal class ReducerFactoryFileGenerator {
     fun generate(signature: ValidReducerSignature): FileSpec {
         val fileSpec = FileSpec.builder(signature.packageName, signature.factoryClassName.simpleName)
             .indent("    ")
-        signature.runtimeArgsClassName?.let { runtimeArgsClassName ->
-            fileSpec.addType(generateRuntimeArgsType(signature, runtimeArgsClassName))
+        signature.factoryArgsClassName?.let { factoryArgsClassName ->
+            fileSpec.addType(generateFactoryArgsType(signature, factoryArgsClassName))
         }
         fileSpec.addType(generateFactoryType(signature))
         return fileSpec.build()
@@ -44,15 +45,15 @@ internal class ReducerFactoryFileGenerator {
 
     fun render(fileSpec: FileSpec): String = fileSpec.toString()
 
-    private fun generateRuntimeArgsType(
+    private fun generateFactoryArgsType(
         signature: ValidReducerSignature,
-        runtimeArgsClassName: ClassName,
+        factoryArgsClassName: ClassName,
     ): TypeSpec {
         val constructorBuilder = FunSpec.constructorBuilder()
-        val typeBuilder = TypeSpec.classBuilder(runtimeArgsClassName)
+        val typeBuilder = TypeSpec.classBuilder(factoryArgsClassName)
             .addModifiers(KModifier.DATA)
 
-        signature.runtimeParameters.forEach { parameter ->
+        signature.factoryArgParameters.forEach { parameter ->
             constructorBuilder.addParameter(parameter.name, parameter.typeName)
             typeBuilder.addProperty(
                 PropertySpec.builder(parameter.name, parameter.typeName)
@@ -81,7 +82,7 @@ internal class ReducerFactoryFileGenerator {
             typeBuilder.primaryConstructor(constructorBuilder.build())
         }
 
-        if (signature.runtimeArgsClassName == null) {
+        if (signature.factoryArgsClassName == null) {
             typeBuilder.addSuperinterface(
                 reducerFactoryType.parameterizedBy(
                     signature.uiStateTypeName,
@@ -92,7 +93,7 @@ internal class ReducerFactoryFileGenerator {
         }
 
         typeBuilder.addFunction(generateCreateOverride(signature))
-        if (signature.runtimeParameters.isNotEmpty()) {
+        if (signature.factoryArgParameters.isNotEmpty()) {
             typeBuilder.addFunction(generateConvenienceCreate(signature))
         }
 
@@ -102,20 +103,20 @@ internal class ReducerFactoryFileGenerator {
     private fun generateCreateOverride(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
             .returns(publicReducerReturnType(signature))
-            .addKdoc(RuntimeParamKdoc)
+            .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    RuntimeParam,
-                    reducerRuntimeType.parameterizedBy(signature.actionTypeName),
+                    ContextParam,
+                    presenterContextType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )
 
-        if (signature.runtimeArgsClassName == null) {
+        if (signature.factoryArgsClassName == null) {
             functionBuilder.addModifiers(KModifier.OVERRIDE)
         }
 
-        signature.runtimeArgsClassName?.let { runtimeArgsClassName ->
-            functionBuilder.addParameter("runtimeArgs", runtimeArgsClassName)
+        signature.factoryArgsClassName?.let { factoryArgsClassName ->
+            functionBuilder.addParameter(FactoryArgsParam, factoryArgsClassName)
         }
 
         functionBuilder.addCode(buildReducerCall(signature))
@@ -125,15 +126,15 @@ internal class ReducerFactoryFileGenerator {
     private fun generateConvenienceCreate(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
             .returns(publicReducerReturnType(signature))
-            .addKdoc(RuntimeParamKdoc)
+            .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
-                    RuntimeParam,
-                    reducerRuntimeType.parameterizedBy(signature.actionTypeName),
+                    ContextParam,
+                    presenterContextType.parameterizedBy(signature.actionTypeName),
                 ).build(),
             )
 
-        signature.runtimeParameters.forEach { parameter ->
+        signature.factoryArgParameters.forEach { parameter ->
             functionBuilder.addKdoc("@param %L\n", parameter.name)
             functionBuilder.addParameter(parameter.name, parameter.typeName)
         }
@@ -142,14 +143,14 @@ internal class ReducerFactoryFileGenerator {
             CodeBlock.builder()
                 .add("return create(\n")
                 .indent()
-                .add("runtime = runtime,\n")
+                .add("$ContextParam = $ContextParam,\n")
                 .add(
-                    "runtimeArgs = %T(\n",
-                    requireNotNull(signature.runtimeArgsClassName),
+                    "$FactoryArgsParam = %T(\n",
+                    requireNotNull(signature.factoryArgsClassName),
                 )
                 .indent()
                 .apply {
-                    signature.runtimeParameters.forEach { parameter ->
+                    signature.factoryArgParameters.forEach { parameter ->
                         add("%L = %L,\n", parameter.name, parameter.name)
                     }
                 }.unindent()
@@ -182,9 +183,9 @@ internal class ReducerFactoryFileGenerator {
     }
 
     private fun constructorValueExpression(parameter: ValidatedReducerParameter): CodeBlock = when (parameter.kind) {
-        ParameterKind.CoroutineScope -> CodeBlock.of("runtime.coroutineScope")
-        ParameterKind.EmitUserAction -> CodeBlock.of("runtime.emitUserAction")
+        ParameterKind.CoroutineScope -> CodeBlock.of("$ContextParam.coroutineScope")
+        ParameterKind.EmitUserAction -> CodeBlock.of("$ContextParam.emitUserAction")
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
-        ParameterKind.Runtime -> CodeBlock.of("runtimeArgs.%L", parameter.name)
+        ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
     }
 }

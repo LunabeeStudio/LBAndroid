@@ -17,8 +17,8 @@
 package studio.lunabee.compose.presenter
 
 /**
- * Marks a reducer constructor parameter that must be provided when the reducer is created at runtime.
+ * Marks a reducer constructor parameter that must be provided by the factory at creation time.
  */
 @Target(AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.BINARY)
-annotation class Runtime
+annotation class FactoryArg

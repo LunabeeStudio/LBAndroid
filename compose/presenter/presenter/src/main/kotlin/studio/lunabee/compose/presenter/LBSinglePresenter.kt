@@ -35,11 +35,11 @@ abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Act
      * Override this hook when the reducer depends on values computed from presenter constructor parameters or
      * presenter-owned runtime state.
      */
-    protected abstract fun createReducer(runtime: LBReducerRuntime<Action>): LBSingleReducer<UiState, NavScope, Action>
+    protected abstract fun createReducer(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action>
 
     private val reducer by lazy {
         createReducer(
-            LBReducerRuntime(
+            LBPresenterContext(
                 coroutineScope = viewModelScope,
                 emitUserAction = ::emitUserAction,
             ),
