@@ -19,8 +19,8 @@ package studio.lunabee.compose.presenter.ksp
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.LambdaTypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName
-import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.TypeName
 
 private val coroutineScopeType: ClassName = ClassName("kotlinx.coroutines", "CoroutineScope")
 private val kotlinUnitType: ClassName = ClassName("kotlin", "Unit")
@@ -233,19 +233,14 @@ internal fun moreRestrictiveVisibility(
     first: Visibility,
     second: Visibility,
 ): Visibility {
-    val firstRank = when (first) {
-        Visibility.Public -> 0
-        Visibility.Internal -> 1
-        Visibility.Protected -> 2
-        Visibility.Private -> 3
+    return listOf(first, second).maxBy {
+        when (it) {
+            Visibility.Public -> 0
+            Visibility.Internal -> 1
+            Visibility.Protected -> 2
+            Visibility.Private -> 3
+        }
     }
-    val secondRank = when (second) {
-        Visibility.Public -> 0
-        Visibility.Internal -> 1
-        Visibility.Protected -> 2
-        Visibility.Private -> 3
-    }
-    return if (firstRank >= secondRank) first else second
 }
 
 internal fun TypeName.parameterizedBy(vararg typeArguments: TypeName): ParameterizedTypeName =
