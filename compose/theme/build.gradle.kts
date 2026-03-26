@@ -21,7 +21,7 @@ plugins {
 
 android {
     namespace = "studio.lunabee.compose.theme"
-    // resourcePrefix("lbc_th_")
+    resourcePrefix = "lbc_th_"
 
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

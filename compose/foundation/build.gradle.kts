@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_mat_")
+    resourcePrefix = "lbc_mat_"
     namespace = "studio.lunabee.compose.foundation"
 
     defaultConfig {
