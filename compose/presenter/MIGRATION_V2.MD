@@ -30,8 +30,19 @@ Target migration:
     - remove unused constructor params/properties that were only needed for manual reducer instantiation
     - remove unused imports such as `LBSingleReducer`, `viewModelScope`, or obsolete use cases/managers no longer used by the presenter
     - keep only dependencies still needed for `flows`, `getInitialState()`, `content`, or other presenter-owned logic
-10. Update DI registrations so presenters receive `reducerFactory = get()` when needed.
-11. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
+10. Add KDoc on every presenter class to link the related presenter files:
+    - if the presenter class has no KDoc, add:
+      `/**`
+      ` * NAMEPresenter`
+      ` *`
+      ` * @see [NAME]Reducer`
+      ` * @see [NAME]UiState`
+      ` * @see [NAME]Action`
+      ` * @see [NAME]NavScope`
+      ` */`
+    - if the presenter class already has KDoc, keep the existing text and append the `@see` lines at the end of the KDoc block
+11. Update DI registrations so presenters receive `reducerFactory = get()` when needed.
+12. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
 
 Implementation guidance:
 - Prefer small, repetitive-safe edits.
