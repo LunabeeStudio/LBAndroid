@@ -31,6 +31,10 @@ lbDetekt {
     config.setFrom(files(lunabeeConfig, customConfig))
 }
 
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+    exclude("compose/presenter/template/*")
+}
+
 /*
  * Build group id based on real project path
  */
