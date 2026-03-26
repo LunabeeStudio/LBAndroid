@@ -43,5 +43,5 @@ dependencies {
     androidTestImplementation(libs.androidxPreferenceKtx)
     androidTestImplementation(libs.androidxTestCoreKtx)
     androidTestImplementation((libs.junit4))
-    androidTestImplementation(libs.kotlinTest)
+    androidTestImplementation(libs.kotlinTestJunit)
 }

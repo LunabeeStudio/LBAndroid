@@ -41,8 +41,8 @@ class FileExtTest {
         @BeforeClass
         @JvmStatic
         fun setup() {
-            srcResize.writeBytes(this.javaClass.classLoader!!.getResourceAsStream("src_resize_test_259_194.jpeg").readBytes())
-            srcAlpha.writeBytes(this.javaClass.classLoader!!.getResourceAsStream("src_png_transparent_320_213.png").readBytes())
+            srcResize.writeBytes(this::class.java.classLoader!!.getResourceAsStream("src_resize_test_259_194.jpeg").readBytes())
+            srcAlpha.writeBytes(this::class.java.classLoader!!.getResourceAsStream("src_png_transparent_320_213.png").readBytes())
         }
 
         @AfterClass

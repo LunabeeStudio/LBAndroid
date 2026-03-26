@@ -89,7 +89,7 @@ class ShowDelayedLoadingTest {
 
         assertFalse(actualShowLoading!!)
         composeTestRule.wait(delayBeforeShow * 1.5)
-        assertTrue(actualShowLoading!!)
+        assertTrue(actualShowLoading)
     }
 
     @Test
@@ -109,7 +109,7 @@ class ShowDelayedLoadingTest {
 
         assertTrue(actualShowLoading!!)
         shouldShowLoading.value = false
-        composeTestRule.waitUntil { !actualShowLoading!! }
+        composeTestRule.waitUntil { !actualShowLoading }
     }
 
     @Test
@@ -134,10 +134,10 @@ class ShowDelayedLoadingTest {
         // Request false
         shouldShowLoading.value = false
         composeTestRule.mainClock.advanceTimeByFrame()
-        assertTrue(actualShowLoading!!) // Still true because of minLoadingShowDuration
+        assertTrue(actualShowLoading) // Still true because of minLoadingShowDuration
 
         composeTestRule.wait(minLoadingShowDuration)
-        assertFalse(actualShowLoading!!)
+        assertFalse(actualShowLoading)
     }
 
     @Test

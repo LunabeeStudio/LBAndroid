@@ -45,7 +45,7 @@ dependencies {
     implementation(projects.compose.image)
     api(projects.compose.presenterAnnotations)
 
-    androidTestImplementation(libs.kotlinTest)
+    androidTestImplementation(libs.kotlinTestJunit)
     androidTestImplementation(libs.kotlinxCoroutinesTest)
 
     testImplementation(libs.androidxComposeUiTestJunit)
