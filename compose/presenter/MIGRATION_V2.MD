@@ -9,8 +9,11 @@ Before editing:
 Target migration:
 1. Upgrade each affected module to use LBPresenter reducer factory generation.
 2. Add the KSP dependency for the presenter processor where needed.
-3. If the project uses Koin, add the exact KSP flag:
-   `ksp { arg("studio.lunabee.presenter.generateKoinModule", "true") }`
+3. If the project uses Koin, add the exact KSP flags:
+   `ksp {`
+   `    arg("studio.lunabee.presenter.generateKoinModule", "true")`
+   `    arg("studio.lunabee.presenter.koinModulePackage", "YOUR_MODULE_ROOT_PACKAGE")`
+   `}`
 4. If the project uses Koin, include the generated module:
    `includes(generatedReducerFactoryModule)`
 5. Annotate reducers that should get generated factories with `@GenerateReducerFactory`.

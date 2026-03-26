@@ -18,6 +18,7 @@ package studio.lunabee.compose.presenter.ksp
 
 import com.google.devtools.ksp.processing.PlatformInfo
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -43,6 +44,35 @@ class ReducerFactoryProcessorTest {
                 platforms = listOf(
                     FakePlatformInfo(platformName = "JVM"),
                     FakePlatformInfo(platformName = "Native"),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun resolve_module_root_package_name_uses_configured_package_test() {
+        assertEquals(
+            "studio.lunabee.compose.demo",
+            resolveModuleRootPackageName(
+                configuredPackageName = "studio.lunabee.compose.demo",
+                sourcePackageNames = listOf(
+                    "studio.lunabee.compose.demo.presenter.timer",
+                    "studio.lunabee.compose.demo.presenter.simple",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun resolve_module_root_package_name_falls_back_to_common_source_package_test() {
+        assertEquals(
+            "studio.lunabee.compose.demo",
+            resolveModuleRootPackageName(
+                configuredPackageName = null,
+                sourcePackageNames = listOf(
+                    "studio.lunabee.compose.demo.presenter.timer",
+                    "studio.lunabee.compose.demo.presenter.simple",
+                    "studio.lunabee.compose.demo.navigation",
                 ),
             ),
         )

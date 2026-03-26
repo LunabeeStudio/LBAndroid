@@ -22,8 +22,10 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
+private val moduleNamespace: String = "studio.lunabee.compose"
+
 android {
-    namespace = "studio.lunabee.compose"
+    namespace = moduleNamespace
 
     compileSdk = AndroidConfig.CompileSdk
 
@@ -76,6 +78,7 @@ android {
 
 ksp {
     arg("studio.lunabee.presenter.generateKoinModule", "true")
+    arg("studio.lunabee.presenter.koinModulePackage", moduleNamespace)
 }
 
 kotlin {

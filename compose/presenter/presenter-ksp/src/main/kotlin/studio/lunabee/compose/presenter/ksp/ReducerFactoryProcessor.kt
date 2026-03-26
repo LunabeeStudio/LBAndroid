@@ -40,6 +40,7 @@ private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateRedu
 private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
+private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
@@ -58,6 +59,7 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
             generateKoinModule = generateKoinModule,
+            configuredKoinModulePackageName = environment.options[KoinModulePackageOption]?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 }
@@ -68,17 +70,25 @@ internal class ReducerFactoryProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
     private val generateKoinModule: Boolean,
+    private val configuredKoinModulePackageName: String?,
 ) : SymbolProcessor {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
     private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
     private var hasGeneratedKoinModule: Boolean = false
     private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
-    private val koinModuleDependenciesFiles: LinkedHashSet<KSFile> = linkedSetOf()
+    private val moduleSourceFiles: LinkedHashSet<KSFile> = linkedSetOf()
     private var moduleRootPackageName: String? = null
+    private var hasWarnedAboutMissingKoinModulePackageOption: Boolean = false
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         if (generateKoinModule && moduleRootPackageName == null) {
-            moduleRootPackageName = resolveModuleRootPackageName(resolver)
+            val sourceFiles = resolver.getAllFiles().toList()
+            moduleSourceFiles += sourceFiles
+            moduleRootPackageName = resolveModuleRootPackageName(
+                configuredPackageName = configuredKoinModulePackageName,
+                sourcePackageNames = sourceFiles.map { it.packageName.asString() },
+            )
+            warnAboutMissingKoinModulePackageOptionIfNeeded()
         }
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
@@ -108,7 +118,6 @@ internal class ReducerFactoryProcessor(
 
         if (generateKoinModule) {
             koinModuleSignatures[generatedFactoryFiles.signature.factoryClassName.canonicalName] = generatedFactoryFiles.signature
-            declaration.containingFile?.let(koinModuleDependenciesFiles::add)
         }
     }
 
@@ -120,7 +129,7 @@ internal class ReducerFactoryProcessor(
             moduleRootPackageName = moduleRootPackageName
                 ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
         )
-        writeGeneratedFile(fileSpec, koinModuleDependenciesFiles.toList())
+        writeGeneratedAggregatingFile(fileSpec, moduleSourceFiles.toList())
         hasGeneratedKoinModule = true
     }
 
@@ -131,12 +140,14 @@ internal class ReducerFactoryProcessor(
         return koinModuleSignatures.isNotEmpty()
     }
 
-    private fun resolveModuleRootPackageName(resolver: Resolver): String {
-        val sourcePackageNames = resolver.getAllFiles()
-            .map { it.packageName.asString() }
-            .filter { it.isNotBlank() }
-            .toList()
-        return sourcePackageNames.firstOrNull()?.let { commonPackageName(sourcePackageNames) } ?: ""
+    private fun warnAboutMissingKoinModulePackageOptionIfNeeded() {
+        if (configuredKoinModulePackageName != null) return
+        if (hasWarnedAboutMissingKoinModulePackageOption) return
+        logger.warn(
+            "KSP option '$KoinModulePackageOption' is not set. Falling back to package inference from source files for " +
+                "generatedReducerFactoryModule. Add the option to make the generated Koin module package explicit and stable.",
+        )
+        hasWarnedAboutMissingKoinModulePackageOption = true
     }
 
     private fun writeGeneratedFile(
@@ -147,14 +158,14 @@ internal class ReducerFactoryProcessor(
         writeGeneratedFile(fileSpec, dependencies)
     }
 
-    private fun writeGeneratedFile(
+    private fun writeGeneratedAggregatingFile(
         fileSpec: com.squareup.kotlinpoet.FileSpec,
         dependenciesFiles: List<KSFile>,
     ) {
         val dependencies = dependenciesFiles.takeIf { it.isNotEmpty() }
             ?.toTypedArray()
-            ?.let { Dependencies(false, *it) }
-            ?: Dependencies(false)
+            ?.let { Dependencies(true, *it) }
+            ?: Dependencies(true)
         writeGeneratedFile(fileSpec, dependencies)
     }
 
@@ -229,4 +240,14 @@ internal class ReducerFactoryProcessor(
         Modifier.INTERNAL in modifiers -> Visibility.Internal
         else -> Visibility.Public
     }
+}
+
+internal fun resolveModuleRootPackageName(
+    configuredPackageName: String?,
+    sourcePackageNames: List<String>,
+): String {
+    configuredPackageName?.takeIf { it.isNotBlank() }?.let { return it }
+
+    val normalizedSourcePackageNames = sourcePackageNames.filter { it.isNotBlank() }
+    return normalizedSourcePackageNames.firstOrNull()?.let { commonPackageName(normalizedSourcePackageNames) } ?: ""
 }
