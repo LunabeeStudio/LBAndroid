@@ -25,6 +25,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ReducerFactoryProcessorTest {
+    private val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+
     @Test
     fun should_generate_koin_module_for_single_platform_compilation_test() {
         assertTrue(
@@ -101,6 +103,38 @@ class ReducerFactoryProcessorTest {
         }
 
         assertEquals("@Named qualifier must declare a non-empty String value or a type", exception.message)
+    }
+
+    @Test
+    fun should_generate_koin_module_at_finish_when_signatures_were_collected_test() {
+        assertTrue(
+            shouldGenerateKoinModuleAtFinish(
+                generateKoinModule = true,
+                signatures = listOf(
+                    ValidReducerSignature(
+                        packageName = "studio.lunabee.compose.demo.presenter.timer",
+                        reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerReducer"),
+                        uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                        navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                        actionTypeName = actionType,
+                        generatedVisibility = Visibility.Public,
+                        factoryClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerReducerFactory"),
+                        factoryArgsClassName = null,
+                        constructorParameters = emptyList(),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun should_not_generate_koin_module_at_finish_without_signatures_test() {
+        assertFalse(
+            shouldGenerateKoinModuleAtFinish(
+                generateKoinModule = true,
+                signatures = emptyList(),
+            ),
+        )
     }
 }
 

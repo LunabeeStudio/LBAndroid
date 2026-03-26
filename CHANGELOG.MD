@@ -13,6 +13,7 @@ LbcpresenterKsp 2.0.0-beta03
 
 - Match generated reducer factory visibility to the stricter reducer and constructor visibility so generated APIs do not expose hidden constructors
 - Preserve constructor qualifier metadata in generated reducer Koin modules, including typed `@Named` qualifiers, so qualified dependencies resolve with the expected binding
+- Defer generated reducer Koin module aggregation to the final KSP round so factories discovered from later generated sources are included
 
 ## 2026-03-26
 

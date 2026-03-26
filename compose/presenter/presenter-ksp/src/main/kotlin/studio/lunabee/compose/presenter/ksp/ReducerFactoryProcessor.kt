@@ -90,28 +90,29 @@ internal class ReducerFactoryProcessor(
 ) : SymbolProcessor {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
     private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
-    private var hasGeneratedKoinModule: Boolean = false
     private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
     private val moduleSourceFiles: LinkedHashSet<KSFile> = linkedSetOf()
     private var moduleRootPackageName: String? = null
     private var hasWarnedAboutMissingKoinModulePackageOption: Boolean = false
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        if (generateKoinModule && moduleRootPackageName == null) {
-            val sourceFiles = resolver.getAllFiles().toList()
-            moduleSourceFiles += sourceFiles
-            moduleRootPackageName = resolveModuleRootPackageName(
-                configuredPackageName = configuredKoinModulePackageName,
-                sourcePackageNames = sourceFiles.map { it.packageName.asString() },
-            )
-            warnAboutMissingKoinModulePackageOptionIfNeeded()
-        }
+        collectKoinModuleContext(resolver)
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
             .forEach { symbol -> processSymbol(symbol, deferred) }
 
-        generateKoinModuleIfReady(deferred)
         return deferred
+    }
+
+    override fun finish() {
+        if (!shouldGenerateKoinModuleAtFinish(generateKoinModule, koinModuleSignatures.values)) return
+
+        val fileSpec = fileGenerator.generateKoinModule(
+            signatures = koinModuleSignatures.values.toList(),
+            moduleRootPackageName = moduleRootPackageName
+                ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
+        )
+        writeGeneratedAggregatingFile(fileSpec, moduleSourceFiles.toList())
     }
 
     private fun processSymbol(
@@ -137,23 +138,16 @@ internal class ReducerFactoryProcessor(
         }
     }
 
-    private fun generateKoinModuleIfReady(deferred: List<KSAnnotated>) {
-        if (!shouldGenerateKoinModule(deferred)) return
+    private fun collectKoinModuleContext(resolver: Resolver) {
+        if (!generateKoinModule) return
 
-        val fileSpec = fileGenerator.generateKoinModule(
-            signatures = koinModuleSignatures.values.toList(),
-            moduleRootPackageName = moduleRootPackageName
-                ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
+        val sourceFiles = resolver.getAllFiles().toList()
+        moduleSourceFiles += sourceFiles
+        moduleRootPackageName = resolveModuleRootPackageName(
+            configuredPackageName = configuredKoinModulePackageName,
+            sourcePackageNames = moduleSourceFiles.map { it.packageName.asString() },
         )
-        writeGeneratedAggregatingFile(fileSpec, moduleSourceFiles.toList())
-        hasGeneratedKoinModule = true
-    }
-
-    private fun shouldGenerateKoinModule(deferred: List<KSAnnotated>): Boolean {
-        if (!generateKoinModule) return false
-        if (deferred.isNotEmpty()) return false
-        if (hasGeneratedKoinModule) return false
-        return koinModuleSignatures.isNotEmpty()
+        warnAboutMissingKoinModulePackageOptionIfNeeded()
     }
 
     private fun warnAboutMissingKoinModulePackageOptionIfNeeded() {
@@ -315,6 +309,11 @@ internal fun resolveNamedQualifier(
     }
     throw InvalidReducerFactoryException("@Named qualifier must declare a non-empty String value or a type")
 }
+
+internal fun shouldGenerateKoinModuleAtFinish(
+    generateKoinModule: Boolean,
+    signatures: Collection<ValidReducerSignature>,
+): Boolean = generateKoinModule && signatures.isNotEmpty()
 
 internal fun resolveModuleRootPackageName(
     configuredPackageName: String?,
