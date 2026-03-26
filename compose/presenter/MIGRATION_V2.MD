@@ -13,7 +13,7 @@ Target migration:
 1. Update the presenter version entry in `libs.versions.toml` to the latest version (2.0.0+) published on Maven Central before changing
    code.
     - Check Maven Central for `studio.lunabee.compose.presenter:presenter`, `studio.lunabee.compose.presenter:presenter-koin`,
-      `studio.lunabee.compose.presenter:presenter-ksp` and `studio.lunabee.compose.presenter:presenter-annotation`
+      `studio.lunabee.compose.presenter:presenter-ksp` and `studio.lunabee.compose.presenter:presenter-annotations`
     - If the project uses a shared presenter version alias, update that alias once and reuse it for every presenter dependency, except if
       you found more recent versions for specific artifacts
 2. Upgrade each affected module to use LBPresenter reducer factory generation.
@@ -32,6 +32,7 @@ Target migration:
     - route / nav args from `SavedStateHandle`
     - callbacks / lambdas created in the presenter
     - presenter-owned values computed at runtime
+   - put `@FactoryArg` on the same line as the parameter
 8. Migrate presenters using these rules:
     - If the reducer only needs DI dependencies plus `LBPresenterContext`, convert the presenter to `LBFactorySinglePresenter` and inject
       the generated reducer factory.
@@ -45,6 +46,7 @@ Target migration:
     - remove unused constructor params/properties that were only needed for manual reducer instantiation
     - remove unused imports such as `LBSingleReducer`, `viewModelScope`, or obsolete use cases/managers no longer used by the presenter
     - keep only dependencies still needed for `flows`, `getInitialState()`, `content`, or other presenter-owned logic
+    - try to remove `@Suppress("LongParameterList")` on presenter constructors when the migration cleanup makes it unnecessary
 11. Add KDoc on every presenter class to link the related presenter files:
     - if the presenter class has no KDoc, add:
       `/**`
@@ -57,6 +59,10 @@ Target migration:
       ` */`
     - if the presenter class already has KDoc, keep the existing text and append the `@see` lines at the end of the KDoc block
 12. Update DI registrations so presenters receive `reducerFactory = get()` when needed.
+    - do not modify the Koin module beyond:
+      `includes(generatedReducerFactoryModule)`
+      removing old presenter constructor arguments that are no longer needed after reducer factory migration
+    - if several generated Koin modules named `generatedReducerFactoryModule` are imported in the same file, use import aliases to avoid collisions
 13. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
 
 Implementation guidance:
