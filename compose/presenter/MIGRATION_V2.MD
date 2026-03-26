@@ -1,0 +1,56 @@
+Analyze this repository and migrate it from manual presenter reducer instantiation to the LBPresenter generated reducer-factory pattern.
+
+Before editing:
+- Read and follow any `AGENTS.md` / repo instructions you find.
+- Limit scope to the presenter migration only. Do not copy unrelated product changes from reference branches.
+- Identify every presenter/reducer pair still using manual reducer creation (`initReducer()` or `createReducer(...)` that directly instantiates the reducer).
+- Library code is open-source at https://github.com/LunabeeStudio/LBAndroid
+
+Target migration:
+1. Upgrade each affected module to use LBPresenter reducer factory generation.
+2. Add the KSP dependency for the presenter processor where needed.
+3. If the project uses Koin, add the exact KSP flag:
+   `ksp { arg("studio.lunabee.presenter.generateKoinModule", "true") }`
+4. If the project uses Koin, include the generated module:
+   `includes(generatedReducerFactoryModule)`
+5. Annotate reducers that should get generated factories with `@GenerateReducerFactory`.
+6. Mark every reducer constructor parameter that is not DI-provided and must be supplied by the presenter at creation time with `@FactoryArg`.
+   Typical examples:
+    - route / nav args from `SavedStateHandle`
+    - callbacks / lambdas created in the presenter
+    - presenter-owned values computed at runtime
+7. Migrate presenters using these rules:
+    - If the reducer only needs DI dependencies plus `LBPresenterContext`, convert the presenter to `LBFactorySinglePresenter` and inject the generated reducer factory.
+    - If the reducer needs presenter-owned runtime values, keep `LBSinglePresenter`, override `createReducer(context: LBPresenterContext<Action>)`, and call the generated factory with `factoryArgs = ...`.
+8. Replace old manual reducer creation patterns:
+    - remove `initReducer()`
+    - stop manually wiring `viewModelScope` / `::emitUserAction` into reducer constructors
+    - use `context.coroutineScope` and `context.emitUserAction` via generated factories
+9. Clean up presenter constructors, properties, and imports after the migration:
+    - remove unused constructor params/properties that were only needed for manual reducer instantiation
+    - remove unused imports such as `LBSingleReducer`, `viewModelScope`, or obsolete use cases/managers no longer used by the presenter
+    - keep only dependencies still needed for `flows`, `getInitialState()`, `content`, or other presenter-owned logic
+10. Update DI registrations so presenters receive `reducerFactory = get()` when needed.
+11. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
+
+Implementation guidance:
+- Prefer small, repetitive-safe edits.
+- Preserve existing style, naming, and DI conventions.
+- When a multiline call supports named arguments, use named arguments.
+- Do not introduce unrelated behavior changes.
+- If a module is not Koin-based, pause and explain the mismatch instead of guessing how to apply the generated Koin module step.
+
+Verification:
+- Run a real Gradle build covering every touched module.
+- Run detekt after the migration.
+- If repo instructions specify an exact detekt command, use that exact command.
+- Fix warnings/errors related to the migration instead of suppressing them.
+- Report the files changed, the migration categories applied, and the exact verification commands/results.
+
+In your final summary, include:
+- which presenters were converted to `LBFactorySinglePresenter`
+- which presenters stayed on `LBSinglePresenter` with generated `FactoryArgs`
+- which reducers gained `@GenerateReducerFactory`
+- which constructor params were marked `@FactoryArg`
+- confirmation that presenter constructor unused params/properties were cleaned up
+- build and detekt results

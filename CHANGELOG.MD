@@ -14,12 +14,14 @@ LbcpresenterKoin 2.0.0
 LbcpresenterKsp 2.0.0
 ```
 
+- Use [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to let AI migrate client project
 - Add new `lbcpresenter-annotations` module to share reducer factory annotations between runtime and KSP processor
 - Add new `lbcpresenter-ksp` module to with KSP processor for presenter
-  - Add optional `studio.lunabee.presenter.generateKoinModule=true` KSP flag to generate a per-module Koin reducer factory module
+    - Add optional `studio.lunabee.presenter.generateKoinModule=true` KSP flag to generate a per-module Koin reducer factory module
 - Add `@GenerateReducerFactory` and `@FactoryArg` to generate single reducer factories from reducer constructor signatures
 - Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
-- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for constructor-injected `LBSingleReducerFactory`
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for
+  constructor-injected `LBSingleReducerFactory`
 
 ## 2026-03-23
 
