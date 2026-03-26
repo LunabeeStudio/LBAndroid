@@ -79,8 +79,14 @@ class ReducerFactoryFileGeneratorTest {
         assertTrue(generatedSource.contains("    public val runtimeParam: TimerRuntimeParam,"))
         assertTrue(generatedSource.contains("public fun create("))
         assertFalse(generatedSource.contains("override fun create("))
-        assertTrue(generatedSource.contains("LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>"))
-        assertFalse(generatedSource.contains("): TimerReducer"))
+        assertTrue(generatedSource.contains("factoryArgs: TimerReducerFactoryArgs"))
+        assertEquals(
+            2,
+            generatedSource.split("TimerReducer =").size - 1,
+        )
+        assertFalse(
+            generatedSource.contains("): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>"),
+        )
         assertTrue(generatedSource.contains("runtimeParam: TimerRuntimeParam"))
         assertFalse(generatedSource.contains("\n    ,\n"))
     }
@@ -214,12 +220,29 @@ class ReducerFactoryFileGeneratorTest {
             ),
         )
 
-        val fileSpec = generator.generateKoinModule(listOf(timerSignature, simpleSignature))
+        val fileSpec = generator.generateKoinModule(
+            signatures = listOf(timerSignature, simpleSignature),
+            moduleRootPackageName = "studio.lunabee.compose.demo",
+        )
         val generatedSource = generator.render(fileSpec)
 
-        assertEquals("studio.lunabee.compose.demo.presenter", fileSpec.packageName)
+        assertEquals("studio.lunabee.compose.demo", fileSpec.packageName)
         assertTrue(generatedSource.contains("public val generatedReducerFactoryModule: Module = module {"))
         assertTrue(generatedSource.contains("factory { SimpleReducerFactory() }"))
         assertTrue(generatedSource.contains("factory { TimerReducerFactory(get()) }"))
+    }
+
+    @Test
+    fun common_package_name_test() {
+        assertEquals(
+            "studio.lunabee.compose.demo",
+            commonPackageName(
+                listOf(
+                    "studio.lunabee.compose.demo.presenter.timer",
+                    "studio.lunabee.compose.demo.presenter.simple",
+                    "studio.lunabee.compose.demo.navigation",
+                ),
+            ),
+        )
     }
 }

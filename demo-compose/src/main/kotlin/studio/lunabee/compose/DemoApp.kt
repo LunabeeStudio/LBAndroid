@@ -21,7 +21,6 @@ import dagger.hilt.android.HiltAndroidApp
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
-import studio.lunabee.compose.demo.generatedReducerFactoryModule
 import studio.lunabee.compose.demo.navigation.presenter.TestPresenterPresenter
 import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
 import studio.lunabee.compose.demo.presenter.timer.TimerKoinPresenter

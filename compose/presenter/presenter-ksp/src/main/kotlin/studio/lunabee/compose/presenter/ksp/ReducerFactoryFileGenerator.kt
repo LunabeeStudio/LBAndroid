@@ -28,7 +28,6 @@ import com.squareup.kotlinpoet.TypeSpec
 
 private val presenterContextType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBPresenterContext")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
-private val singleReducerType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducer")
 private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
 private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
 private const val ContextParam = "context"
@@ -50,12 +49,15 @@ internal class ReducerFactoryFileGenerator {
 
     fun render(fileSpec: FileSpec): String = fileSpec.toString()
 
-    fun generateKoinModule(signatures: List<ValidReducerSignature>): FileSpec {
+    fun generateKoinModule(
+        signatures: List<ValidReducerSignature>,
+        moduleRootPackageName: String,
+    ): FileSpec {
         require(signatures.isNotEmpty()) { "Koin module generation requires at least one reducer signature" }
 
         val sortedSignatures = signatures.sortedBy { it.factoryClassName.canonicalName }
         return FileSpec.builder(
-            packageName = commonPackageName(sortedSignatures.map { it.packageName }),
+            packageName = moduleRootPackageName,
             fileName = GeneratedKoinModuleFileName,
         ).indent("    ")
             .addProperty(
@@ -125,7 +127,7 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateCreateOverride(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
-            .returns(publicReducerReturnType(signature))
+            .returns(signature.reducerClassName)
             .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
@@ -148,7 +150,7 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateConvenienceCreate(signature: ValidReducerSignature): FunSpec {
         val functionBuilder = FunSpec.builder("create")
-            .returns(publicReducerReturnType(signature))
+            .returns(signature.reducerClassName)
             .addKdoc(ContextParamKdoc)
             .addParameter(
                 ParameterSpec.builder(
@@ -181,15 +183,6 @@ internal class ReducerFactoryFileGenerator {
         functionBuilder.addCode(convenienceCreateCode)
         return functionBuilder.build()
     }
-
-    private fun publicReducerReturnType(signature: ValidReducerSignature) =
-        singleReducerType.parameterizedBy(
-            typeArguments = arrayOf(
-                signature.uiStateTypeName,
-                signature.navScopeTypeName,
-                signature.actionTypeName,
-            ),
-        )
 
     private fun buildKoinModuleInitializer(signatures: List<ValidReducerSignature>): CodeBlock =
         CodeBlock.builder()
@@ -227,15 +220,20 @@ internal class ReducerFactoryFileGenerator {
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
     }
+}
 
-    private fun commonPackageName(packageNames: List<String>): String {
-        val firstPackageSegments = packageNames.first().split('.')
-        val commonSegments = firstPackageSegments.indices.takeWhile { index ->
-            packageNames.drop(1).all { candidate ->
-                candidate.split('.').getOrNull(index) == firstPackageSegments[index]
-            }
-        }.map { firstPackageSegments[it] }
+internal fun commonPackageName(packageNames: List<String>): String {
+    require(packageNames.isNotEmpty()) { "At least one package name is required" }
 
-        return commonSegments.joinToString(".").ifEmpty { packageNames.first() }
-    }
+    val normalizedPackageNames = packageNames.filter { it.isNotBlank() }
+    if (normalizedPackageNames.isEmpty()) return packageNames.first()
+
+    val firstPackageSegments = normalizedPackageNames.first().split('.')
+    val commonSegments = firstPackageSegments.indices.takeWhile { index ->
+        normalizedPackageNames.drop(1).all { candidate ->
+            candidate.split('.').getOrNull(index) == firstPackageSegments[index]
+        }
+    }.map { firstPackageSegments[it] }
+
+    return commonSegments.joinToString(".").ifEmpty { normalizedPackageNames.first() }
 }
