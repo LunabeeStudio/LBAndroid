@@ -69,4 +69,5 @@ class MultiStatePresenter @Inject constructor() : LBPresenter<MultiStateUiState,
             }
         }
     }
+    override val topBar: @Composable ((MultiStateUiState) -> Unit) = {}
 }

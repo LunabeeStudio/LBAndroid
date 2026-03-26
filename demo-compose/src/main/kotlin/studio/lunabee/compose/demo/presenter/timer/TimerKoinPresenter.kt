@@ -53,4 +53,5 @@ class TimerKoinPresenter(
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }
+    override val topBar: @Composable ((TimerUiState) -> Unit) = {}
 }

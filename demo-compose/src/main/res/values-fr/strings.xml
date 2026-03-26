@@ -62,4 +62,8 @@
     <!-- CoreStreen -->
     <string name="core_title">Core</string>
     <string name="core_description">Lunabee librairie core</string>
+
+    <!-- LbcNavigation -->
+    <string name="navigation_title">Navigation</string>
+    <string name="navigation_description">Lunabee navigation library</string>
 </resources>

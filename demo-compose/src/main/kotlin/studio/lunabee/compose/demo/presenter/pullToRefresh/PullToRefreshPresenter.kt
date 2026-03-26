@@ -41,4 +41,5 @@ class PullToRefreshPresenter @Inject constructor(
     )
 
     override val content: @Composable (PullToRefreshUiState) -> Unit = { PullToRefreshScreen(it) }
+    override val topBar: @Composable ((PullToRefreshUiState) -> Unit) = {}
 }

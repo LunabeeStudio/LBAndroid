@@ -43,4 +43,5 @@ class SimpleExamplePresenter @Inject constructor() :
     )
 
     override val content: @Composable (SimpleExampleUiState) -> Unit = { SimpleExampleScreen(it) }
+    override val topBar: @Composable ((SimpleExampleUiState) -> Unit) = {}
 }
