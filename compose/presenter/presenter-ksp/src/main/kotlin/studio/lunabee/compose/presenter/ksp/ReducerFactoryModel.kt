@@ -31,6 +31,7 @@ internal data class RawReducerSignature(
     val uiStateTypeName: TypeName,
     val navScopeTypeName: TypeName,
     val actionTypeName: TypeName,
+    val reducerVisibility: Visibility = Visibility.Public,
     val constructorVisibility: Visibility,
     val constructorParameters: List<RawReducerParameter>,
 )
@@ -41,6 +42,7 @@ internal data class RawReducerParameter(
     val hasRuntimeAnnotation: Boolean,
     val hasDefault: Boolean,
     val isVararg: Boolean,
+    val qualifier: KoinQualifier? = null,
 )
 
 internal data class ValidReducerSignature(
@@ -49,6 +51,7 @@ internal data class ValidReducerSignature(
     val uiStateTypeName: TypeName,
     val navScopeTypeName: TypeName,
     val actionTypeName: TypeName,
+    val generatedVisibility: Visibility,
     val factoryClassName: ClassName,
     val factoryArgsClassName: ClassName?,
     val constructorParameters: List<ValidatedReducerParameter>,
@@ -66,7 +69,18 @@ internal data class ValidatedReducerParameter(
     val name: String,
     val typeName: TypeName,
     val kind: ParameterKind,
+    val qualifier: KoinQualifier? = null,
 )
+
+internal sealed interface KoinQualifier {
+    data class Named(
+        val value: String,
+    ) : KoinQualifier
+
+    data class Typed(
+        val annotationClassName: ClassName,
+    ) : KoinQualifier
+}
 
 internal enum class ParameterKind {
     CoroutineScope,
@@ -88,12 +102,15 @@ internal class InvalidReducerFactoryException(
 
 internal class ReducerFactorySignatureValidator {
     fun validate(signature: RawReducerSignature): ValidReducerSignature {
-        if (
-            signature.constructorVisibility == Visibility.Private ||
-            signature.constructorVisibility == Visibility.Protected
-        ) {
-            throw InvalidReducerFactoryException("Reducer factory generation only supports public or internal constructors")
-        }
+        ensureValid(
+            condition = signature.reducerVisibility == Visibility.Public || signature.reducerVisibility == Visibility.Internal,
+            message = "Reducer factory generation only supports public or internal reducers",
+        )
+        ensureValid(
+            condition = signature.constructorVisibility != Visibility.Private &&
+                signature.constructorVisibility != Visibility.Protected,
+            message = "Reducer factory generation only supports public or internal constructors",
+        )
 
         val factoryClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}Factory")
         val factoryArgsClassName = ClassName(signature.packageName, "${signature.reducerClassName.simpleName}FactoryArgs")
@@ -105,16 +122,16 @@ internal class ReducerFactorySignatureValidator {
         }
 
         val coroutineScopeCount = validatedParameters.count { it.kind == ParameterKind.CoroutineScope }
-        if (coroutineScopeCount != 1) {
-            throw InvalidReducerFactoryException("Reducer constructor must declare exactly one coroutineScope: CoroutineScope parameter")
-        }
+        ensureValid(
+            condition = coroutineScopeCount == 1,
+            message = "Reducer constructor must declare exactly one coroutineScope: CoroutineScope parameter",
+        )
 
         val emitUserActionCount = validatedParameters.count { it.kind == ParameterKind.EmitUserAction }
-        if (emitUserActionCount != 1) {
-            throw InvalidReducerFactoryException(
-                message = "Reducer constructor must declare exactly one emitUserAction: (Action) -> Unit parameter",
-            )
-        }
+        ensureValid(
+            condition = emitUserActionCount == 1,
+            message = "Reducer constructor must declare exactly one emitUserAction: (Action) -> Unit parameter",
+        )
 
         return ValidReducerSignature(
             packageName = signature.packageName,
@@ -122,6 +139,7 @@ internal class ReducerFactorySignatureValidator {
             uiStateTypeName = signature.uiStateTypeName,
             navScopeTypeName = signature.navScopeTypeName,
             actionTypeName = signature.actionTypeName,
+            generatedVisibility = signature.reducerVisibility,
             factoryClassName = factoryClassName,
             factoryArgsClassName = factoryArgsClassName.takeIf { validatedParameters.any { it.kind == ParameterKind.FactoryArg } },
             constructorParameters = validatedParameters,
@@ -158,7 +176,12 @@ internal class ReducerFactorySignatureValidator {
                     condition = parameter.typeName == coroutineScopeType,
                     message = "coroutineScope parameter must use kotlinx.coroutines.CoroutineScope",
                 )
-                ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.CoroutineScope)
+                ValidatedReducerParameter(
+                    name = parameter.name,
+                    typeName = parameter.typeName,
+                    kind = ParameterKind.CoroutineScope,
+                    qualifier = parameter.qualifier,
+                )
             }
 
             isEmitUserAction -> {
@@ -169,12 +192,27 @@ internal class ReducerFactorySignatureValidator {
                     ),
                     message = "emitUserAction parameter must use the reducer Action type",
                 )
-                ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.EmitUserAction)
+                ValidatedReducerParameter(
+                    name = parameter.name,
+                    typeName = parameter.typeName,
+                    kind = ParameterKind.EmitUserAction,
+                    qualifier = parameter.qualifier,
+                )
             }
 
-            parameter.hasRuntimeAnnotation -> ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.FactoryArg)
+            parameter.hasRuntimeAnnotation -> ValidatedReducerParameter(
+                name = parameter.name,
+                typeName = parameter.typeName,
+                kind = ParameterKind.FactoryArg,
+                qualifier = parameter.qualifier,
+            )
 
-            else -> ValidatedReducerParameter(parameter.name, parameter.typeName, ParameterKind.Injected)
+            else -> ValidatedReducerParameter(
+                name = parameter.name,
+                typeName = parameter.typeName,
+                kind = ParameterKind.Injected,
+                qualifier = parameter.qualifier,
+            )
         }
     }
 

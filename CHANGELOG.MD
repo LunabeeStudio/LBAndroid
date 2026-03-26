@@ -8,13 +8,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-03-26
 
 ```
+LbcpresenterKsp 2.0.0-beta03
+```
+
+- Match generated reducer factory visibility to the annotated reducer visibility so internal reducers do not expose invalid public APIs
+- Preserve constructor qualifier metadata in generated reducer Koin modules so qualified dependencies resolve with the expected binding
+
+## 2026-03-26
+
+```
 LbcpresenterKsp 2.0.0-beta02
 ```
 
-- Fix generated presenter reducer Koin module duplication on multiplatform builds by skipping common metadata compilation output and letting platform compilations aggregate all factories into a single module
+- Fix generated presenter reducer Koin module duplication on multiplatform builds by skipping common metadata compilation output and letting
+  platform compilations aggregate all factories into a single module
 - Generate the presenter reducer Koin module in the Gradle module root package instead of the common package of annotated reducers
-- Add optional `studio.lunabee.presenter.koinModulePackage` KSP option to pin the generated reducer Koin module package and warn when the processor has to fall back to source-package inference
-- Fix incremental KSP regeneration of the presenter reducer Koin module so new presenters update the existing root module instead of generating a second module in the presenter package
+- Add optional `studio.lunabee.presenter.koinModulePackage` KSP option to pin the generated reducer Koin module package and warn when the
+  processor has to fall back to source-package inference
+- Fix incremental KSP regeneration of the presenter reducer Koin module so new presenters update the existing root module instead of
+  generating a second module in the presenter package
 - Make generated reducer factory `create` overloads return the concrete reducer class instead of the generic `LBSingleReducer` type
 
 ## 2026-03-25

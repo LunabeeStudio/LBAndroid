@@ -30,6 +30,7 @@ private val presenterContextType: ClassName = ClassName("studio.lunabee.compose.
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
 private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
 private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
+private val koinNamedMember: MemberName = MemberName("org.koin.core.qualifier", "named")
 private const val ContextParam = "context"
 private const val FactoryArgsParam = "factoryArgs"
 private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
@@ -75,6 +76,7 @@ internal class ReducerFactoryFileGenerator {
         val constructorBuilder = FunSpec.constructorBuilder()
         val typeBuilder = TypeSpec.classBuilder(factoryArgsClassName)
             .addModifiers(KModifier.DATA)
+        signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
 
         signature.factoryArgParameters.forEach { parameter ->
             constructorBuilder.addParameter(parameter.name, parameter.typeName)
@@ -90,6 +92,7 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateFactoryType(signature: ValidReducerSignature): TypeSpec {
         val typeBuilder = TypeSpec.classBuilder(signature.factoryClassName)
+        signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
         val constructorBuilder = FunSpec.constructorBuilder()
 
         signature.injectedParameters.forEach { parameter ->
@@ -191,9 +194,9 @@ internal class ReducerFactoryFileGenerator {
             .apply {
                 signatures.forEach { signature ->
                     add("factory { %T(", signature.factoryClassName)
-                    signature.injectedParameters.forEachIndexed { index, _ ->
+                    signature.injectedParameters.forEachIndexed { index, parameter ->
                         if (index > 0) add(", ")
-                        add("get()")
+                        add("%L", injectedParameterResolution(parameter))
                     }
                     add(") }\n")
                 }
@@ -220,6 +223,28 @@ internal class ReducerFactoryFileGenerator {
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
     }
+
+    private fun injectedParameterResolution(parameter: ValidatedReducerParameter): CodeBlock = when (val qualifier = parameter.qualifier) {
+        null -> CodeBlock.of("get()")
+
+        is KoinQualifier.Named -> CodeBlock.of("get(qualifier = %M(%S))", koinNamedMember, qualifier.value)
+
+        is KoinQualifier.Typed -> CodeBlock.of(
+            "get(qualifier = %M<%T>())",
+            koinNamedMember,
+            qualifier.annotationClassName,
+        )
+    }
+}
+
+private fun Visibility.toKModifier(): KModifier? = when (this) {
+    Visibility.Public -> null
+
+    Visibility.Internal -> KModifier.INTERNAL
+
+    Visibility.Protected,
+    Visibility.Private,
+    -> error("Unsupported generated visibility: $this")
 }
 
 internal fun commonPackageName(packageNames: List<String>): String {

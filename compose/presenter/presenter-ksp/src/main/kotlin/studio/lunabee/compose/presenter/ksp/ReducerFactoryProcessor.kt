@@ -26,18 +26,31 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import studio.lunabee.compose.presenter.GenerateReducerFactory
 import studio.lunabee.compose.presenter.FactoryArg
+import studio.lunabee.compose.presenter.GenerateReducerFactory
 
 private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
 private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
+private val namedQualifierAnnotations: Set<String> = setOf(
+    "jakarta.inject.Named",
+    "javax.inject.Named",
+    "org.koin.core.annotation.Named",
+)
+private val qualifierMetaAnnotations: Set<String> = setOf(
+    "jakarta.inject.Qualifier",
+    "javax.inject.Qualifier",
+    "org.koin.core.annotation.Qualifier",
+)
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
@@ -218,6 +231,7 @@ internal class ReducerFactoryProcessor(
             uiStateTypeName = reducerTypeArguments[0].toTypeName(),
             navScopeTypeName = reducerTypeArguments[1].toTypeName(),
             actionTypeName = reducerTypeArguments[2].toTypeName(),
+            reducerVisibility = toVisibility(),
             constructorVisibility = primaryConstructor.toVisibility(),
             constructorParameters = primaryConstructor.parameters.map { parameter ->
                 RawReducerParameter(
@@ -229,17 +243,54 @@ internal class ReducerFactoryProcessor(
                     },
                     hasDefault = parameter.hasDefault,
                     isVararg = parameter.isVararg,
+                    qualifier = parameter.toKoinQualifier(),
                 )
             },
         )
     }
 
-    private fun KSFunctionDeclaration.toVisibility(): Visibility = when {
+    private fun KSDeclaration.toVisibility(): Visibility = when {
         Modifier.PRIVATE in modifiers -> Visibility.Private
         Modifier.PROTECTED in modifiers -> Visibility.Protected
         Modifier.INTERNAL in modifiers -> Visibility.Internal
         else -> Visibility.Public
     }
+
+    private fun KSValueParameter.toKoinQualifier(): KoinQualifier? {
+        val qualifiers = annotations.mapNotNull { it.toKoinQualifier() }.toList()
+        if (qualifiers.size > 1) {
+            throw InvalidReducerFactoryException("Reducer constructor parameters support at most one qualifier annotation")
+        }
+        return qualifiers.singleOrNull()
+    }
+
+    private fun KSAnnotation.toKoinQualifier(): KoinQualifier? {
+        val annotationDeclaration = annotationType.resolve().declaration as? KSClassDeclaration ?: return null
+        val annotationQualifiedName = annotationDeclaration.qualifiedName?.asString() ?: return null
+        if (annotationQualifiedName == factoryArgAnnotation) return null
+
+        if (annotationQualifiedName in namedQualifierAnnotations) {
+            val qualifierName = stringArgumentValue()
+                ?: throw InvalidReducerFactoryException("@Named qualifier must declare a String value")
+            return KoinQualifier.Named(qualifierName)
+        }
+
+        return if (annotationDeclaration.isQualifierAnnotation()) {
+            KoinQualifier.Typed(annotationDeclaration.toClassName())
+        } else {
+            null
+        }
+    }
+
+    private fun KSClassDeclaration.isQualifierAnnotation(): Boolean =
+        annotations.any { annotation ->
+            annotation.annotationType.resolve().declaration.qualifiedName?.asString() in qualifierMetaAnnotations
+        }
+
+    private fun KSAnnotation.stringArgumentValue(): String? =
+        arguments.firstOrNull { argument ->
+            argument.name?.asString() == "value" || argument.name == null
+        }?.value as? String
 }
 
 internal fun resolveModuleRootPackageName(
