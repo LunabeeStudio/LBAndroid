@@ -91,7 +91,7 @@ internal class ReducerFactoryProcessor(
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
     private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
     private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
-    private val moduleSourceFiles: LinkedHashSet<KSFile> = linkedSetOf()
+    private val moduleSourcePackageNames: LinkedHashSet<String> = linkedSetOf()
     private var moduleRootPackageName: String? = null
     private var hasWarnedAboutMissingKoinModulePackageOption: Boolean = false
 
@@ -112,7 +112,7 @@ internal class ReducerFactoryProcessor(
             moduleRootPackageName = moduleRootPackageName
                 ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
         )
-        writeGeneratedAggregatingFile(fileSpec, moduleSourceFiles.toList())
+        writeGeneratedAggregatingFile(fileSpec)
     }
 
     private fun processSymbol(
@@ -141,11 +141,10 @@ internal class ReducerFactoryProcessor(
     private fun collectKoinModuleContext(resolver: Resolver) {
         if (!generateKoinModule) return
 
-        val sourceFiles = resolver.getAllFiles().toList()
-        moduleSourceFiles += sourceFiles
+        moduleSourcePackageNames += resolver.getAllFiles().map { it.packageName.asString() }.toList()
         moduleRootPackageName = resolveModuleRootPackageName(
             configuredPackageName = configuredKoinModulePackageName,
-            sourcePackageNames = moduleSourceFiles.map { it.packageName.asString() },
+            sourcePackageNames = moduleSourcePackageNames.toList(),
         )
         warnAboutMissingKoinModulePackageOptionIfNeeded()
     }
@@ -168,15 +167,8 @@ internal class ReducerFactoryProcessor(
         writeGeneratedFile(fileSpec, dependencies)
     }
 
-    private fun writeGeneratedAggregatingFile(
-        fileSpec: com.squareup.kotlinpoet.FileSpec,
-        dependenciesFiles: List<KSFile>,
-    ) {
-        val dependencies = dependenciesFiles.takeIf { it.isNotEmpty() }
-            ?.toTypedArray()
-            ?.let { Dependencies(true, *it) }
-            ?: Dependencies(true)
-        writeGeneratedFile(fileSpec, dependencies)
+    private fun writeGeneratedAggregatingFile(fileSpec: com.squareup.kotlinpoet.FileSpec) {
+        writeGeneratedFile(fileSpec, Dependencies(true))
     }
 
     private fun writeGeneratedFile(
