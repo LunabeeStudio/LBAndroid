@@ -8,10 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-03-25
 
 ```
-Lbcpresenter 2.0.0
-LbcpresenterAnnotations 2.0.0
-LbcpresenterKoin 2.0.0
-LbcpresenterKsp 2.0.0
+Lbcpresenter 2.0.0-beta01
+LbcpresenterAnnotations 2.0.0-beta01
+LbcpresenterKoin 2.0.0-beta01
+LbcpresenterKsp 2.0.0-beta01
 ```
 
 - Use [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to let AI migrate client project
