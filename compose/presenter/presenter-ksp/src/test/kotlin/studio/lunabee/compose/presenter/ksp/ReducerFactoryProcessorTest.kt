@@ -17,8 +17,10 @@
 package studio.lunabee.compose.presenter.ksp
 
 import com.google.devtools.ksp.processing.PlatformInfo
+import com.squareup.kotlinpoet.ClassName
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -76,6 +78,29 @@ class ReducerFactoryProcessorTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun resolve_named_qualifier_supports_typed_koin_named_test() {
+        assertEquals(
+            KoinQualifier.Typed(ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier")),
+            resolveNamedQualifier(
+                value = null,
+                type = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier"),
+            ),
+        )
+    }
+
+    @Test
+    fun resolve_named_qualifier_rejects_empty_named_qualifier_without_type_test() {
+        val exception = assertFailsWith<InvalidReducerFactoryException> {
+            resolveNamedQualifier(
+                value = "",
+                type = ClassName("kotlin", "Unit"),
+            )
+        }
+
+        assertEquals("@Named qualifier must declare a non-empty String value or a type", exception.message)
     }
 }
 

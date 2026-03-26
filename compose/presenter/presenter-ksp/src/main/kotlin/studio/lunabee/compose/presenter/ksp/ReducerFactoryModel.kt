@@ -139,7 +139,10 @@ internal class ReducerFactorySignatureValidator {
             uiStateTypeName = signature.uiStateTypeName,
             navScopeTypeName = signature.navScopeTypeName,
             actionTypeName = signature.actionTypeName,
-            generatedVisibility = signature.reducerVisibility,
+            generatedVisibility = moreRestrictiveVisibility(
+                first = signature.reducerVisibility,
+                second = signature.constructorVisibility,
+            ),
             factoryClassName = factoryClassName,
             factoryArgsClassName = factoryArgsClassName.takeIf { validatedParameters.any { it.kind == ParameterKind.FactoryArg } },
             constructorParameters = validatedParameters,
@@ -224,6 +227,25 @@ internal class ReducerFactorySignatureValidator {
             throw InvalidReducerFactoryException(message)
         }
     }
+}
+
+internal fun moreRestrictiveVisibility(
+    first: Visibility,
+    second: Visibility,
+): Visibility {
+    val firstRank = when (first) {
+        Visibility.Public -> 0
+        Visibility.Internal -> 1
+        Visibility.Protected -> 2
+        Visibility.Private -> 3
+    }
+    val secondRank = when (second) {
+        Visibility.Public -> 0
+        Visibility.Internal -> 1
+        Visibility.Protected -> 2
+        Visibility.Private -> 3
+    }
+    return if (firstRank >= secondRank) first else second
 }
 
 internal fun TypeName.parameterizedBy(vararg typeArguments: TypeName): ParameterizedTypeName =

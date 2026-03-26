@@ -11,8 +11,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 LbcpresenterKsp 2.0.0-beta03
 ```
 
-- Match generated reducer factory visibility to the annotated reducer visibility so internal reducers do not expose invalid public APIs
-- Preserve constructor qualifier metadata in generated reducer Koin modules so qualified dependencies resolve with the expected binding
+- Match generated reducer factory visibility to the stricter reducer and constructor visibility so generated APIs do not expose hidden constructors
+- Preserve constructor qualifier metadata in generated reducer Koin modules, including typed `@Named` qualifiers, so qualified dependencies resolve with the expected binding
 
 ## 2026-03-26
 

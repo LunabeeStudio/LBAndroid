@@ -31,9 +31,11 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.validate
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import studio.lunabee.compose.presenter.FactoryArg
@@ -51,6 +53,7 @@ private val qualifierMetaAnnotations: Set<String> = setOf(
     "javax.inject.Qualifier",
     "org.koin.core.annotation.Qualifier",
 )
+private val kotlinUnitClassName: ClassName = ClassName("kotlin", "Unit")
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
@@ -270,9 +273,10 @@ internal class ReducerFactoryProcessor(
         if (annotationQualifiedName == factoryArgAnnotation) return null
 
         if (annotationQualifiedName in namedQualifierAnnotations) {
-            val qualifierName = stringArgumentValue()
-                ?: throw InvalidReducerFactoryException("@Named qualifier must declare a String value")
-            return KoinQualifier.Named(qualifierName)
+            return resolveNamedQualifier(
+                value = stringArgumentValue(),
+                type = classArgumentValue(argumentName = "type"),
+            )
         }
 
         return if (annotationDeclaration.isQualifierAnnotation()) {
@@ -291,6 +295,25 @@ internal class ReducerFactoryProcessor(
         arguments.firstOrNull { argument ->
             argument.name?.asString() == "value" || argument.name == null
         }?.value as? String
+
+    private fun KSAnnotation.classArgumentValue(argumentName: String): ClassName? {
+        val value = arguments.firstOrNull { argument -> argument.name?.asString() == argumentName }?.value as? KSType
+        val declaration = value?.declaration as? KSClassDeclaration ?: return null
+        return declaration.toClassName()
+    }
+}
+
+internal fun resolveNamedQualifier(
+    value: String?,
+    type: ClassName?,
+): KoinQualifier {
+    value?.takeIf { it.isNotEmpty() }?.let { qualifierName ->
+        return KoinQualifier.Named(qualifierName)
+    }
+    type?.takeUnless { it == kotlinUnitClassName }?.let { qualifierType ->
+        return KoinQualifier.Typed(qualifierType)
+    }
+    throw InvalidReducerFactoryException("@Named qualifier must declare a non-empty String value or a type")
 }
 
 internal fun resolveModuleRootPackageName(
