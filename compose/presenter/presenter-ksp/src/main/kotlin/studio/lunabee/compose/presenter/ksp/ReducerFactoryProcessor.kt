@@ -197,7 +197,7 @@ internal class ReducerFactoryProcessor(
         }
 
     private fun KSClassDeclaration.toRawSignature(): RawReducerSignature {
-        if (classKind != ClassKind.CLASS) {
+        if (!isConcreteReducerClass(classKind = classKind, modifiers = modifiers)) {
             throw InvalidReducerFactoryException("Reducer factory generation only supports concrete classes")
         }
 
@@ -306,6 +306,11 @@ internal fun shouldGenerateKoinModuleAtFinish(
     generateKoinModule: Boolean,
     signatures: Collection<ValidReducerSignature>,
 ): Boolean = generateKoinModule && signatures.isNotEmpty()
+
+internal fun isConcreteReducerClass(
+    classKind: ClassKind,
+    modifiers: Set<Modifier>,
+): Boolean = classKind == ClassKind.CLASS && Modifier.ABSTRACT !in modifiers
 
 internal fun resolveModuleRootPackageName(
     configuredPackageName: String?,

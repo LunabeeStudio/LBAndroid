@@ -17,6 +17,8 @@
 package studio.lunabee.compose.presenter.ksp
 
 import com.google.devtools.ksp.processing.PlatformInfo
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +51,26 @@ class ReducerFactoryProcessorTest {
                     FakePlatformInfo(platformName = "JVM"),
                     FakePlatformInfo(platformName = "Native"),
                 ),
+            ),
+        )
+    }
+
+    @Test
+    fun should_recognize_concrete_reducer_class_test() {
+        assertTrue(
+            isConcreteReducerClass(
+                classKind = ClassKind.CLASS,
+                modifiers = emptySet(),
+            ),
+        )
+    }
+
+    @Test
+    fun should_reject_abstract_reducer_class_test() {
+        assertFalse(
+            isConcreteReducerClass(
+                classKind = ClassKind.CLASS,
+                modifiers = setOf(Modifier.ABSTRACT),
             ),
         )
     }
