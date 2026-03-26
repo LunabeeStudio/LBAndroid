@@ -19,6 +19,7 @@ package studio.lunabee.compose.presenter.ksp
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.processing.PlatformInfo
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -44,12 +45,24 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
      * Creates the processor used to generate reducer factories.
      */
-    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor = ReducerFactoryProcessor(
-        codeGenerator = environment.codeGenerator,
-        logger = environment.logger,
-        generateKoinModule = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true,
-    )
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
+        val koinModuleGenerationRequested = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true
+        val generateKoinModule = koinModuleGenerationRequested && shouldGenerateKoinModuleForCompilation(environment.platforms)
+        if (koinModuleGenerationRequested && !generateKoinModule) {
+            environment.logger.info(
+                "Skipping reducer Koin module generation for this compilation because it cannot aggregate all factories. " +
+                    "A platform compilation will generate the shared module instead.",
+            )
+        }
+        return ReducerFactoryProcessor(
+            codeGenerator = environment.codeGenerator,
+            logger = environment.logger,
+            generateKoinModule = generateKoinModule,
+        )
+    }
 }
+
+internal fun shouldGenerateKoinModuleForCompilation(platforms: List<PlatformInfo>): Boolean = platforms.size == 1
 
 internal class ReducerFactoryProcessor(
     private val codeGenerator: CodeGenerator,
@@ -61,8 +74,12 @@ internal class ReducerFactoryProcessor(
     private var hasGeneratedKoinModule: Boolean = false
     private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
     private val koinModuleDependenciesFiles: LinkedHashSet<KSFile> = linkedSetOf()
+    private var moduleRootPackageName: String? = null
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        if (generateKoinModule && moduleRootPackageName == null) {
+            moduleRootPackageName = resolveModuleRootPackageName(resolver)
+        }
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
             .forEach { symbol -> processSymbol(symbol, deferred) }
@@ -98,7 +115,11 @@ internal class ReducerFactoryProcessor(
     private fun generateKoinModuleIfReady(deferred: List<KSAnnotated>) {
         if (!shouldGenerateKoinModule(deferred)) return
 
-        val fileSpec = fileGenerator.generateKoinModule(koinModuleSignatures.values.toList())
+        val fileSpec = fileGenerator.generateKoinModule(
+            signatures = koinModuleSignatures.values.toList(),
+            moduleRootPackageName = moduleRootPackageName
+                ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
+        )
         writeGeneratedFile(fileSpec, koinModuleDependenciesFiles.toList())
         hasGeneratedKoinModule = true
     }
@@ -108,6 +129,14 @@ internal class ReducerFactoryProcessor(
         if (deferred.isNotEmpty()) return false
         if (hasGeneratedKoinModule) return false
         return koinModuleSignatures.isNotEmpty()
+    }
+
+    private fun resolveModuleRootPackageName(resolver: Resolver): String {
+        val sourcePackageNames = resolver.getAllFiles()
+            .map { it.packageName.asString() }
+            .filter { it.isNotBlank() }
+            .toList()
+        return sourcePackageNames.firstOrNull()?.let { commonPackageName(sourcePackageNames) } ?: ""
     }
 
     private fun writeGeneratedFile(

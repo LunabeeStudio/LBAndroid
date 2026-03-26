@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-26
+
+```
+LbcpresenterKsp 2.0.0-beta02
+```
+
+- Fix generated presenter reducer Koin module duplication on multiplatform builds by skipping common metadata compilation output and letting platform compilations aggregate all factories into a single module
+- Generate the presenter reducer Koin module in the Gradle module root package instead of the common package of annotated reducers
+- Make generated reducer factory `create` overloads return the concrete reducer class instead of the generic `LBSingleReducer` type
+
 ## 2026-03-25
 
 ```
