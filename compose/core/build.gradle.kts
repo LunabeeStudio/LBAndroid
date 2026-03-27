@@ -47,6 +47,7 @@ dependencies {
     debugImplementation(libs.composeUiTestManifest)
 
     androidTestImplementation(libs.androidxTestRunner)
+    androidTestImplementation(libs.androidxUiToolingPreview)
     androidTestImplementation(libs.composeUiTest)
     androidTestImplementation(libs.composeUiTestJunit4)
     androidTestImplementation(libs.kotlinTest)
