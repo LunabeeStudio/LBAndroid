@@ -100,8 +100,9 @@ internal class ReducerFactoryProcessor(
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
             .forEach { symbol -> processSymbol(symbol, deferred) }
+        collectKoinModuleSignatures(resolver, deferred)
 
-        return deferred
+        return deferred.distinct()
     }
 
     override fun finish() {
@@ -132,10 +133,6 @@ internal class ReducerFactoryProcessor(
 
         val generatedFactoryFiles = buildFileSpec(declaration) ?: return
         writeGeneratedFile(generatedFactoryFiles.fileSpec, declaration.containingFile)
-
-        if (generateKoinModule) {
-            koinModuleSignatures[generatedFactoryFiles.signature.factoryClassName.canonicalName] = generatedFactoryFiles.signature
-        }
     }
 
     private fun collectKoinModuleContext(resolver: Resolver) {
@@ -159,6 +156,29 @@ internal class ReducerFactoryProcessor(
         hasWarnedAboutMissingKoinModulePackageOption = true
     }
 
+    private fun collectKoinModuleSignatures(
+        resolver: Resolver,
+        deferred: MutableList<KSAnnotated>,
+    ) {
+        if (!generateKoinModule) return
+
+        koinModuleSignatures.clear()
+        // KSP incremental runs may not surface every annotated reducer in getSymbolsWithAnnotation().
+        // Rebuilding the aggregating module from all visible source files keeps the shared Koin module stable.
+        resolver.getAllFiles()
+            .asSequence()
+            .flatMap { file -> file.annotatedReducerDeclarations() }
+            .forEach { declaration ->
+                if (!declaration.validate()) {
+                    deferred += declaration
+                    return@forEach
+                }
+
+                val signature = buildValidSignature(declaration) ?: return@forEach
+                koinModuleSignatures[signature.factoryClassName.canonicalName] = signature
+            }
+    }
+
     private fun writeGeneratedFile(
         fileSpec: com.squareup.kotlinpoet.FileSpec,
         dependenciesFile: KSFile?,
@@ -168,7 +188,8 @@ internal class ReducerFactoryProcessor(
     }
 
     private fun writeGeneratedAggregatingFile(fileSpec: com.squareup.kotlinpoet.FileSpec) {
-        writeGeneratedFile(fileSpec, Dependencies(true))
+        // The shared Koin module needs full-source invalidation so KSP does not drop it on unrelated incremental reruns.
+        writeGeneratedFile(fileSpec, Dependencies.ALL_FILES)
     }
 
     private fun writeGeneratedFile(
@@ -191,6 +212,14 @@ internal class ReducerFactoryProcessor(
                 signature = signature,
                 fileSpec = fileGenerator.generate(signature),
             )
+        }.getOrElse { throwable ->
+            logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
+            null
+        }
+
+    private fun buildValidSignature(declaration: KSClassDeclaration): ValidReducerSignature? =
+        runCatching {
+            validator.validate(declaration.toRawSignature())
         }.getOrElse { throwable ->
             logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
             null
@@ -287,6 +316,24 @@ internal class ReducerFactoryProcessor(
         val declaration = value?.declaration as? KSClassDeclaration ?: return null
         return declaration.toClassName()
     }
+
+    private fun KSFile.annotatedReducerDeclarations(): Sequence<KSClassDeclaration> =
+        declarations.asSequence().flatMap { declaration -> declaration.annotatedReducerDeclarations() }
+
+    private fun KSDeclaration.annotatedReducerDeclarations(): Sequence<KSClassDeclaration> = sequence {
+        val classDeclaration = this@annotatedReducerDeclarations as? KSClassDeclaration ?: return@sequence
+        if (classDeclaration.hasGenerateReducerFactoryAnnotation()) {
+            yield(classDeclaration)
+        }
+        classDeclaration.declarations.forEach { declaration ->
+            yieldAll(declaration.annotatedReducerDeclarations())
+        }
+    }
+
+    private fun KSClassDeclaration.hasGenerateReducerFactoryAnnotation(): Boolean =
+        annotations.any { annotation ->
+            annotation.annotationType.resolve().declaration.qualifiedName?.asString() == generateReducerFactoryAnnotation
+        }
 }
 
 internal fun resolveNamedQualifier(
