@@ -19,8 +19,13 @@
 package studio.lunabee.extension
 
 import android.app.Activity
+import android.graphics.Color
+import android.os.Build
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 
 /**
@@ -38,4 +43,34 @@ fun Activity.hideSoftKeyBoard() {
         }
         imm.hideSoftInputFromWindow(view?.windowToken, 0)
     }
+}
+
+/**
+ * Enables the edge-to-edge display for this [ComponentActivity].
+ *
+ * @see ComponentActivity.enableEdgeToEdge
+ */
+fun ComponentActivity.lbEnableEdgeToEdge(isDark: Boolean = true) {
+    // Don't use SystemBarStyle.auto for navigation bar because it always adds a scrim (cf doc)
+    val navigationBarStyle = if (isDark) {
+        SystemBarStyle.dark(scrim = Color.TRANSPARENT)
+    } else {
+        SystemBarStyle.light(
+            scrim = Color.TRANSPARENT,
+            darkScrim = Color.TRANSPARENT,
+        )
+    }
+    val statusBarStyle = if (isDark) {
+        SystemBarStyle.dark(Color.TRANSPARENT)
+    } else {
+        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+    }
+    enableEdgeToEdge(
+        statusBarStyle = statusBarStyle,
+        navigationBarStyle = navigationBarStyle,
+    )
+
+    // For API29(Q) or higher and 3-button navigation,
+    // the following code must be written to make the navigation color completely transparent.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
 }
