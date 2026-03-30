@@ -22,5 +22,5 @@ data class CountryCodeFieldData(
     val phoneNumber: TextFieldValue,
     val countryCode: String,
 ) {
-    fun fullNumber(): String = "+$countryCode$phoneNumber"
+    fun fullNumber(): String = "+$countryCode${phoneNumber.text}"
 }

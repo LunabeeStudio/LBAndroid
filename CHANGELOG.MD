@@ -17,21 +17,12 @@ LbcpresenterKsp 2.0.0-beta04
 ## 2026-03-26
 
 ```
+Lbcuifield 2.0.1
+LbcpresenterKsp 2.0.0-beta02
 LbcpresenterKsp 2.0.0-beta03
 ```
 
-- Match generated reducer factory visibility to the stricter reducer and constructor visibility so generated APIs do not expose hidden
-  constructors
-- Preserve constructor qualifier metadata in generated reducer Koin modules, including typed `@Named` qualifiers, so qualified dependencies
-  resolve with the expected binding
-- Defer generated reducer Koin module aggregation to the final KSP round so factories discovered from later generated sources are included
-
-## 2026-03-26
-
-```
-LbcpresenterKsp 2.0.0-beta02
-```
-
+- Fix `CountryCodeFieldData` `fullNumber` function using raw `TextFieldValue` in string phone number result
 - Fix generated presenter reducer Koin module duplication on multiplatform builds by skipping common metadata compilation output and letting
   platform compilations aggregate all factories into a single module
 - Generate the presenter reducer Koin module in the Gradle module root package instead of the common package of annotated reducers
@@ -40,6 +31,12 @@ LbcpresenterKsp 2.0.0-beta02
 - Fix incremental KSP regeneration of the presenter reducer Koin module so new presenters update the existing root module instead of
   generating a second module in the presenter package
 - Make generated reducer factory `create` overloads return the concrete reducer class instead of the generic `LBSingleReducer` type
+
+- Match generated reducer factory visibility to the stricter reducer and constructor visibility so generated APIs do not expose hidden
+  constructors
+- Preserve constructor qualifier metadata in generated reducer Koin modules, including typed `@Named` qualifiers, so qualified dependencies
+  resolve with the expected binding
+- Defer generated reducer Koin module aggregation to the final KSP round so factories discovered from later generated sources are included
 
 ## 2026-03-25
 
