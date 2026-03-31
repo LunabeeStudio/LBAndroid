@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-31
+
+```
+Lbcpresenter 2.0.0-rc01
+LbcpresenterAnnotations 2.0.0-rc01
+LbcpresenterKoin 2.0.0-rc01
+LbcpresenterKsp 2.0.0-rc01
+```
+
+- Introduce presenter v2 generated reducer factories with the new `lbcpresenter-annotations` and `lbcpresenter-ksp` modules, plus optional
+  generated Koin reducer modules
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for reducer
+  factories injected by DI
+- Add [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to help client projects migrate and keep generated factories and Koin bindings
+  aligned with reducer visibility, qualifiers, and multiplatform / incremental KSP builds
+
 ## 2026-03-27
 
 ```
