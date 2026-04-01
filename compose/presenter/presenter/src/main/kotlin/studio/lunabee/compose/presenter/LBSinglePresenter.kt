@@ -16,20 +16,37 @@
 
 package studio.lunabee.compose.presenter
 
+import androidx.lifecycle.viewModelScope
+
 /**
  * Subclass of [LBPresenter] to implement a single state presenter
+ *
+ * Override [createReducer] to define how the presenter builds its reducer.
  *
  * @param verbose enable verbose logs using kermit logger
  * @see LBPresenter
  */
-abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Action>(
+abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Action> protected constructor(
     verbose: Boolean = false,
 ) : LBPresenter<UiState, NavScope, Action>(verbose = verbose) {
-    private val reducer by lazy { initReducer() }
+    /**
+     * Creates the single reducer used by this presenter.
+     *
+     * Override this hook when the reducer depends on values computed from presenter constructor parameters or
+     * presenter-owned runtime state.
+     */
+    protected abstract fun createReducer(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action>
+
+    private val reducer by lazy {
+        createReducer(
+            context = LBPresenterContext(
+                coroutineScope = viewModelScope,
+                emitUserAction = ::emitUserAction,
+            ),
+        )
+    }
 
     final override fun getReducerByState(
         actualState: UiState,
     ): LBSingleReducer<UiState, NavScope, Action> = reducer
-
-    abstract fun initReducer(): LBSingleReducer<UiState, NavScope, Action>
 }

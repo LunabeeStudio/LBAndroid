@@ -20,7 +20,7 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import androidx.test.core.app.ApplicationProvider
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class SharedPreferencesExtTest {

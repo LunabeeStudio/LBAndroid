@@ -16,8 +16,10 @@
 
 package studio.lunabee.compose.demo.presenter.timer
 
+import androidx.compose.runtime.Stable
 import studio.lunabee.compose.presenter.PresenterUiState
 
+@Stable
 data class TimerUiState(
-    val timer: Int,
+    val timer: String,
 ) : PresenterUiState

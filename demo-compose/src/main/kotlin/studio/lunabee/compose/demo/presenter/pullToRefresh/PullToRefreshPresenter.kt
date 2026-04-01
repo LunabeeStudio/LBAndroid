@@ -17,29 +17,28 @@
 package studio.lunabee.compose.demo.presenter.pullToRefresh
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import studio.lunabee.compose.presenter.LBSinglePresenter
-import studio.lunabee.compose.presenter.LBSingleReducer
+import studio.lunabee.compose.presenter.LBFactorySinglePresenter
 import javax.inject.Inject
 
 @HiltViewModel
-class PullToRefreshPresenter @Inject constructor() :
-    LBSinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction>(verbose = true) {
+class PullToRefreshPresenter @Inject constructor(
+    reducerFactory: PullToRefreshReducerFactory,
+) : LBFactorySinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction>(
+    reducerFactory = reducerFactory,
+    verbose = true,
+) {
 
     override val flows: List<Flow<PullToRefreshAction>> = listOf()
 
+    /**
+     * Returns the initial state displayed before any action is reduced.
+     */
     override fun getInitialState(): PullToRefreshUiState = PullToRefreshUiState(
         isRefreshing = false,
         refresh = { emitUserAction(PullToRefreshAction.Refresh) },
     )
-
-    override fun initReducer(): LBSingleReducer<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction> =
-        PullToRefreshReducer(
-            coroutineScope = viewModelScope,
-            emitUserAction = ::emitUserAction,
-        )
 
     override val content: @Composable (PullToRefreshUiState) -> Unit = { PullToRefreshScreen(it) }
 }

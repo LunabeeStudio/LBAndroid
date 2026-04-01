@@ -20,12 +20,14 @@ import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
+import studio.lunabee.compose.presenter.GenerateReducerFactory
 import studio.lunabee.compose.presenter.LBSingleReducer
 import studio.lunabee.compose.presenter.ReduceResult
 import studio.lunabee.compose.presenter.asResult
 import studio.lunabee.compose.presenter.withSideEffect
 import kotlin.random.Random
 
+@GenerateReducerFactory
 class SimpleExampleReducer(
     override val coroutineScope: CoroutineScope,
     override val emitUserAction: (SimpleExampleAction) -> Unit,

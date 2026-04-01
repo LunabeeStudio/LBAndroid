@@ -27,7 +27,7 @@ import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Rule
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -89,7 +89,7 @@ class ShowDelayedLoadingTest {
 
         assertFalse(actualShowLoading!!)
         composeTestRule.wait(delayBeforeShow * 1.5)
-        assertTrue(actualShowLoading!!)
+        assertTrue(actualShowLoading)
     }
 
     @Test
@@ -109,7 +109,7 @@ class ShowDelayedLoadingTest {
 
         assertTrue(actualShowLoading!!)
         shouldShowLoading.value = false
-        composeTestRule.waitUntil { !actualShowLoading!! }
+        composeTestRule.waitUntil { !actualShowLoading }
     }
 
     @Test
@@ -134,10 +134,10 @@ class ShowDelayedLoadingTest {
         // Request false
         shouldShowLoading.value = false
         composeTestRule.mainClock.advanceTimeByFrame()
-        assertTrue(actualShowLoading!!) // Still true because of minLoadingShowDuration
+        assertTrue(actualShowLoading) // Still true because of minLoadingShowDuration
 
         composeTestRule.wait(minLoadingShowDuration)
-        assertFalse(actualShowLoading!!)
+        assertFalse(actualShowLoading)
     }
 
     @Test

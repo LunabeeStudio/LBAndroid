@@ -22,7 +22,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Test
+import kotlin.test.Test
 import studio.lunabee.compose.androidtest.LbcComposeTest
 import studio.lunabee.compose.androidtest.extension.waitAndPrintRootToCacheDir
 import java.io.File

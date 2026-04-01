@@ -18,13 +18,23 @@ package studio.lunabee.compose.demo.presenter.timer
 
 import android.app.Activity
 import kotlinx.coroutines.CoroutineScope
+import studio.lunabee.compose.presenter.FactoryArg
+import studio.lunabee.compose.presenter.GenerateReducerFactory
 import studio.lunabee.compose.presenter.LBSingleReducer
 import studio.lunabee.compose.presenter.ReduceResult
 import studio.lunabee.compose.presenter.asResult
+import kotlin.time.Instant
 
+data class TimerInjectedParam(
+    val prefix: String,
+)
+
+@GenerateReducerFactory
 class TimerReducer(
     override val coroutineScope: CoroutineScope,
     override val emitUserAction: (TimerAction) -> Unit,
+    private val injectedParam: TimerInjectedParam,
+    @FactoryArg private val currentTime: Instant,
 ) : LBSingleReducer<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
     override suspend fun reduce(
         actualState: TimerUiState,
@@ -32,6 +42,8 @@ class TimerReducer(
         performNavigation: (TimerNavScope.() -> Unit) -> Unit,
         useActivity: (suspend (Activity) -> Unit) -> Unit,
     ): ReduceResult<TimerUiState> = when (action) {
-        is TimerAction.NewTimerValue -> actualState.copy(timer = action.timerValue).asResult()
+        is TimerAction.NewTimerValue -> actualState.copy(
+            timer = injectedParam.prefix + Instant.fromEpochSeconds(action.timerValue + currentTime.epochSeconds),
+        ).asResult()
     }
 }

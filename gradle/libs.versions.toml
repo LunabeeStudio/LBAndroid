@@ -9,6 +9,7 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMul
 # Do not remove, use as "id" instead of alias, this is why it is not detected.
 composePlugin = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "dagger" }
+kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 lbDetekt = { id = "studio.lunabee.plugin.detekt", version.ref = "lbDetekt" }
@@ -50,6 +51,7 @@ junit4 = "4.13.2"
 junitJupiter = "6.0.3"
 koin = "4.2.0"
 kotlin = "2.3.10"
+kotlinPoet = "1.18.1"
 kotlinxCoroutines = "1.10.2"
 kotlinxDatetime = "0.7.1"
 kotlinxSerialization = "1.10.0"
@@ -138,6 +140,8 @@ koinComposeViewmodel = { group = "io.insert-koin", name = "koin-compose-viewmode
 koinCore = { group = "io.insert-koin", name = "koin-core" }
 koinViewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel" }
 kotlinGradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlinPoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinPoet" }
+kotlinPoetKsp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlinPoet" }
 kotlinTest = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 kotlinTestJunit = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit", version.ref = "kotlin" }
 kotlinxCoroutinesAndroid = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
@@ -147,6 +151,7 @@ kotlinxCoroutinesTest = { group = "org.jetbrains.kotlinx", name = "kotlinx-corou
 kotlinxDatetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerializationJson = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinxViewModel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "kotlinxViewModel" }
+kspApi = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 ktorClientAndroid = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktorClientCore = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktorClientIos = { group = "io.ktor", name = "ktor-client-ios", version.ref = "ktor" }

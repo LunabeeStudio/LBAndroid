@@ -22,8 +22,10 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
+private val moduleNamespace: String = "studio.lunabee.compose"
+
 android {
-    namespace = "studio.lunabee.compose"
+    namespace = moduleNamespace
 
     compileSdk = AndroidConfig.CompileSdk
 
@@ -74,6 +76,11 @@ android {
     }
 }
 
+ksp {
+    arg("studio.lunabee.presenter.generateKoinModule", "true")
+    arg("studio.lunabee.presenter.koinModulePackage", moduleNamespace)
+}
+
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
@@ -84,8 +91,10 @@ dependencies {
     coreLibraryDesugaring(libs.desugarJdk)
 
     implementation(platform(libs.composeBom))
+    implementation(platform(libs.koinBom))
 
     ksp(libs.hiltAndroidCompiler)
+    ksp(projects.compose.presenterKsp)
 
     implementation(libs.androidxActivityCompose)
     implementation(libs.androidxAppcompat)
@@ -98,6 +107,8 @@ dependencies {
     implementation(libs.composeMaterialIconsExtended)
     implementation(libs.googleAndroidMaterial)
     implementation(libs.hiltAndroid)
+    implementation(libs.koinCompose)
+    implementation(libs.koinComposeViewmodel)
     implementation(libs.ktorClientAndroid)
     implementation(libs.ktorClientCore)
     implementation(libs.navigationCompose)

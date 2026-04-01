@@ -49,5 +49,5 @@ dependencies {
     androidTestImplementation(libs.androidxTestRunner)
     androidTestImplementation(libs.composeUiTest)
     androidTestImplementation(libs.composeUiTestJunit4)
-    androidTestImplementation(libs.kotlinTest)
+    androidTestImplementation(libs.kotlinTestJunit)
 }

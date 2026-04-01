@@ -43,12 +43,13 @@ dependencies {
 
     implementation(projects.compose.core)
     implementation(projects.compose.image)
+    api(projects.compose.presenterAnnotations)
 
-    androidTestImplementation(libs.kotlinTest)
+    androidTestImplementation(libs.kotlinTestJunit)
     androidTestImplementation(libs.kotlinxCoroutinesTest)
 
     testImplementation(libs.androidxComposeUiTestJunit)
-    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.kotlinxCoroutinesTest)
     testImplementation(projects.compose.robolectrictest)
     testImplementation(libs.robolectric)

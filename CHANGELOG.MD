@@ -5,13 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-03-31
+
+```
+Lbcpresenter 2.0.0-rc01
+LbcpresenterAnnotations 2.0.0-rc01
+LbcpresenterKoin 2.0.0-rc01
+LbcpresenterKsp 2.0.0-rc01
+```
+
+- Introduce presenter v2 generated reducer factories with the new `lbcpresenter-annotations` and `lbcpresenter-ksp` modules, plus optional
+  generated Koin reducer modules
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for reducer
+  factories injected by DI
+- Add [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to help client projects migrate and keep generated factories and Koin bindings
+  aligned with reducer visibility, qualifiers, and multiplatform / incremental KSP builds
+
+## 2026-03-27
+
+```
+LbcpresenterKsp 2.0.0-beta04
+```
+
+- Fix incremental KSP reruns dropping the generated reducer Koin module after unrelated source changes by treating the
+  shared module as a full-source aggregating output
+
 ## 2026-03-26
 
 ```
 Lbcuifield 2.0.1
+LbcpresenterKsp 2.0.0-beta02
+LbcpresenterKsp 2.0.0-beta03
 ```
 
 - Fix `CountryCodeFieldData` `fullNumber` function using raw `TextFieldValue` in string phone number result
+- Fix generated presenter reducer Koin module duplication on multiplatform builds by skipping common metadata compilation output and letting
+  platform compilations aggregate all factories into a single module
+- Generate the presenter reducer Koin module in the Gradle module root package instead of the common package of annotated reducers
+- Add optional `studio.lunabee.presenter.koinModulePackage` KSP option to pin the generated reducer Koin module package and warn when the
+  processor has to fall back to source-package inference
+- Fix incremental KSP regeneration of the presenter reducer Koin module so new presenters update the existing root module instead of
+  generating a second module in the presenter package
+- Make generated reducer factory `create` overloads return the concrete reducer class instead of the generic `LBSingleReducer` type
+
+- Match generated reducer factory visibility to the stricter reducer and constructor visibility so generated APIs do not expose hidden
+  constructors
+- Preserve constructor qualifier metadata in generated reducer Koin modules, including typed `@Named` qualifiers, so qualified dependencies
+  resolve with the expected binding
+- Defer generated reducer Koin module aggregation to the final KSP round so factories discovered from later generated sources are included
+
+## 2026-03-25
+
+```
+Lbcpresenter 2.0.0-beta01
+LbcpresenterAnnotations 2.0.0-beta01
+LbcpresenterKoin 2.0.0-beta01
+LbcpresenterKsp 2.0.0-beta01
+```
+
+- Use [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to let AI migrate client project
+- Add new `lbcpresenter-annotations` module to share reducer factory annotations between runtime and KSP processor
+- Add new `lbcpresenter-ksp` module to with KSP processor for presenter
+    - Add optional `studio.lunabee.presenter.generateKoinModule=true` KSP flag to generate a per-module Koin reducer factory module
+- Add `@GenerateReducerFactory` and `@FactoryArg` to generate single reducer factories from reducer constructor signatures
+- Add reducer factory injection for `LBSinglePresenter` so reducers can be created by DI without manual instantiation in presenters
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for
+  constructor-injected `LBSingleReducerFactory`
 
 ## 2026-03-23
 

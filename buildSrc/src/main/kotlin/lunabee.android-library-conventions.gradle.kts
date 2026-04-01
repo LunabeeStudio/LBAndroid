@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.TestReport
+
 plugins {
     id("com.android.library")
 }
@@ -45,6 +49,7 @@ android {
 
 dependencies {
     androidTestImplementation(libs.findLibrary("androidxTestRunner").get())
+    testImplementation(libs.findLibrary("kotlinTestJunit").get())
 }
 
 kotlin.compilerOptions.jvmTarget.set(AndroidConfig.JVM_TARGET)
@@ -53,4 +58,22 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(AndroidConfig.JDK_VERSION.toString()))
     }
+}
+
+val hostTestTasks = tasks.withType<Test>()
+
+tasks.register<TestReport>("allTests") {
+    description = "Runs the tests for all targets and create aggregated report"
+    group = "verification"
+    destinationDirectory.set(layout.buildDirectory.dir("reports/tests/allTests"))
+    testResults.from(hostTestTasks.map { it.binaryResultsDirectory })
+    dependsOn(hostTestTasks)
+}
+
+tasks.register<Delete>("cleanAllTests") {
+    description = "Deletes all the test results."
+    delete(
+        layout.buildDirectory.dir("reports/tests/allTests"),
+        layout.buildDirectory.dir("test-results"),
+    )
 }

@@ -14,19 +14,11 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.demo.presenter.timer
+package studio.lunabee.compose.presenter
 
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-
-data object TimerDestination {
-    val route = TimerDestination.javaClass.simpleName
-
-    fun composable(navGraphBuilder: NavGraphBuilder, navScope: TimerNavScope) {
-        navGraphBuilder.composable(route) {
-            val presenter: TimerPresenter = hiltViewModel()
-            presenter(navScope)
-        }
-    }
-}
+/**
+ * Marks a reducer constructor parameter that must be provided by the factory at creation time.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+@Retention(AnnotationRetention.BINARY)
+annotation class FactoryArg

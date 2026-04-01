@@ -17,38 +17,46 @@
 package studio.lunabee.compose.demo.presenter.timer
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import studio.lunabee.compose.presenter.LBSinglePresenter
+import studio.lunabee.compose.presenter.LBPresenterContext
 import studio.lunabee.compose.presenter.LBSingleReducer
+import studio.lunabee.compose.presenter.LBSinglePresenter
 import javax.inject.Inject
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
-class TimerPresenter @Inject constructor() : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(
-    verbose = true,
-) {
+class TimerHiltPresenter @Inject constructor(
+    injectedParam: TimerInjectedParam,
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
+    private val reducerFactory: TimerReducerFactory = TimerReducerFactory(injectedParam)
+    private val currentTime = Clock.System.now()
+
+    override fun createReducer(context: LBPresenterContext<TimerAction>): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> =
+        reducerFactory.create(
+            context = context,
+            currentTime = currentTime,
+        )
+
     private val timerFlow: Flow<TimerAction.NewTimerValue> = flow {
-        var value: Int = 0
+        var value = 0
         while (true) {
-            delay(1.seconds)
             emit(value++)
+            delay(1.seconds)
         }
     }.map { TimerAction.NewTimerValue(it) }
 
     override val flows: List<Flow<TimerAction>> = listOf(timerFlow)
 
+    /**
+     * Returns the initial state displayed before any action is reduced.
+     */
     override fun getInitialState(): TimerUiState = TimerUiState(
-        timer = 0,
-    )
-
-    override fun initReducer(): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> = TimerReducer(
-        coroutineScope = viewModelScope,
-        emitUserAction = ::emitUserAction,
+        timer = "Initial time = $currentTime",
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }
