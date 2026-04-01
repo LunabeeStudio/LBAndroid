@@ -35,7 +35,7 @@ Target migration:
    - put `@FactoryArg` on the same line as the parameter
 8. Migrate presenters using these rules:
     - If the reducer only needs DI dependencies plus `LBPresenterContext`, convert the presenter to `LBFactorySinglePresenter` and inject
-      the generated reducer factory.
+      the generated reducer factory. ⚠️ presenter instanciate with koin param `parameterOf` must be migrate with `@FactoryArg`
     - If the reducer needs presenter-owned runtime values, keep `LBSinglePresenter`, override
       `createReducer(context: LBPresenterContext<Action>)`, and call the generated factory with `factoryArgs = ...`.
 9. Replace old manual reducer creation patterns:
