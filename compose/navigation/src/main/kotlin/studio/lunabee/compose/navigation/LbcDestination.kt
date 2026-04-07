@@ -18,18 +18,17 @@ package studio.lunabee.compose.navigation
 
 import androidx.compose.runtime.Composable
 import kotlinx.serialization.Serializable
-import studio.lunabee.compose.presenter.LBPresenter
 
 @Serializable
-abstract class CoreDestination<NavScope : Any> {
+abstract class LbcDestination<NavScope : Any> {
     @Composable
-    abstract fun getPresenter(): LBPresenter<*, NavScope, *>
+    abstract fun getLbcNavigationScreen(): LbcNavigationScreen<NavScope>
     abstract fun getNavScope(navigationHelper: NavigationHelper): NavScope
 
     @Composable
-    internal fun present(navigationHelper: NavigationHelper): LBPresenter<*, *, *> {
-        val presenter = getPresenter()
-        presenter(getNavScope(navigationHelper))
-        return presenter
+    fun present(navigationHelper: NavigationHelper): LbcNavigationScreen<NavScope> {
+        val screen = getLbcNavigationScreen()
+        screen.Screen(getNavScope(navigationHelper))
+        return screen
     }
 }

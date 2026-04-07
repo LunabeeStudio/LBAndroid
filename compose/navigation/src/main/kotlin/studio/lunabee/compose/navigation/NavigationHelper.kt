@@ -21,13 +21,13 @@ import kotlin.reflect.KClass
 import kotlin.uuid.Uuid
 
 class NavigationHelper internal constructor(
-    private val backStack: NavBackStack<CoreNavigationKey>,
+    private val backStack: NavBackStack<LbcNavigationKey>,
 ) {
 
-    fun popBackStack(popupTo: KClass<out CoreDestination<*>>? = null, inclusive: Boolean = false) {
+    fun popBackStack(popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
         popupTo?.let {
-            if (backStack.any { it.screen::class == popupTo }) {
-                while (backStack.lastOrNull()?.let { it.screen::class != popupTo } == true) {
+            if (backStack.any { it.destination::class == popupTo }) {
+                while (backStack.lastOrNull()?.let { it.destination::class != popupTo } == true) {
                     backStack.removeLastOrNull()
                 }
                 if (inclusive) backStack.removeLastOrNull()
@@ -37,35 +37,35 @@ class NavigationHelper internal constructor(
         }
     }
 
-    fun navigate(coreDestination: CoreDestination<*>, popupTo: KClass<out CoreDestination<*>>? = null, inclusive: Boolean = false) {
+    fun navigate(lbcDestination: LbcDestination<*>, popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
         popupTo?.let { popBackStack(popupTo, inclusive) }
         val actualScreen = backStack.lastOrNull()
         if (actualScreen?.isModal == true) {
             backStack.add(
-                CoreNavigationKey(
+                LbcNavigationKey(
                     isModal = true,
-                    screen = coreDestination,
-                    bottomSheetGroupId = actualScreen.resolvedBottomSheetGroupId(),
-                    bottomSheetHeightFraction = actualScreen.bottomSheetHeightFraction,
+                    destination = lbcDestination,
+                    modalGroupId = actualScreen.resolvedModalGroupId(),
+                    modalHeightFraction = actualScreen.modalHeightFraction,
                 ),
             )
         } else {
-            backStack.add(CoreNavigationKey(isModal = false, screen = coreDestination))
+            backStack.add(LbcNavigationKey(isModal = false, destination = lbcDestination))
         }
     }
 
-    fun modal(coreDestination: CoreDestination<*>, popupTo: KClass<out CoreDestination<*>>? = null, inclusive: Boolean = false) {
+    fun modal(lbcDestination: LbcDestination<*>, popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
         popupTo?.let { popBackStack(popupTo, inclusive) }
         val actualScreen = backStack.lastOrNull()
         backStack.add(
-            CoreNavigationKey(
+            LbcNavigationKey(
                 isModal = true,
-                screen = coreDestination,
-                bottomSheetGroupId = Uuid.random(),
-                bottomSheetHeightFraction = if (actualScreen?.isModal == true) {
-                    actualScreen.bottomSheetHeightFraction - 0.03f
+                destination = lbcDestination,
+                modalGroupId = Uuid.random(),
+                modalHeightFraction = if (actualScreen?.isModal == true) {
+                    actualScreen.modalHeightFraction - 0.03f
                 } else {
-                    CoreNavigationKey.DefaultBottomSheetHeightFraction
+                    LbcNavigationKey.DefaultModalHeightFraction
                 },
             ),
         )

@@ -60,5 +60,4 @@ class TimerHiltPresenter @Inject constructor(
     )
 
     override val content: @Composable (TimerUiState) -> Unit = { TimerScreen(it) }
-    override val topBar: @Composable ((TimerUiState) -> Unit) = {}
 }

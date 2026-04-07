@@ -22,23 +22,22 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import studio.lunabee.compose.presenter.LBPresenter
 import kotlin.uuid.Uuid
 
-val LocalPresenterRegistry: ProvidableCompositionLocal<PresenterRegistry?> = staticCompositionLocalOf { null }
+val LocalScreenRegistry: ProvidableCompositionLocal<PresenterRegistry?> = staticCompositionLocalOf { null }
 
 data class PresenterEntry(
     val id: Uuid,
-    val presenter: LBPresenter<*, *, *>,
+    val presenter: LbcNavigationScreen<*>,
 )
 
 class PresenterRegistry {
     private val presenters = mutableStateListOf<PresenterEntry>()
 
-    fun get(key: Uuid): LBPresenter<*, *, *>? = presenters.lastOrNull { it.id == key }?.presenter ?: presenters.lastOrNull()?.presenter
+    fun get(key: Uuid): LbcNavigationScreen<*>? = presenters.lastOrNull { it.id == key }?.presenter ?: presenters.lastOrNull()?.presenter
 
-    fun put(key: Uuid, presenter: LBPresenter<*, *, *>) {
-        presenters.add(PresenterEntry(key, presenter))
+    fun put(key: Uuid, screen: LbcNavigationScreen<*>) {
+        presenters.add(PresenterEntry(key, screen))
     }
 
     fun remove(key: Uuid) {
@@ -50,13 +49,13 @@ class PresenterRegistry {
 fun rememberPresenterRegistry(): PresenterRegistry = remember { PresenterRegistry() }
 
 @Composable
-fun RegisterPresenterEffect(
+fun RegisterNavigationScreen(
     key: Uuid,
-    presenter: LBPresenter<*, *, *>,
+    screen: LbcNavigationScreen<*>,
 ) {
-    val registry = LocalPresenterRegistry.current ?: return
-    DisposableEffect(key, presenter, registry) {
-        registry.put(key, presenter)
+    val registry = LocalScreenRegistry.current ?: return
+    DisposableEffect(key, screen, registry) {
+        registry.put(key, screen)
         onDispose { registry.remove(key) }
     }
 }

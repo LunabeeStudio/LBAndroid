@@ -22,8 +22,8 @@ import androidx.compose.runtime.remember
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
-import studio.lunabee.compose.navigation.CoreDestination
-import studio.lunabee.compose.navigation.CoreNavigationKey
+import studio.lunabee.compose.navigation.LbcDestination
+import studio.lunabee.compose.navigation.LbcNavigationKey
 import studio.lunabee.compose.navigation.LbcNavHost
 import studio.lunabee.compose.navigation.rememberLbcNavBackStack
 
@@ -31,7 +31,7 @@ import studio.lunabee.compose.navigation.rememberLbcNavBackStack
 fun LbcNavigationDemoScreen() {
     val destinationSerializersModule = remember {
         SerializersModule {
-            polymorphic(CoreDestination::class) {
+            polymorphic(LbcDestination::class) {
                 subclass(ScreenA::class)
                 subclass(ScreenB::class)
                 subclass(BottomSheet::class)
@@ -41,11 +41,11 @@ fun LbcNavigationDemoScreen() {
     }
     val backStack = rememberLbcNavBackStack(
         serializersModule = destinationSerializersModule,
-        CoreNavigationKey(false, ScreenA()),
+        LbcNavigationKey(false, ScreenA()),
     )
     LbcNavHost(backStack)
 
     LaunchedEffect(backStack.size) {
-        println("backstack -> ${backStack.joinToString { "%s %s".format(it.screen.toString(), it.id.toString()) }}")
+        println("backstack -> ${backStack.joinToString { "%s %s".format(it.destination.toString(), it.id.toString()) }}")
     }
 }

@@ -28,8 +28,13 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavMetadataKey
@@ -40,7 +45,7 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import kotlinx.coroutines.launch
-import studio.lunabee.compose.navigation.BottomSheetSceneStrategy.Companion.bottomSheet
+import studio.lunabee.compose.navigation.ModalSceneStrategy.Companion.modal
 import studio.lunabee.compose.navigation.utils.normalPopTransition
 import studio.lunabee.compose.navigation.utils.normalPushTransition
 import kotlin.uuid.ExperimentalUuidApi
@@ -52,7 +57,7 @@ private data class BottomSheetContentState<T : Any>(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
-internal class BottomSheetScene<T : Any>(
+internal class ModalScene<T : Any>(
     override val key: T,
     override val previousEntries: List<NavEntry<T>>,
     override val overlaidEntries: List<NavEntry<T>>,
@@ -84,30 +89,42 @@ internal class BottomSheetScene<T : Any>(
                 dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
                 contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
             ) {
-                val backStack = LocalBackStack.current
-                backStack?.lastOrNull {
-                    it.bottomSheetGroupId == entries.last().metadata[BottomSheetSceneStrategy.Companion.BottomSheetGroupIdKey]
-                }?.let { entry ->
-                    LocalPresenterRegistry.current?.get(entry.id)?.TopBar()
-                }
-                AnimatedContent(
-                    targetState = topContent,
-                    transitionSpec = {
-                        if (targetState.depth >= initialState.depth) {
-                            normalPushTransition()
-                        } else {
-                            normalPopTransition()
-                        }
-                    },
-                ) { state ->
-                    BackHandler {
-                        if (entries.size > 1) {
-                            onBack()
-                        } else {
-                            requestDismiss()
+                Box {
+                    val localDensity = LocalDensity.current
+                    val localTopBarSize = remember { mutableStateOf(0.dp) }
+                    val backStack = LocalBackStack.current
+                    backStack?.lastOrNull {
+                        it.modalGroupId == entries.last().metadata[ModalSceneStrategy.Companion.ModalGroupIdKey]
+                    }?.let { entry ->
+                        Box(
+                            modifier = Modifier.onSizeChanged { localTopBarSize.value = with(localDensity) { it.height.toDp() } },
+                        ) {
+                            LocalScreenRegistry.current?.get(entry.id)?.TopBar()
                         }
                     }
-                    state.entry.Content()
+                    CompositionLocalProvider(
+                        LocalTopBarPadding provides localTopBarSize.value,
+                    ) {
+                        AnimatedContent(
+                            targetState = topContent,
+                            transitionSpec = {
+                                if (targetState.depth >= initialState.depth) {
+                                    normalPushTransition()
+                                } else {
+                                    normalPopTransition()
+                                }
+                            },
+                        ) { state ->
+                            BackHandler {
+                                if (entries.size > 1) {
+                                    onBack()
+                                } else {
+                                    requestDismiss()
+                                }
+                            }
+                            state.entry.Content()
+                        }
+                    }
                 }
             }
         }
@@ -115,18 +132,18 @@ internal class BottomSheetScene<T : Any>(
 }
 
 /**
- * A [SceneStrategy] that displays entries that have added [bottomSheet] to their [NavEntry.metadata]
+ * A [SceneStrategy] that displays entries that have added [modal] to their [NavEntry.metadata]
  * within a [ModalBottomSheet] instance.
  *
  * This strategy should always be added before any non-overlay scene strategies.
  */
 @OptIn(ExperimentalMaterial3Api::class)
-class BottomSheetSceneStrategy<T : Any> : SceneStrategy<T> {
+class ModalSceneStrategy<T : Any> : SceneStrategy<T> {
 
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         val lastEntry = entries.lastOrNull() ?: return null
-        val bottomSheetProperties = lastEntry.metadata[BottomSheetKey] ?: return null
-        val currentBottomSheetGroupId = lastEntry.metadata[BottomSheetGroupIdKey] ?: return null
+        val bottomSheetProperties = lastEntry.metadata[ModalKey] ?: return null
+        val currentBottomSheetGroupId = lastEntry.metadata[ModalGroupIdKey] ?: return null
 
         // Split the back stack into:
         // - baseEntries: every destination that should stay underneath the top-most sheet
@@ -136,8 +153,8 @@ class BottomSheetSceneStrategy<T : Any> : SceneStrategy<T> {
         // the previous sheet entries stay in baseEntries, so Nav 3 can keep rendering them
         // underneath, while the new group becomes the only content of the new overlay scene.
         val bottomSheetStartIndex = entries.indexOfLast { entry ->
-            entry.metadata[BottomSheetKey] == null ||
-                entry.metadata[BottomSheetGroupIdKey] != currentBottomSheetGroupId
+            entry.metadata[ModalKey] == null ||
+                entry.metadata[ModalGroupIdKey] != currentBottomSheetGroupId
         } + 1
         val bottomSheetEntries = entries.drop(bottomSheetStartIndex)
         val baseEntries = entries.take(bottomSheetStartIndex)
@@ -157,7 +174,7 @@ class BottomSheetSceneStrategy<T : Any> : SceneStrategy<T> {
 
         return bottomSheetProperties.let { properties ->
             @Suppress("UNCHECKED_CAST")
-            BottomSheetScene(
+            ModalScene(
                 // The scene key must stay stable across pushes inside the sheet.
                 // Using the first sheet entry keeps the same overlay alive while only its content changes.
                 key = bottomSheetEntries.first().contentKey as T,
@@ -188,18 +205,18 @@ class BottomSheetSceneStrategy<T : Any> : SceneStrategy<T> {
          * @param modalBottomSheetProperties properties that should be passed to the containing
          * [ModalBottomSheet].
          */
-        fun bottomSheet(
+        fun modal(
             groupId: Uuid,
             modalBottomSheetProperties: ModalBottomSheetProperties = DefaultBottomSheetProperties,
         ): Map<String, Any> =
             metadata {
-                put(BottomSheetKey, modalBottomSheetProperties)
-                put(BottomSheetGroupIdKey, groupId)
+                put(ModalKey, modalBottomSheetProperties)
+                put(ModalGroupIdKey, groupId)
             }
 
-        object BottomSheetKey : NavMetadataKey<ModalBottomSheetProperties>
+        object ModalKey : NavMetadataKey<ModalBottomSheetProperties>
 
         @OptIn(ExperimentalUuidApi::class)
-        object BottomSheetGroupIdKey : NavMetadataKey<Uuid>
+        object ModalGroupIdKey : NavMetadataKey<Uuid>
     }
 }

@@ -16,8 +16,12 @@
 
 package studio.lunabee.compose.navigation
 
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.navigation3.runtime.NavBackStack
+import androidx.compose.runtime.Composable
 
-internal val LocalBackStack: ProvidableCompositionLocal<NavBackStack<LbcNavigationKey>?> = staticCompositionLocalOf { null }
+interface LbcNavigationScreen<NavScope> {
+    @Composable
+    fun Screen(navScope: NavScope)
+
+    @Composable
+    fun TopBar()
+}

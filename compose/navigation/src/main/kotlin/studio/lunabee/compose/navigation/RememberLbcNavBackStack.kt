@@ -29,8 +29,8 @@ import kotlinx.serialization.modules.SerializersModule
 @Composable
 fun rememberLbcNavBackStack(
     serializersModule: SerializersModule = EmptySerializersModule(),
-    vararg startDestinations: CoreNavigationKey,
-): NavBackStack<CoreNavigationKey> {
+    vararg startDestinations: LbcNavigationKey,
+): NavBackStack<LbcNavigationKey> {
     val configuration = remember(serializersModule) {
         SavedStateConfiguration {
             this.serializersModule = serializersModule

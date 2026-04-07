@@ -16,22 +16,9 @@
 
 package studio.lunabee.compose.navigation
 
-import androidx.navigation3.runtime.NavKey
-import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
-@Serializable
-data class CoreNavigationKey(
-    val isModal: Boolean,
-    val screen: CoreDestination<*>,
-    val bottomSheetGroupId: Uuid? = null,
-    val bottomSheetHeightFraction: Float = DefaultBottomSheetHeightFraction,
-    val id: Uuid = Uuid.random(),
-) : NavKey {
-
-    internal fun resolvedBottomSheetGroupId(): Uuid = bottomSheetGroupId ?: id
-
-    companion object {
-        const val DefaultBottomSheetHeightFraction: Float = 0.95f
-    }
-}
+val LocalTopBarPadding: ProvidableCompositionLocal<Dp> = staticCompositionLocalOf { 0.dp }

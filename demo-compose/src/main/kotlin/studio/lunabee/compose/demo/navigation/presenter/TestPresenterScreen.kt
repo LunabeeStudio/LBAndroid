@@ -16,16 +16,17 @@
 
 package studio.lunabee.compose.demo.navigation.presenter
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import studio.lunabee.compose.navigation.LocalTopBarPadding
 
 @Composable
 fun TestPresenterScreen(
@@ -34,8 +35,12 @@ fun TestPresenterScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding(),
+            .padding(top = LocalTopBarPadding.current)
+            .navigationBarsPadding(),
     ) {
+        Text(
+            text = "This is a top text",
+        )
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,

@@ -22,17 +22,16 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import studio.lunabee.compose.demo.navigation.presenter.TestPresenterNavScope
 import studio.lunabee.compose.demo.navigation.presenter.TestPresenterPresenter
-import studio.lunabee.compose.navigation.CoreDestination
+import studio.lunabee.compose.navigation.LbcDestination
 import studio.lunabee.compose.navigation.NavigationHelper
-import studio.lunabee.compose.presenter.LBPresenter
 
 @Serializable
 data class ScreenA(
     val title: String = "Screen A",
-) : CoreDestination<TestPresenterNavScope>() {
+) : LbcDestination<TestPresenterNavScope>() {
 
     @Composable
-    override fun getPresenter(): TestPresenterPresenter {
+    override fun getLbcNavigationScreen(): TestPresenterPresenter {
         return koinViewModel<TestPresenterPresenter>(
             parameters = { parametersOf(title) },
         )
@@ -53,10 +52,10 @@ data class ScreenA(
 @Serializable
 data class ScreenB(
     val title: String = "Screen B",
-) : CoreDestination<TestPresenterNavScope>() {
+) : LbcDestination<TestPresenterNavScope>() {
 
     @Composable
-    override fun getPresenter(): LBPresenter<*, TestPresenterNavScope, *> {
+    override fun getLbcNavigationScreen(): TestPresenterPresenter {
         return koinViewModel<TestPresenterPresenter>(
             parameters = { parametersOf(title) },
         )
@@ -77,10 +76,10 @@ data class ScreenB(
 @Serializable
 data class BottomSheet(
     val title: String = "Bottom Sheet",
-) : CoreDestination<TestPresenterNavScope>() {
+) : LbcDestination<TestPresenterNavScope>() {
 
     @Composable
-    override fun getPresenter(): LBPresenter<*, TestPresenterNavScope, *> {
+    override fun getLbcNavigationScreen(): TestPresenterPresenter {
         return koinViewModel<TestPresenterPresenter>(
             parameters = { parametersOf(title) },
         )
@@ -101,10 +100,10 @@ data class BottomSheet(
 @Serializable
 data class BottomSheet2(
     val title: String = "Bottom Sheet B",
-) : CoreDestination<TestPresenterNavScope>() {
+) : LbcDestination<TestPresenterNavScope>() {
 
     @Composable
-    override fun getPresenter(): LBPresenter<*, TestPresenterNavScope, *> {
+    override fun getLbcNavigationScreen(): TestPresenterPresenter {
         return koinViewModel<TestPresenterPresenter>(
             parameters = { parametersOf(title) },
         )

@@ -107,14 +107,12 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
      */
     abstract val content: @Composable (UiState) -> Unit
 
-    abstract val topBar: @Composable (UiState) -> Unit
-
     /**
      * StateFlow of the current [UiState] collected in the [invoke] composable.
      * Handles the reducer change automatically
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val uiStateFlow: StateFlow<UiState> by lazy {
+    protected val uiStateFlow: StateFlow<UiState> by lazy {
         var actualStateSaved: UiState = getInitialState()
 
         val reducer: MutableStateFlow<LBSimpleReducer<UiState, NavScope, Action>> = MutableStateFlow(
@@ -178,12 +176,6 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
 
         val uiState by uiStateFlow.collectAsStateWithLifecycle()
         content(uiState)
-    }
-
-    @Composable
-    fun TopBar() {
-        val uiState by uiStateFlow.collectAsStateWithLifecycle()
-        topBar(uiState)
     }
 
     private inline fun log(message: () -> String) {

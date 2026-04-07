@@ -16,8 +16,22 @@
 
 package studio.lunabee.compose.navigation
 
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
-internal val LocalBackStack: ProvidableCompositionLocal<NavBackStack<LbcNavigationKey>?> = staticCompositionLocalOf { null }
+@Serializable
+data class LbcNavigationKey(
+    val isModal: Boolean,
+    val destination: LbcDestination<*>,
+    val modalGroupId: Uuid? = null,
+    val modalHeightFraction: Float = DefaultModalHeightFraction,
+    val id: Uuid = Uuid.random(),
+) : NavKey {
+
+    internal fun resolvedModalGroupId(): Uuid = modalGroupId ?: id
+
+    companion object {
+        const val DefaultModalHeightFraction: Float = 0.95f
+    }
+}

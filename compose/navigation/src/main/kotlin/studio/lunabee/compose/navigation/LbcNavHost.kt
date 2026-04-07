@@ -16,14 +16,18 @@
 
 package studio.lunabee.compose.navigation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
@@ -37,21 +41,32 @@ import studio.lunabee.compose.navigation.utils.normalPushTransition
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LbcNavHost(
-    backStack: NavBackStack<CoreNavigationKey>,
+    backStack: NavBackStack<LbcNavigationKey>,
     onBack: () -> Unit = { backStack.removeLastOrNull() },
 ) {
-    val bottomSheetStrategy = remember { BottomSheetSceneStrategy<CoreNavigationKey>() }
+    val bottomSheetStrategy = remember { ModalSceneStrategy<LbcNavigationKey>() }
     val navigationHelper = remember { NavigationHelper(backStack) }
     val presenterRegistry = rememberPresenterRegistry()
 
-    CompositionLocalProvider(
-        LocalBackStack provides backStack,
-        LocalPresenterRegistry provides presenterRegistry,
-    ) {
-        Column {
+    Box {
+        val localDensity = LocalDensity.current
+        val localTopBarSize = remember { mutableStateOf(0.dp) }
+        Box(
+            modifier = Modifier
+                .animateContentSize()
+                .onSizeChanged {
+                    localTopBarSize.value = with(localDensity) { it.height.toDp() }
+                },
+        ) {
             backStack.lastOrNull { !it.isModal }?.let { entry ->
                 presenterRegistry.get(entry.id)?.TopBar()
             }
+        }
+        CompositionLocalProvider(
+            LocalBackStack provides backStack,
+            LocalScreenRegistry provides presenterRegistry,
+            LocalTopBarPadding provides localTopBarSize.value,
+        ) {
             NavDisplay(
                 backStack = backStack,
                 sceneStrategies = listOf(bottomSheetStrategy),
@@ -68,13 +83,13 @@ fun LbcNavHost(
                         NavEntry(
                             key = route,
                             contentKey = route.id,
-                            metadata = BottomSheetSceneStrategy.bottomSheet(
-                                groupId = route.resolvedBottomSheetGroupId(),
+                            metadata = ModalSceneStrategy.modal(
+                                groupId = route.resolvedModalGroupId(),
                             ),
                         ) {
-                            Box(modifier = Modifier.fillMaxHeight(route.bottomSheetHeightFraction)) {
-                                val presenter = route.screen.present(navigationHelper)
-                                RegisterPresenterEffect(route.id, presenter)
+                            Box(modifier = Modifier.fillMaxHeight(route.modalHeightFraction)) {
+                                val presenter = route.destination.present(navigationHelper)
+                                RegisterNavigationScreen(route.id, presenter)
                             }
                         }
                     } else {
@@ -82,8 +97,8 @@ fun LbcNavHost(
                             key = route,
                             contentKey = route.id,
                         ) {
-                            val presenter = route.screen.present(navigationHelper)
-                            RegisterPresenterEffect(route.id, presenter)
+                            val presenter = route.destination.present(navigationHelper)
+                            RegisterNavigationScreen(route.id, presenter)
                         }
                     }
                 },
