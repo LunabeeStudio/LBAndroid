@@ -46,7 +46,7 @@ fun LbcNavHost(
 ) {
     val bottomSheetStrategy = remember { ModalSceneStrategy<LbcNavigationKey>() }
     val navigationHelper = remember { NavigationHelper(backStack) }
-    val presenterRegistry = rememberPresenterRegistry()
+    val presenterRegistry = rememberScreenRegistry()
 
     Box {
         val localDensity = LocalDensity.current

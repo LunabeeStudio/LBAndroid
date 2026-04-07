@@ -24,14 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import kotlin.uuid.Uuid
 
-val LocalScreenRegistry: ProvidableCompositionLocal<PresenterRegistry?> = staticCompositionLocalOf { null }
+val LocalScreenRegistry: ProvidableCompositionLocal<ScreenRegistry?> = staticCompositionLocalOf { null }
 
 data class PresenterEntry(
     val id: Uuid,
     val presenter: LbcNavigationScreen<*>,
 )
 
-class PresenterRegistry {
+class ScreenRegistry {
     private val presenters = mutableStateListOf<PresenterEntry>()
 
     fun get(key: Uuid): LbcNavigationScreen<*>? = presenters.lastOrNull { it.id == key }?.presenter ?: presenters.lastOrNull()?.presenter
@@ -46,7 +46,7 @@ class PresenterRegistry {
 }
 
 @Composable
-fun rememberPresenterRegistry(): PresenterRegistry = remember { PresenterRegistry() }
+fun rememberScreenRegistry(): ScreenRegistry = remember { ScreenRegistry() }
 
 @Composable
 fun RegisterNavigationScreen(
