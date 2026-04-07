@@ -49,7 +49,7 @@ dependencies {
     androidTestImplementation(libs.kotlinxCoroutinesTest)
 
     testImplementation(libs.androidxComposeUiTestJunit)
-    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.kotlinxCoroutinesTest)
     testImplementation(projects.compose.robolectrictest)
     testImplementation(libs.robolectric)

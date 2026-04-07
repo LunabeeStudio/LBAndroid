@@ -186,4 +186,37 @@ class ReducerFactorySignatureValidatorTest {
 
         assertEquals("@FactoryArg parameter name 'context' is reserved by generated factory methods", exception.message)
     }
+
+    @Test
+    fun validate_generated_visibility_uses_stricter_constructor_visibility_test() {
+        val signature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "InternalCtorReducer"),
+                uiStateTypeName = uiStateType,
+                navScopeTypeName = navScopeType,
+                actionTypeName = actionType,
+                reducerVisibility = Visibility.Public,
+                constructorVisibility = Visibility.Internal,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(Visibility.Internal, signature.generatedVisibility)
+    }
 }

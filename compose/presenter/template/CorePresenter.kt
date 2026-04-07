@@ -9,21 +9,26 @@ import kotlinx.coroutines.flow.Flow
 import studio.lunabee.compose.presenter.LBPresenterContext
 import studio.lunabee.compose.presenter.LBSinglePresenter
 
+/**
+ * ${Name}Presenter
+ *
+ * @see ${Name}Reducer
+ * @see ${Name}UiState
+ * @see ${Name}Action
+ * @see ${Name}NavScope
+ */
 class ${Name}Presenter(
-    savedStateHandle: SavedStateHandle,
+savedStateHandle: SavedStateHandle,
+private val reducerFactory: ${Name}ReducerFactory,
 ) : LBSinglePresenter<${Name}UiState, ${Name}NavScope, ${Name}Action>() {
 
     private val params: ${Name}Destination = savedStateHandle.toRoute()
 
     override val flows: List<Flow<${Name}Action>> = listOf()
-    
-    override fun createReducer(runtime: LBPresenterContext<${Name}Action>): ${Name}Reducer {
-        return ${Name}Reducer(
-            coroutineScope = runtime.coroutineScope,
-            emitUserAction = runtime.emitUserAction,
-        )
-    }
-    
+
+    override fun createReducer(context: LBPresenterContext<${Name}Action>): ${Name}Reducer = reducerFactory.create(
+        context = context,
+    )
 
     override fun getInitialState(): ${Name}UiState = ${Name}UiState()
 
