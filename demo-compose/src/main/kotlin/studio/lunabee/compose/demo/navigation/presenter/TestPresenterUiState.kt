@@ -20,5 +20,6 @@ import studio.lunabee.compose.presenter.PresenterUiState
 
 data class TestPresenterUiState(
     val onNavigate: () -> Unit,
+    val onPop: () -> Unit,
     val timer: Long,
 ) : PresenterUiState

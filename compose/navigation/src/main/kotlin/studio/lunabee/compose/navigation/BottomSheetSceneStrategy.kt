@@ -85,7 +85,6 @@ internal class BottomSheetScene<T : Any>(
                 contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
             ) {
                 val backStack = LocalBackStack.current
-
                 backStack?.lastOrNull {
                     it.bottomSheetGroupId == entries.last().metadata[BottomSheetSceneStrategy.Companion.BottomSheetGroupIdKey]
                 }?.let { entry ->

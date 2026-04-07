@@ -49,14 +49,17 @@ class TestPresenterPresenter(
     override fun createReducer(context: LBPresenterContext<TestPresenterAction>): TestPresenterReducer =
         reducerFactory.create(
             context = context,
-        ) as TestPresenterReducer
+        )
 
     override fun getInitialState(): TestPresenterUiState = TestPresenterUiState(
         onNavigate = { emitUserAction(TestPresenterAction.Navigate) },
         timer = 0L,
+        onPop = { emitUserAction(TestPresenterAction.PopModal) }
     )
 
-    override val content: @Composable (TestPresenterUiState) -> Unit = { TestPresenterScreen(it) }
+    override val content: @Composable (TestPresenterUiState) -> Unit = {
+        TestPresenterScreen(it)
+    }
     override val topBar: @Composable ((TestPresenterUiState) -> Unit) = {
         CoreTopBar(
             title = LbcTextSpec.Raw(title),

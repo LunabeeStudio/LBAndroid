@@ -38,6 +38,7 @@ import studio.lunabee.compose.navigation.utils.normalPushTransition
 @Composable
 fun LbcNavHost(
     backStack: NavBackStack<CoreNavigationKey>,
+    onBack: () -> Unit = { backStack.removeLastOrNull() },
 ) {
     val bottomSheetStrategy = remember { BottomSheetSceneStrategy<CoreNavigationKey>() }
     val navigationHelper = remember { NavigationHelper(backStack) }
@@ -48,13 +49,13 @@ fun LbcNavHost(
         LocalPresenterRegistry provides presenterRegistry,
     ) {
         Column {
-            backStack.lastOrNull { !it.isBottomSheet }?.let { entry ->
+            backStack.lastOrNull { !it.isModal }?.let { entry ->
                 presenterRegistry.get(entry.id)?.TopBar()
             }
             NavDisplay(
                 backStack = backStack,
                 sceneStrategies = listOf(bottomSheetStrategy),
-                onBack = { backStack.removeLastOrNull() },
+                onBack = onBack,
                 transitionSpec = { normalPushTransition() },
                 popTransitionSpec = { normalPopTransition() },
                 predictivePopTransitionSpec = { _: @NavigationEvent.SwipeEdge Int -> normalPredictivePopTransition() },
@@ -63,7 +64,7 @@ fun LbcNavHost(
                     rememberViewModelStoreNavEntryDecorator(),
                 ),
                 entryProvider = { route ->
-                    if (route.isBottomSheet) {
+                    if (route.isModal) {
                         NavEntry(
                             key = route,
                             contentKey = route.id,

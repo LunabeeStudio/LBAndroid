@@ -20,4 +20,6 @@ sealed interface TestPresenterAction {
 
     data class NewTimer(val timer: Long) : TestPresenterAction
     object Navigate : TestPresenterAction
+
+    object PopModal : TestPresenterAction
 }

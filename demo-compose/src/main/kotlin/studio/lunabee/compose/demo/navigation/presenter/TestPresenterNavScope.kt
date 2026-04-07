@@ -18,4 +18,5 @@ package studio.lunabee.compose.demo.navigation.presenter
 
 interface TestPresenterNavScope {
     val navigate: () -> Unit
+    val popAllModal: () -> Unit
 }

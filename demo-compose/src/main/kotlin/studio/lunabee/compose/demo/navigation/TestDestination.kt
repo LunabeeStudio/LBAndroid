@@ -17,7 +17,6 @@
 package studio.lunabee.compose.demo.navigation
 
 import androidx.compose.runtime.Composable
-import io.ktor.http.parameters
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -44,6 +43,9 @@ data class ScreenA(
             override val navigate: () -> Unit = {
                 navigationHelper.navigate(ScreenB())
             }
+            override val popAllModal: () -> Unit = {
+                navigationHelper.popBackStack(BottomSheet::class)
+            }
         }
     }
 }
@@ -64,6 +66,9 @@ data class ScreenB(
         return object : TestPresenterNavScope {
             override val navigate: () -> Unit = {
                 navigationHelper.modal(BottomSheet())
+            }
+            override val popAllModal: () -> Unit = {
+                navigationHelper.popBackStack(BottomSheet::class)
             }
         }
     }
@@ -86,6 +91,9 @@ data class BottomSheet(
             override val navigate: () -> Unit = {
                 navigationHelper.navigate(BottomSheet2())
             }
+            override val popAllModal: () -> Unit = {
+                navigationHelper.popBackStack(BottomSheet::class)
+            }
         }
     }
 }
@@ -106,6 +114,9 @@ data class BottomSheet2(
         return object : TestPresenterNavScope {
             override val navigate: () -> Unit = {
                 navigationHelper.modal(BottomSheet2())
+            }
+            override val popAllModal: () -> Unit = {
+                navigationHelper.popBackStack(BottomSheet::class)
             }
         }
     }

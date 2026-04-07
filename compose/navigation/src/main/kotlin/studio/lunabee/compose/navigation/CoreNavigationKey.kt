@@ -22,7 +22,7 @@ import kotlin.uuid.Uuid
 
 @Serializable
 data class CoreNavigationKey(
-    val isBottomSheet: Boolean,
+    val isModal: Boolean,
     val screen: CoreDestination<*>,
     val bottomSheetGroupId: Uuid? = null,
     val bottomSheetHeightFraction: Float = DefaultBottomSheetHeightFraction,

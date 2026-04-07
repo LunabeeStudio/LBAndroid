@@ -39,6 +39,9 @@ class TestPresenterReducer(
             TestPresenterAction.Navigate -> actualState withSideEffect {
                 performNavigation { navigate() }
             }
+            TestPresenterAction.PopModal -> actualState withSideEffect {
+                performNavigation { popAllModal() }
+            }
 
             is TestPresenterAction.NewTimer -> actualState.copy(
                 timer = action.timer,

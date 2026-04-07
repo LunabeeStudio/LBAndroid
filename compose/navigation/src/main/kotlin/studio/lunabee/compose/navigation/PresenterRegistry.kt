@@ -19,7 +19,7 @@ package studio.lunabee.compose.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import studio.lunabee.compose.presenter.LBPresenter
@@ -27,19 +27,22 @@ import kotlin.uuid.Uuid
 
 val LocalPresenterRegistry: ProvidableCompositionLocal<PresenterRegistry?> = staticCompositionLocalOf { null }
 
-class PresenterRegistry {
-    private val presenters = mutableStateMapOf<Uuid, LBPresenter<*, *, *>>()
+data class PresenterEntry(
+    val id: Uuid,
+    val presenter: LBPresenter<*, *, *>,
+)
 
-    fun get(key: Uuid): LBPresenter<*, *, *>? = presenters[key] ?: presenters.entries.lastOrNull()?.value
+class PresenterRegistry {
+    private val presenters = mutableStateListOf<PresenterEntry>()
+
+    fun get(key: Uuid): LBPresenter<*, *, *>? = presenters.lastOrNull { it.id == key }?.presenter ?: presenters.lastOrNull()?.presenter
 
     fun put(key: Uuid, presenter: LBPresenter<*, *, *>) {
-        presenters[key] = presenter
+        presenters.add(PresenterEntry(key, presenter))
     }
 
-    fun remove(key: Uuid, presenter: LBPresenter<*, *, *>) {
-        if (presenters[key] === presenter) {
-            presenters.remove(key)
-        }
+    fun remove(key: Uuid) {
+        presenters.removeAll { it.id == key }
     }
 }
 
@@ -54,8 +57,6 @@ fun RegisterPresenterEffect(
     val registry = LocalPresenterRegistry.current ?: return
     DisposableEffect(key, presenter, registry) {
         registry.put(key, presenter)
-        onDispose {
-            registry.remove(key, presenter)
-        }
+        onDispose { registry.remove(key) }
     }
 }

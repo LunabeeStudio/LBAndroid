@@ -16,6 +16,7 @@
 
 package studio.lunabee.compose.demo.navigation.presenter
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,12 @@ fun TestPresenterScreen(
                 onClick = uiState.onNavigate,
             ) {
                 Text(text = "Navigate")
+            }
+
+            Button(
+                onClick = uiState.onPop,
+            ) {
+                Text(text = "Pop")
             }
         }
     }

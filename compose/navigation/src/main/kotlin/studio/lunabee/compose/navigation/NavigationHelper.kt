@@ -40,17 +40,17 @@ class NavigationHelper internal constructor(
     fun navigate(coreDestination: CoreDestination<*>, popupTo: KClass<out CoreDestination<*>>? = null, inclusive: Boolean = false) {
         popupTo?.let { popBackStack(popupTo, inclusive) }
         val actualScreen = backStack.lastOrNull()
-        if (actualScreen?.isBottomSheet == true) {
+        if (actualScreen?.isModal == true) {
             backStack.add(
                 CoreNavigationKey(
-                    isBottomSheet = true,
+                    isModal = true,
                     screen = coreDestination,
                     bottomSheetGroupId = actualScreen.resolvedBottomSheetGroupId(),
                     bottomSheetHeightFraction = actualScreen.bottomSheetHeightFraction,
                 ),
             )
         } else {
-            backStack.add(CoreNavigationKey(isBottomSheet = false, screen = coreDestination))
+            backStack.add(CoreNavigationKey(isModal = false, screen = coreDestination))
         }
     }
 
@@ -59,10 +59,10 @@ class NavigationHelper internal constructor(
         val actualScreen = backStack.lastOrNull()
         backStack.add(
             CoreNavigationKey(
-                isBottomSheet = true,
+                isModal = true,
                 screen = coreDestination,
                 bottomSheetGroupId = Uuid.random(),
-                bottomSheetHeightFraction = if (actualScreen?.isBottomSheet == true) {
+                bottomSheetHeightFraction = if (actualScreen?.isModal == true) {
                     actualScreen.bottomSheetHeightFraction - 0.03f
                 } else {
                     CoreNavigationKey.DefaultBottomSheetHeightFraction
