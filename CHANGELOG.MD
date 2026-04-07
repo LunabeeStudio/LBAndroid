@@ -8,6 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-03-31
 
 ```
+LbcNavigation 1.0.0
+Lbcpresenter 2.0.1-rc01
+```
+
+- Introduce LbcNavigation using Nav3.
+- `uiStateFlow` private to protected to allow use in `LbcNavigation`
+
+
+## 2026-03-31
+
+```
 Lbcpresenter 2.0.0-rc01
 LbcpresenterAnnotations 2.0.0-rc01
 LbcpresenterKoin 2.0.0-rc01
