@@ -32,7 +32,7 @@ abstract class LBFactorySinglePresenter<
     Action,
     Reducer : LBSingleReducer<UiState, NavScope, Action>,
     > protected constructor(
-    private val reducerFactory: LBSingleReducerFactory<UiState, NavScope, Action, Reducer>,
+    private val reducerFactory: LBSingleReducerFactory<Action, Reducer>,
     verbose: Boolean = false,
 ) : LBSinglePresenter<UiState, NavScope, Action, Reducer>(verbose = verbose) {
     final override fun createReducer(context: LBPresenterContext<Action>): Reducer =
