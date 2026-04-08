@@ -26,7 +26,9 @@ private val reducerFactory: ${Name}ReducerFactory,
 
     override val flows: List<Flow<${Name}Action>> = listOf()
 
-    override fun createReducer(context: LBPresenterContext<${Name}Action>): ${Name}Reducer = reducerFactory.create(
+    override fun createReducer(
+      context: LBPresenterContext<${Name}Action>
+    ): ${Name}Reducer = reducerFactory.create(
         context = context,
     )
 

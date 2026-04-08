@@ -115,6 +115,7 @@ internal class ReducerFactoryFileGenerator {
                         signature.uiStateTypeName,
                         signature.navScopeTypeName,
                         signature.actionTypeName,
+                        signature.reducerClassName,
                     ),
                 ),
             )

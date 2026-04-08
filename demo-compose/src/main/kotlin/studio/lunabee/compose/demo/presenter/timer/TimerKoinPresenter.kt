@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class TimerKoinPresenter(
     private val reducerFactory: TimerReducerFactory,
-) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction, TimerReducer>(verbose = true) {
     private val currentTime = Clock.System.now()
 
     override fun createReducer(context: LBPresenterContext<TimerAction>): TimerReducer =

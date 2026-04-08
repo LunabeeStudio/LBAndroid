@@ -26,16 +26,22 @@ import androidx.lifecycle.viewModelScope
  * @param verbose enable verbose logs using kermit logger
  * @see LBPresenter
  */
-abstract class LBSinglePresenter<UiState : PresenterUiState, NavScope : Any, Action> protected constructor(
+abstract class LBSinglePresenter<
+    UiState : PresenterUiState,
+    NavScope : Any,
+    Action,
+    Reducer : LBSingleReducer<UiState, NavScope, Action>,
+    > protected constructor(
     verbose: Boolean = false,
 ) : LBPresenter<UiState, NavScope, Action>(verbose = verbose) {
+
     /**
      * Creates the single reducer used by this presenter.
      *
      * Override this hook when the reducer depends on values computed from presenter constructor parameters or
      * presenter-owned runtime state.
      */
-    protected abstract fun createReducer(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action>
+    protected abstract fun createReducer(context: LBPresenterContext<Action>): Reducer
 
     private val reducer by lazy {
         createReducer(
