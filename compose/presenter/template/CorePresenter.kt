@@ -20,7 +20,7 @@ import studio.lunabee.compose.presenter.LBSinglePresenter
 class ${Name}Presenter(
 savedStateHandle: SavedStateHandle,
 private val reducerFactory: ${Name}ReducerFactory,
-) : LBSinglePresenter<${Name}UiState, ${Name}NavScope, ${Name}Action>() {
+) : LBSinglePresenter<${Name}UiState, ${Name}NavScope, ${Name}Action, ${Name}Reducer>() {
 
     private val params: ${Name}Destination = savedStateHandle.toRoute()
 
