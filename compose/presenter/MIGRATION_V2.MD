@@ -62,8 +62,10 @@ Target migration:
     - do not modify the Koin module beyond:
       `includes(generatedReducerFactoryModule)`
       removing old presenter constructor arguments that are no longer needed after reducer factory migration
-    - if several generated Koin modules named `generatedReducerFactoryModule` are imported in the same file, use import aliases to avoid collisions
+    - if several generated Koin modules named `generatedReducerFactoryModule` are imported in the same file, use import aliases to avoid
+      collisions
 13. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
+    You can use templates from https://github.com/LunabeeStudio/LBAndroid/tree/master/compose/presenter/template to update template
 
 Implementation guidance:
 
