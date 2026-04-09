@@ -112,7 +112,7 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
      * Handles the reducer change automatically
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    protected val uiStateFlow: StateFlow<UiState> by lazy {
+    private val uiStateFlow: StateFlow<UiState> by lazy {
         var actualStateSaved: UiState = getInitialState()
 
         val reducer: MutableStateFlow<LBSimpleReducer<UiState, NavScope, Action>> = MutableStateFlow(

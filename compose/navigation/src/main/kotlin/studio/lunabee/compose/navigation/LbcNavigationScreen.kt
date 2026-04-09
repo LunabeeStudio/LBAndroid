@@ -21,7 +21,4 @@ import androidx.compose.runtime.Composable
 interface LbcNavigationScreen<NavScope> {
     @Composable
     fun Screen(navScope: NavScope)
-
-    @Composable
-    fun TopBar()
 }

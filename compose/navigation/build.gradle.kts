@@ -51,5 +51,6 @@ dependencies {
     implementation(libs.composeUi)
     implementation(libs.koin.compose.navigation3)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.navigation3.runtime)
     implementation(libs.touchlabKermit)
 }

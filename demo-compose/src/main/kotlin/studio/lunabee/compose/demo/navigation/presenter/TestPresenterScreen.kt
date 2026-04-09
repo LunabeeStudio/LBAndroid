@@ -16,17 +16,21 @@
 
 package studio.lunabee.compose.demo.navigation.presenter
 
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import studio.lunabee.compose.navigation.LocalTopBarPadding
+import studio.lunabee.compose.core.LbcTextSpec
+import studio.lunabee.compose.demo.core.topbar.CoreTopBar
+import studio.lunabee.compose.demo.core.topbar.action.CoreTopBarAction
+import studio.lunabee.compose.navigation.utils.animatedTopBarModifier
 
 @Composable
 fun TestPresenterScreen(
@@ -35,12 +39,9 @@ fun TestPresenterScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = LocalTopBarPadding.current)
             .navigationBarsPadding(),
     ) {
-        Text(
-            text = "This is a top text",
-        )
+        TopBar(title = uiState.title, timer = uiState.timer)
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
@@ -59,4 +60,20 @@ fun TestPresenterScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun TopBar(title: String, timer: Long) {
+    CoreTopBar(
+        title = LbcTextSpec.Raw(title),
+        leadingAction = CoreTopBarAction.backAction(
+            onClick = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher::onBackPressed,
+        ),
+        trailingAction = CoreTopBarAction.Custom {
+            Text(text = timer.toString())
+        },
+        modifier = Modifier
+            .animatedTopBarModifier(),
+    )
 }

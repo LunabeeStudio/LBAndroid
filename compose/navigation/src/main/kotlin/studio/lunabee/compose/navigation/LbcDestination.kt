@@ -26,9 +26,9 @@ abstract class LbcDestination<NavScope : Any> {
     abstract fun getNavScope(navigationHelper: NavigationHelper): NavScope
 
     @Composable
-    fun present(navigationHelper: NavigationHelper): LbcNavigationScreen<NavScope> {
+    fun Present(navigationHelper: NavigationHelper) {
         val screen = getLbcNavigationScreen()
-        screen.Screen(getNavScope(navigationHelper))
-        return screen
+        val navScope = getNavScope(navigationHelper)
+        screen.Screen(navScope)
     }
 }

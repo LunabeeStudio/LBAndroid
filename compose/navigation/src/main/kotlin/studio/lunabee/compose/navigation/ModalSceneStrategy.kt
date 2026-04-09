@@ -18,6 +18,8 @@ package studio.lunabee.compose.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,12 +31,8 @@ import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavMetadataKey
@@ -66,6 +64,8 @@ internal class ModalScene<T : Any>(
     private val onDismiss: () -> Unit,
     private val onBack: () -> Unit,
 ) : OverlayScene<T> {
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
     override val content: @Composable (() -> Unit) = {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         // Keep a single ModalBottomSheet alive and only swap the top-most destination inside it.
@@ -89,39 +89,28 @@ internal class ModalScene<T : Any>(
                 dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
                 contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
             ) {
-                Box {
-                    val localDensity = LocalDensity.current
-                    val localTopBarSize = remember { mutableStateOf(0.dp) }
-                    val backStack = LocalBackStack.current
-                    backStack?.lastOrNull {
-                        it.modalGroupId == entries.last().metadata[ModalSceneStrategy.Companion.ModalGroupIdKey]
-                    }?.let { entry ->
-                        Box(
-                            modifier = Modifier.onSizeChanged { localTopBarSize.value = with(localDensity) { it.height.toDp() } },
-                        ) {
-                            LocalScreenRegistry.current?.get(entry.id)?.TopBar()
-                        }
-                    }
-                    CompositionLocalProvider(
-                        LocalTopBarPadding provides localTopBarSize.value,
-                    ) {
-                        AnimatedContent(
-                            targetState = topContent,
-                            transitionSpec = {
-                                if (targetState.depth >= initialState.depth) {
-                                    normalPushTransition()
-                                } else {
-                                    normalPopTransition()
-                                }
-                            },
-                        ) { state ->
-                            BackHandler {
-                                if (entries.size > 1) {
-                                    onBack()
-                                } else {
-                                    requestDismiss()
-                                }
+                SharedTransitionLayout {
+                    AnimatedContent(
+                        targetState = topContent,
+                        transitionSpec = {
+                            if (targetState.depth >= initialState.depth) {
+                                normalPushTransition()
+                            } else {
+                                normalPopTransition()
                             }
+                        },
+                    ) { state ->
+                        BackHandler {
+                            if (entries.size > 1) {
+                                onBack()
+                            } else {
+                                requestDismiss()
+                            }
+                        }
+                        CompositionLocalProvider(
+                            LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                            LocalAnimatedVisibilityScope provides this@AnimatedContent,
+                        ) {
                             state.entry.Content()
                         }
                     }

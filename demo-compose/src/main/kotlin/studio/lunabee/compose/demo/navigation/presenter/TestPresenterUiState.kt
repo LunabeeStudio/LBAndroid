@@ -22,4 +22,5 @@ data class TestPresenterUiState(
     val onNavigate: () -> Unit,
     val onPop: () -> Unit,
     val timer: Long,
+    val title: String,
 ) : PresenterUiState

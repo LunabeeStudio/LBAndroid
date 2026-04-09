@@ -16,9 +16,13 @@
 
 package studio.lunabee.compose.navigation
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
-val LocalTopBarPadding: ProvidableCompositionLocal<Dp> = staticCompositionLocalOf { 0.dp }
+@ExperimentalSharedTransitionApi
+val LocalSharedTransitionScope: ProvidableCompositionLocal<SharedTransitionScope?> = staticCompositionLocalOf { null }
+
+val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope?> = staticCompositionLocalOf { null }
