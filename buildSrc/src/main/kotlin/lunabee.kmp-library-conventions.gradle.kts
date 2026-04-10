@@ -16,7 +16,6 @@
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
-    id("co.touchlab.skie")
 }
 
 tasks.withType<Test> {

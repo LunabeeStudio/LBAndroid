@@ -112,7 +112,7 @@ dependencies {
     implementation(libs.ktorClientAndroid)
     implementation(libs.ktorClientCore)
     implementation(libs.navigationCompose)
-
+    implementation("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0-Beta1")
     implementation(projects.compose.accessibility)
     implementation(projects.compose.core)
     implementation(projects.compose.crop)

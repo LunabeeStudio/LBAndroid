@@ -16,7 +16,6 @@
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
-    id("co.touchlab.skie")
     alias(libs.plugins.kotlinxSerialization)
     alias(libs.plugins.composeMultiplatform)
     id(libs.plugins.composePlugin.get().pluginId)
