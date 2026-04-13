@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import studio.lunabee.compose.presenter.LBPresenterContext
-import studio.lunabee.compose.presenter.LBSingleReducer
 import studio.lunabee.compose.presenter.LBSinglePresenter
 import javax.inject.Inject
 import kotlin.time.Clock
@@ -32,11 +31,11 @@ import kotlin.time.Duration.Companion.seconds
 @HiltViewModel
 class TimerHiltPresenter @Inject constructor(
     injectedParam: TimerInjectedParam,
-) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction, TimerReducer>(verbose = true) {
     private val reducerFactory: TimerReducerFactory = TimerReducerFactory(injectedParam)
     private val currentTime = Clock.System.now()
 
-    override fun createReducer(context: LBPresenterContext<TimerAction>): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> =
+    override fun createReducer(context: LBPresenterContext<TimerAction>): TimerReducer =
         reducerFactory.create(
             context = context,
             currentTime = currentTime,

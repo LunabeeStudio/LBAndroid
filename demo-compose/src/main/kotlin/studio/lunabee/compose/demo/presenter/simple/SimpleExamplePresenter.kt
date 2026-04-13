@@ -24,7 +24,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SimpleExamplePresenter @Inject constructor() :
-    LBFactorySinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction>(
+    LBFactorySinglePresenter<SimpleExampleUiState, SimpleExampleNavScope, SimpleExampleAction, SimpleExampleReducer>(
         reducerFactory = SimpleExampleReducerFactory(),
         verbose = true,
     ) {

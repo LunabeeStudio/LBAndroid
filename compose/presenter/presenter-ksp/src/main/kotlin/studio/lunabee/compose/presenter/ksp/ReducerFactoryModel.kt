@@ -48,8 +48,6 @@ internal data class RawReducerParameter(
 internal data class ValidReducerSignature(
     val packageName: String,
     val reducerClassName: ClassName,
-    val uiStateTypeName: TypeName,
-    val navScopeTypeName: TypeName,
     val actionTypeName: TypeName,
     val generatedVisibility: Visibility,
     val factoryClassName: ClassName,
@@ -136,8 +134,6 @@ internal class ReducerFactorySignatureValidator {
         return ValidReducerSignature(
             packageName = signature.packageName,
             reducerClassName = signature.reducerClassName,
-            uiStateTypeName = signature.uiStateTypeName,
-            navScopeTypeName = signature.navScopeTypeName,
             actionTypeName = signature.actionTypeName,
             generatedVisibility = moreRestrictiveVisibility(
                 first = signature.reducerVisibility,

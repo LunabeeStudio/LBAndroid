@@ -112,9 +112,8 @@ internal class ReducerFactoryFileGenerator {
             typeBuilder.addSuperinterface(
                 reducerFactoryType.parameterizedBy(
                     typeArguments = arrayOf(
-                        signature.uiStateTypeName,
-                        signature.navScopeTypeName,
                         signature.actionTypeName,
+                        signature.reducerClassName,
                     ),
                 ),
             )

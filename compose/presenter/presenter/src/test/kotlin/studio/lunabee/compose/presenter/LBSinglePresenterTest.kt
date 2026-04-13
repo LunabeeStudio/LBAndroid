@@ -31,11 +31,11 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
-import kotlin.test.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import studio.lunabee.compose.robolectrictest.LbcInjectComponentActivityRule
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -141,7 +141,7 @@ class LBSinglePresenterTest {
 
     private class ActivityTestPresenter(
         reducerFactory: ActivityTestReducerFactory,
-    ) : LBFactorySinglePresenter<TestUiState, Unit, TestAction>(
+    ) : LBFactorySinglePresenter<TestUiState, Unit, TestAction, ActivityTestReducer>(
         reducerFactory = reducerFactory,
         verbose = true,
     ) {
@@ -152,7 +152,7 @@ class LBSinglePresenterTest {
         override val content: @Composable ((TestUiState) -> Unit) = {}
     }
 
-    private class ActivityTestReducerFactory : LBSingleReducerFactory<TestUiState, Unit, TestAction> {
+    private class ActivityTestReducerFactory : LBSingleReducerFactory<TestAction, ActivityTestReducer> {
         var createCount: Int = 0
         lateinit var context: LBPresenterContext<TestAction>
 
@@ -168,7 +168,7 @@ class LBSinglePresenterTest {
 
     private class ActivityRuntimeArgsPresenter(
         private val reducerFactory: ActivityRuntimeArgsReducerFactory,
-    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction, ActivityRuntimeArgsReducer>(verbose = true) {
         override fun createReducer(context: LBPresenterContext<TestAction>): ActivityRuntimeArgsReducer =
             reducerFactory.create(
                 context = context,
@@ -185,7 +185,7 @@ class LBSinglePresenterTest {
     private class ActivitySharedRuntimePresenter(
         private val reducerFactory: ActivityRuntimeArgsReducerFactory,
         prefix: String,
-    ) : LBSinglePresenter<TestUiState, Unit, TestAction>(verbose = true) {
+    ) : LBSinglePresenter<TestUiState, Unit, TestAction, ActivityRuntimeArgsReducer>(verbose = true) {
         val presenterRuntimeValue: String = "$prefix-runtime"
 
         override fun createReducer(context: LBPresenterContext<TestAction>): ActivityRuntimeArgsReducer =

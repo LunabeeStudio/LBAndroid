@@ -21,7 +21,7 @@ import studio.lunabee.compose.presenter.LBSingleReducerFactory
 import javax.inject.Inject
 
 class PullToRefreshReducerFactory @Inject constructor() :
-    LBSingleReducerFactory<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction> {
+    LBSingleReducerFactory<PullToRefreshAction, PullToRefreshReducer> {
     /**
      * Creates the reducer instance using the context owned by the presenter.
      */

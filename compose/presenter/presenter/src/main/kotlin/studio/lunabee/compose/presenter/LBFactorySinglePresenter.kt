@@ -26,10 +26,15 @@ package studio.lunabee.compose.presenter
  * @param reducerFactory factory used to build the reducer from presenter runtime values
  * @param verbose enable verbose logs using kermit logger
  */
-abstract class LBFactorySinglePresenter<UiState : PresenterUiState, NavScope : Any, Action> protected constructor(
-    private val reducerFactory: LBSingleReducerFactory<UiState, NavScope, Action>,
+abstract class LBFactorySinglePresenter<
+    UiState : PresenterUiState,
+    NavScope : Any,
+    Action,
+    Reducer : LBSingleReducer<UiState, NavScope, Action>,
+    > protected constructor(
+    private val reducerFactory: LBSingleReducerFactory<Action, Reducer>,
     verbose: Boolean = false,
-) : LBSinglePresenter<UiState, NavScope, Action>(verbose = verbose) {
-    final override fun createReducer(context: LBPresenterContext<Action>): LBSingleReducer<UiState, NavScope, Action> =
+) : LBSinglePresenter<UiState, NavScope, Action, Reducer>(verbose = verbose) {
+    final override fun createReducer(context: LBPresenterContext<Action>): Reducer =
         reducerFactory.create(context)
 }

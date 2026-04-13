@@ -25,7 +25,7 @@ import javax.inject.Inject
 @HiltViewModel
 class PullToRefreshPresenter @Inject constructor(
     reducerFactory: PullToRefreshReducerFactory,
-) : LBFactorySinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction>(
+) : LBFactorySinglePresenter<PullToRefreshUiState, PullToRefreshNavScope, PullToRefreshAction, PullToRefreshReducer>(
     reducerFactory = reducerFactory,
     verbose = true,
 ) {
