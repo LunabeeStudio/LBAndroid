@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_image_")
+    resourcePrefix = "lbc_image_"
     namespace = "studio.lunabee.compose.image"
 }
 

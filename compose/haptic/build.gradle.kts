@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_hap_")
+    resourcePrefix = "lbc_hap_"
     namespace = "studio.lunabee.compose.haptic"
 
     defaultConfig {

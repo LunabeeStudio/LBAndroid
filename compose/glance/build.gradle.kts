@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_glance_")
+    resourcePrefix = "lbc_glance_"
     namespace = "studio.lunabee.compose.glance"
 }
 

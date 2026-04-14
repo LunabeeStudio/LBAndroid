@@ -25,7 +25,7 @@ description = "Enables injection of LoadingManager in Compose with Hilt"
 version = AndroidConfig.LOADING_VERSION
 
 android {
-    // resourcePrefix("lb_loading_")
+    resourcePrefix = "lb_loading_"
     namespace = "studio.lunabee.loading.hilt"
 }
 

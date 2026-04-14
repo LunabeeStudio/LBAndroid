@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_at_")
+    resourcePrefix = "lbc_at_"
     namespace = "studio.lunabee.compose.androidtest"
 }
 

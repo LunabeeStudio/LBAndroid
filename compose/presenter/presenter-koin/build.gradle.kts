@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_presenter_")
+    resourcePrefix = "lbc_presenter_"
     namespace = "studio.lunabee.compose.presenter.koin"
 }
 

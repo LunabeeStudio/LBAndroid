@@ -30,7 +30,7 @@ kotlin {
             this.additionalParameters += "resourcePrefix"
         }
         // FIXME http://issuetracker.google.com/issues/470478219
-        //  resourcePrefix("lb_log")
+        //  resourcePrefix = "lb_log"
     }
 
     sourceSets {
