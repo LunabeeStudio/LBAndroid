@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_crop_")
+    resourcePrefix = "lbc_crop_"
     namespace = "studio.lunabee.compose.crop"
 
     defaultConfig {

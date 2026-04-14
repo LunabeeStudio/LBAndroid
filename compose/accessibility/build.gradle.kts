@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_acc_")
+    resourcePrefix = "lbc_acc_"
     namespace = "studio.lunabee.compose.accessibility"
 
     defaultConfig {

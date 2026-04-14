@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    // resourcePrefix("lbc_uifield_")
+    resourcePrefix = "lbc_uifield_"
     namespace = "studio.lunabee.compose.uifield.countrypicker"
 
     defaultConfig {

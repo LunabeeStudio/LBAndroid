@@ -23,7 +23,7 @@ description = "Tools for developing robolectric test"
 version = AndroidConfig.LBCROBOLECTRICTEST_VERSION
 
 android {
-    // resourcePrefix("lbc_robolectrictest_")
+    resourcePrefix = "lbc_robolectrictest_"
     namespace = "studio.lunabee.compose.robolectrictest"
 }
 

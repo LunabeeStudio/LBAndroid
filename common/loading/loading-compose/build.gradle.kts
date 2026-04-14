@@ -23,7 +23,7 @@ description = "A global blocking loading view for Compose"
 version = AndroidConfig.LOADING_VERSION
 
 android {
-    // resourcePrefix("lb_loading_")
+    resourcePrefix = "lb_loading_"
     namespace = "studio.lunabee.loading.compose"
 }
 

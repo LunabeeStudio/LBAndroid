@@ -21,7 +21,7 @@ plugins {
 
 android {
     namespace = "studio.lunabee.corecompose"
-    // resourcePrefix("lb_")
+    resourcePrefix = "lb_"
 }
 
 description = "Lunabee Studio core compose lib"
