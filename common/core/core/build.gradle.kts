@@ -33,6 +33,10 @@ kotlin {
 
             api(projects.loggerKermit)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlinTest)
+            implementation(libs.kotlinxCoroutinesTest)
+        }
         jvmTest.dependencies {
             implementation(project.dependencies.platform(libs.junitJupiterBom))
 
