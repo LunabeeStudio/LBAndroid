@@ -74,3 +74,10 @@ sealed class LBResult<out T> {
         is Failure -> LBFlowResult.Failure(throwable, failureData)
     }
 }
+
+/**
+ * Returns the first failure
+ */
+fun <T> Collection<LBResult<T>>.firstFailure(): LBResult.Failure<T>? {
+    return this.filterIsInstance<LBResult.Failure<T>>().firstOrNull()
+}
