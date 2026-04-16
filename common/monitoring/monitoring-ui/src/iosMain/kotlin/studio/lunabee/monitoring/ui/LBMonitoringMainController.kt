@@ -18,8 +18,8 @@ package studio.lunabee.monitoring.ui
 
 import androidx.compose.ui.uikit.OnFocusBehavior
 import androidx.compose.ui.window.ComposeUIViewController
-import studio.lunabee.monitoring.core.LBMonitoring
 import platform.UIKit.UIViewController
+import studio.lunabee.monitoring.core.LBMonitoring
 
 @Suppress("unused")
 object LBMonitoringMainController {
@@ -27,13 +27,13 @@ object LBMonitoringMainController {
         monitoring: LBMonitoring,
         closeMonitoring: () -> Unit,
     ): UIViewController {
-        studio.lunabee.monitoring.ui.LBUiMonitoring.init(monitoring = monitoring)
+        LBUiMonitoring.init(monitoring = monitoring)
         return ComposeUIViewController(
             configure = {
                 onFocusBehavior = OnFocusBehavior.DoNothing // Let Compose handle keyboard instead of iOS.
             },
         ) {
-            studio.lunabee.monitoring.ui.LBMonitoringMainRoute(
+            LBMonitoringMainRoute(
                 closeMonitoring = closeMonitoring,
             )
         }

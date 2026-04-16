@@ -125,6 +125,7 @@ hiltCore = { group = "com.google.dagger", name = "hilt-core", version.ref = "dag
 javapoet = { group = "com.squareup", name = "javapoet", version.ref = "javapoet" }
 jetbrainsComponentsResources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "jetbrainsCompose" }
 jetbrainsFoundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "jetbrainsCompose" }
+jetbrainsLifecycleRuntimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 jetbrainsMaterial3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "jetbrainsMaterial3" }
 jetbrainsRuntime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "jetbrainsCompose" }
 jetbrainsUi = { module = "org.jetbrains.compose.ui:ui", version.ref = "jetbrainsCompose" }

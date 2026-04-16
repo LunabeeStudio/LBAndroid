@@ -45,6 +45,7 @@ kotlin {
             implementation(libs.composeNavigation)
             implementation(libs.jetbrainsComponentsResources)
             implementation(libs.jetbrainsFoundation)
+            implementation(libs.jetbrainsLifecycleRuntimeCompose)
             implementation(libs.jetbrainsMaterial3)
             implementation(libs.jetbrainsRuntime)
             implementation(libs.jetbrainsUi)

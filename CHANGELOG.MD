@@ -8,10 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-04-16
 
 ```
-LbCore 4.10.0
+core 4.10.0
+monitoring 4.9.1
 ```
 
 - Add `firstFailure` extension on `LBResult` collection to extract the first failure
+- Fix `monitoring-ui` missing dependency to lifecycle lib
 
 ## 2026-03-31
 
