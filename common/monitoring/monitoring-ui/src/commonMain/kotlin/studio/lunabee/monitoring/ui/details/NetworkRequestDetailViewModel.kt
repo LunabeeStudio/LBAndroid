@@ -32,7 +32,7 @@ internal class NetworkRequestDetailViewModel(
     private val monitoring: LBMonitoring,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val params: studio.lunabee.monitoring.ui.details.NetworkRequestDetailDestination = savedStateHandle.toRoute()
+    private val params: NetworkRequestDetailDestination = savedStateHandle.toRoute()
 
     val request: StateFlow<LBRequest?> = monitoring
         .getRequestByIdAsFlow(requestId = params.requestId.let(Uuid::parseHex))

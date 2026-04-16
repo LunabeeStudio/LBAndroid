@@ -128,6 +128,7 @@ jetbrainsFoundation = { module = "org.jetbrains.compose.foundation:foundation", 
 jetbrainsMaterial3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "jetbrainsMaterial3" }
 jetbrainsRuntime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "jetbrainsCompose" }
 jetbrainsUi = { module = "org.jetbrains.compose.ui:ui", version.ref = "jetbrainsCompose" }
+jetbrainsLifecycleRuntimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 jreleaserGradlePlugin = { group = "org.jreleaser", name = "org.jreleaser.gradle.plugin", version.ref = "jreleaser" }
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 junitJupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }

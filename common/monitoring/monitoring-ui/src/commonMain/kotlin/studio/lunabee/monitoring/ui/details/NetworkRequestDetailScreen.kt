@@ -34,26 +34,26 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import studio.lunabee.monitoring.core.LBRequest
-import studio.lunabee.monitoring.ui.res.CoreDrawable
-import studio.lunabee.monitoring.ui.res.CoreString
-import studio.lunabee.monitoring.ui.theme.CorePayload
-import studio.lunabee.monitoring.ui.theme.CoreRequest
-import studio.lunabee.monitoring.ui.theme.CoreRequestConfig
-import studio.lunabee.monitoring.ui.theme.CoreTopBar
 import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import studio.lunabee.monitoring.core.LBRequest
+import studio.lunabee.monitoring.ui.res.CoreDrawable
+import studio.lunabee.monitoring.ui.res.CoreString
 import studio.lunabee.monitoring.ui.res.ic_bin
 import studio.lunabee.monitoring.ui.res.networkRequestDetailReceivedTitle
 import studio.lunabee.monitoring.ui.res.networkRequestDetailSentTitle
 import studio.lunabee.monitoring.ui.res.networkRequestDetailTitle
+import studio.lunabee.monitoring.ui.theme.CorePayload
+import studio.lunabee.monitoring.ui.theme.CoreRequest
+import studio.lunabee.monitoring.ui.theme.CoreRequestConfig
+import studio.lunabee.monitoring.ui.theme.CoreTopBar
 
 @Composable
 internal fun NetworkRequestDetailScreen(
-    navScope: studio.lunabee.monitoring.ui.details.NetworkRequestDetailNavScope,
-    viewmodel: studio.lunabee.monitoring.ui.details.NetworkRequestDetailViewModel = koinViewModel(),
+    navScope: NetworkRequestDetailNavScope,
+    viewmodel: NetworkRequestDetailViewModel = koinViewModel(),
 ) {
     val request: LBRequest? by viewmodel.request.collectAsStateWithLifecycle()
 
@@ -128,9 +128,9 @@ internal data class NetworkRequestDetailDestination(
     val requestId: String,
 ) {
     companion object {
-        fun composable(navGraphBuilder: NavGraphBuilder, navScope: studio.lunabee.monitoring.ui.details.NetworkRequestDetailNavScope) {
-            navGraphBuilder.composable<studio.lunabee.monitoring.ui.details.NetworkRequestDetailDestination> {
-                studio.lunabee.monitoring.ui.details.NetworkRequestDetailScreen(navScope = navScope)
+        fun composable(navGraphBuilder: NavGraphBuilder, navScope: NetworkRequestDetailNavScope) {
+            navGraphBuilder.composable<NetworkRequestDetailDestination> {
+                NetworkRequestDetailScreen(navScope = navScope)
             }
         }
     }

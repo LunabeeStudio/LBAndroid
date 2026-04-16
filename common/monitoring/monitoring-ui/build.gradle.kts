@@ -48,6 +48,7 @@ kotlin {
             implementation(libs.jetbrainsMaterial3)
             implementation(libs.jetbrainsRuntime)
             implementation(libs.jetbrainsUi)
+            implementation(libs.jetbrainsLifecycleRuntimeCompose)
             implementation(libs.koinCompose)
             implementation(libs.koinCore)
             implementation(libs.koinViewmodel)
