@@ -76,7 +76,7 @@ sealed class LBResult<out T> {
 }
 
 /**
- * Returns the first failure
+ * @return the first failure or null if none
  */
 fun <T> Collection<LBResult<T>>.firstFailure(): LBResult.Failure<T>? {
     return this.filterIsInstance<LBResult.Failure<T>>().firstOrNull()
