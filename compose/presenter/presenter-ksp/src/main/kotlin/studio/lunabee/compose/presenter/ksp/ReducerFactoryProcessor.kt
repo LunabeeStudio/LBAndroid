@@ -32,8 +32,8 @@ import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ksp.toClassName
@@ -121,6 +121,7 @@ internal class ReducerFactoryProcessor(
         deferred: MutableList<KSAnnotated>,
     ) {
         if (!symbol.validate()) {
+            logger.warn("Symbol not validate", symbol)
             deferred += symbol
             return
         }
@@ -132,6 +133,7 @@ internal class ReducerFactoryProcessor(
         }
 
         val generatedFactoryFiles = buildFileSpec(declaration) ?: return
+        logger.info("Reducer factory generated", symbol)
         writeGeneratedFile(generatedFactoryFiles.fileSpec, declaration.containingFile)
     }
 

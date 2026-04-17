@@ -64,7 +64,7 @@ object AndroidConfig {
     const val LBCPRESENTER_VERSION: String = "2.0.0-rc01"
     const val LBCPRESENTER_ANNOTATIONS_VERSION: String = "2.0.0-rc01"
     const val LBCPRESENTER_KOIN_VERSION: String = "2.0.0-rc01"
-    const val LBCPRESENTER_KSP_VERSION: String = "2.0.0-rc01"
+    const val LBCPRESENTER_KSP_VERSION: String = "2.0.0-rc02"
     const val LBCROBOLECTRICTEST_VERSION: String = "1.1.0"
     const val LOGGER_KERMIT_VERSION: String = "4.9.0"
     const val CORE_VERSION: String = "4.10.0"
