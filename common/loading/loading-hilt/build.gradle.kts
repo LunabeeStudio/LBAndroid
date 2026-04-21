@@ -39,6 +39,7 @@ dependencies {
     implementation(platform(libs.composeBom))
 
     ksp(libs.hiltAndroidCompiler)
+    ksp(libs.kotlinMetadataJvm)
 
     implementation(libs.androidxLifecycleRuntimeCompose)
     implementation(libs.composeFoundation)

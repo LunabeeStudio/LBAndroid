@@ -94,6 +94,7 @@ dependencies {
     implementation(platform(libs.koinBom))
 
     ksp(libs.hiltAndroidCompiler)
+    ksp(libs.kotlinMetadataJvm)
     ksp(projects.compose.presenterKsp)
 
     implementation(libs.androidxActivityCompose)
@@ -112,7 +113,7 @@ dependencies {
     implementation(libs.ktorClientAndroid)
     implementation(libs.ktorClientCore)
     implementation(libs.navigationCompose)
-    implementation("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0-Beta1")
+    implementation(libs.kotlinMetadataJvm)
     implementation(projects.compose.accessibility)
     implementation(projects.compose.core)
     implementation(projects.compose.crop)

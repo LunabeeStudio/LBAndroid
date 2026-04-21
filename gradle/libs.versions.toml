@@ -139,6 +139,7 @@ koinComposeViewmodel = { group = "io.insert-koin", name = "koin-compose-viewmode
 koinCore = { group = "io.insert-koin", name = "koin-core" }
 koinViewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel" }
 kotlinGradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlinMetadataJvm = { group = "org.jetbrains.kotlin", name = "kotlin-metadata-jvm", version.ref = "kotlin" }
 kotlinPoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinPoet" }
 kotlinPoetKsp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlinPoet" }
 kotlinTest = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
