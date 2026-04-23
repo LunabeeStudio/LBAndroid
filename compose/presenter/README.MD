@@ -75,3 +75,18 @@ The template already shows the expected presenter shape with:
 ## Koin integration
 
 If your project uses Koin, `presenter-koin` provides `PresentScreen` to resolve the presenter as a ViewModel and invoke it with the screen navigation scope.
+
+### Registering generated reducer factories
+
+`presenter-ksp` supports two mutually exclusive modes, picked via KSP options in the consuming module's `build.gradle.kts`:
+
+- **Koin compiler plugin mode** (`studio.lunabee.presenter.useKoinAnnotations=true`) — generated factories are annotated with
+  `@org.koin.core.annotation.Factory` and qualifiers are emitted as `@Named(...)` on the factory constructor, so Koin's K2
+  compiler plugin (`io.insert-koin.compiler.plugin`) auto-registers them through an existing `@Module @ComponentScan("…")` that
+  covers the reducer package. No `generatedReducerFactoryModule` is emitted and presenters do not need `@Provided` on the
+  generated factory parameter.
+- **DSL aggregator mode** (`studio.lunabee.presenter.generateKoinModule=true` + `studio.lunabee.presenter.koinModulePackage=…`)
+  — emits a classic `generatedReducerFactoryModule: Module` that callers add via `startKoin { modules(generatedReducerFactoryModule) }`.
+  Use this when the project has not adopted the Koin compiler plugin or relies on runtime DSL module composition.
+
+See [MIGRATION_V2.MD](MIGRATION_V2.MD) for the full migration decision flow.

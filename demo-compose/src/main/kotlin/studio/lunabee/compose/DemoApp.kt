@@ -29,7 +29,6 @@ class DemoApp : Application() {
 
         startKoin {
             modules(DemoModule().module())
-            modules(generatedReducerFactoryModule)
         }
     }
 }

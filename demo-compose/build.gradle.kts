@@ -78,8 +78,7 @@ android {
 }
 
 ksp {
-    arg("studio.lunabee.presenter.generateKoinModule", "true")
-    arg("studio.lunabee.presenter.koinModulePackage", moduleNamespace)
+    arg("studio.lunabee.presenter.useKoinAnnotations", "true")
 }
 
 kotlin {

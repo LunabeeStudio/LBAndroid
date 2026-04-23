@@ -16,6 +16,7 @@
 
 package studio.lunabee.compose.presenter.ksp
 
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
@@ -31,6 +32,8 @@ private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.pr
 private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
 private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
 private val koinNamedMember: MemberName = MemberName("org.koin.core.qualifier", "named")
+private val koinFactoryAnnotation: ClassName = ClassName("org.koin.core.annotation", "Factory")
+private val koinNamedAnnotation: ClassName = ClassName("org.koin.core.annotation", "Named")
 private const val ContextParam = "context"
 private const val FactoryArgsParam = "factoryArgs"
 private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
@@ -38,13 +41,13 @@ private const val GeneratedKoinModuleFileName = "GeneratedReducerFactoryModule"
 private const val GeneratedKoinModulePropertyName = "generatedReducerFactoryModule"
 
 internal class ReducerFactoryFileGenerator {
-    fun generate(signature: ValidReducerSignature): FileSpec {
+    fun generate(signature: ValidReducerSignature, useKoinAnnotations: Boolean = false): FileSpec {
         val fileSpec = FileSpec.builder(signature.packageName, signature.factoryClassName.simpleName)
             .indent("    ")
         signature.factoryArgsClassName?.let { factoryArgsClassName ->
             fileSpec.addType(generateFactoryArgsType(signature, factoryArgsClassName))
         }
-        fileSpec.addType(generateFactoryType(signature))
+        fileSpec.addType(generateFactoryType(signature = signature, useKoinAnnotations = useKoinAnnotations))
         return fileSpec.build()
     }
 
@@ -90,13 +93,22 @@ internal class ReducerFactoryFileGenerator {
         return typeBuilder.primaryConstructor(constructorBuilder.build()).build()
     }
 
-    private fun generateFactoryType(signature: ValidReducerSignature): TypeSpec {
+    private fun generateFactoryType(signature: ValidReducerSignature, useKoinAnnotations: Boolean): TypeSpec {
         val typeBuilder = TypeSpec.classBuilder(signature.factoryClassName)
+        if (useKoinAnnotations) {
+            typeBuilder.addAnnotation(AnnotationSpec.builder(koinFactoryAnnotation).build())
+        }
         signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
         val constructorBuilder = FunSpec.constructorBuilder()
 
         signature.injectedParameters.forEach { parameter ->
-            constructorBuilder.addParameter(parameter.name, parameter.typeName)
+            val parameterBuilder = ParameterSpec.builder(parameter.name, parameter.typeName)
+            if (useKoinAnnotations) {
+                parameter.qualifier?.let { qualifier ->
+                    parameterBuilder.addAnnotation(koinNamedAnnotationSpec(qualifier))
+                }
+            }
+            constructorBuilder.addParameter(parameterBuilder.build())
             typeBuilder.addProperty(
                 PropertySpec.builder(parameter.name, parameter.typeName)
                     .addModifiers(KModifier.PRIVATE)
@@ -234,6 +246,16 @@ internal class ReducerFactoryFileGenerator {
             koinNamedMember,
             qualifier.annotationClassName,
         )
+    }
+
+    private fun koinNamedAnnotationSpec(qualifier: KoinQualifier): AnnotationSpec = when (qualifier) {
+        is KoinQualifier.Named -> AnnotationSpec.builder(koinNamedAnnotation)
+            .addMember("%S", qualifier.value)
+            .build()
+
+        is KoinQualifier.Typed -> AnnotationSpec.builder(koinNamedAnnotation)
+            .addMember("type = %T::class", qualifier.annotationClassName)
+            .build()
     }
 }
 

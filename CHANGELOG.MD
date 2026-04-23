@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-04-23
+
+```
+LbcpresenterKsp 2.0.0-rc03
+```
+
+- Add `studio.lunabee.presenter.useKoinAnnotations` KSP option. When enabled, generated reducer factories are annotated with
+  `@Factory` (and propagate `@Named` qualifiers) so Koin's compiler plugin auto-discovers them via `@ComponentScan`, removing the
+  need for a hand-wired `generatedReducerFactoryModule` and `@Provided` workarounds on presenter constructors. The classic DSL
+  aggregator path (`generateKoinModule`) is preserved for projects not yet on the Koin K2 compiler plugin.
+- Update [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) so the migration agent asks the user which reducer-factory
+  registration mode to use based on whether the target project has adopted the Koin K2 compiler plugin.
+
 ## 2026-04-17
 
 ```

@@ -57,15 +57,25 @@ private val kotlinUnitClassName: ClassName = ClassName("kotlin", "Unit")
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
+private const val UseKoinAnnotationsOption = "studio.lunabee.presenter.useKoinAnnotations"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
      * Creates the processor used to generate reducer factories.
      */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
+        val useKoinAnnotations = environment.options[UseKoinAnnotationsOption]?.toBooleanStrictOrNull() == true
         val koinModuleGenerationRequested = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true
-        val generateKoinModule = koinModuleGenerationRequested && shouldGenerateKoinModuleForCompilation(environment.platforms)
-        if (koinModuleGenerationRequested && !generateKoinModule) {
+        if (useKoinAnnotations && koinModuleGenerationRequested) {
+            environment.logger.warn(
+                "KSP options '$GenerateKoinModuleOption' and '$UseKoinAnnotationsOption' are both set; " +
+                    "annotations mode takes precedence and the aggregated Koin module will not be generated.",
+            )
+        }
+        val generateKoinModule = !useKoinAnnotations &&
+            koinModuleGenerationRequested &&
+            shouldGenerateKoinModuleForCompilation(environment.platforms)
+        if (!useKoinAnnotations && koinModuleGenerationRequested && !generateKoinModule) {
             environment.logger.info(
                 "Skipping reducer Koin module generation for this compilation because it cannot aggregate all factories. " +
                     "A platform compilation will generate the shared module instead.",
@@ -76,6 +86,7 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
             logger = environment.logger,
             generateKoinModule = generateKoinModule,
             configuredKoinModulePackageName = environment.options[KoinModulePackageOption]?.trim()?.takeIf { it.isNotEmpty() },
+            useKoinAnnotations = useKoinAnnotations,
         )
     }
 }
@@ -87,6 +98,7 @@ internal class ReducerFactoryProcessor(
     private val logger: KSPLogger,
     private val generateKoinModule: Boolean,
     private val configuredKoinModulePackageName: String?,
+    private val useKoinAnnotations: Boolean = false,
 ) : SymbolProcessor {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
     private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
@@ -212,7 +224,7 @@ internal class ReducerFactoryProcessor(
             val signature = validator.validate(declaration.toRawSignature())
             GeneratedReducerFactoryFiles(
                 signature = signature,
-                fileSpec = fileGenerator.generate(signature),
+                fileSpec = fileGenerator.generate(signature = signature, useKoinAnnotations = useKoinAnnotations),
             )
         }.getOrElse { throwable ->
             logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)

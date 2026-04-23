@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import org.koin.core.annotation.KoinViewModel
-import org.koin.core.annotation.Provided
 import studio.lunabee.compose.presenter.LBPresenterContext
 import studio.lunabee.compose.presenter.LBSinglePresenter
 import kotlin.time.Clock
@@ -30,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @KoinViewModel
 class TimerKoinPresenter(
-    @Provided private val reducerFactory: TimerReducerFactory,
+    private val reducerFactory: TimerReducerFactory,
 ) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
     private val currentTime = Clock.System.now()
 

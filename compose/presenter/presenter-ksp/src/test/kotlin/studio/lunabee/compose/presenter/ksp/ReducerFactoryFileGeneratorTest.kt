@@ -194,6 +194,82 @@ class ReducerFactoryFileGeneratorTest {
     }
 
     @Test
+    fun generate_factory_with_koin_annotations_test() {
+        val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+        val qualifierType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier")
+        val validSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "AnnotatedTimerReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                actionTypeName = actionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "injectedParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerInjectedParam"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "apiClient",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerApiClient"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = KoinQualifier.Named("api"),
+                    ),
+                    RawReducerParameter(
+                        name = "qualifierScopedDependency",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifierScopedDependency"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = KoinQualifier.Typed(qualifierType),
+                    ),
+                    RawReducerParameter(
+                        name = "runtimeParam",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerRuntimeParam"),
+                        hasRuntimeAnnotation = true,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = generator.render(generator.generate(signature = validSignature, useKoinAnnotations = true))
+
+        assertTrue(generatedSource.contains("org.koin.core.`annotation`.Factory"))
+        assertTrue(generatedSource.contains("org.koin.core.`annotation`.Named"))
+        assertTrue(generatedSource.contains("@Factory\npublic class AnnotatedTimerReducerFactory"))
+        assertTrue(generatedSource.contains("@Named(\"api\")\n    private val apiClient: TimerApiClient,"))
+        assertTrue(
+            generatedSource.contains(
+                "@Named(type = TimerQualifier::class)\n" +
+                    "    private val qualifierScopedDependency: TimerQualifierScopedDependency,",
+            ),
+        )
+        assertFalse(generatedSource.contains("@Named") && generatedSource.contains("@Named\n    private val injectedParam"))
+    }
+
+    @Test
     fun generate_koin_module_preserves_qualifiers_test() {
         val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
         val qualifierType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier")

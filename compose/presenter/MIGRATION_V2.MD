@@ -18,13 +18,35 @@ Target migration:
       you found more recent versions for specific artifacts
 2. Upgrade each affected module to use LBPresenter reducer factory generation.
 3. Add the KSP dependency for the presenter processor where needed.
-4. If the project uses Koin, add the exact KSP flags:
-   `ksp {`
-   `    arg("studio.lunabee.presenter.generateKoinModule", "true")`
-   `    arg("studio.lunabee.presenter.koinModulePackage", "YOUR_MODULE_ROOT_PACKAGE")`
-   `}`
-5. If the project uses Koin, include the generated module:
-   `includes(generatedReducerFactoryModule)`
+4. If the project uses Koin, ask the user which reducer-factory registration mode they want. Before asking, detect the current
+   setup by scanning the project's build files for the Koin K2 compiler plugin id `io.insert-koin.compiler.plugin` and any
+   `@KoinApplication` / `@Module` / `@ComponentScan` / `@KoinViewModel` annotations, and present the detected mode as the
+   default in the question. Let the user override the default.
+
+   Option A — Koin compiler plugin (recommended when the project already applies `io.insert-koin.compiler.plugin` and uses
+   `@Module` / `@ComponentScan`).
+   - Add the KSP flag:
+     `ksp {`
+     `    arg("studio.lunabee.presenter.useKoinAnnotations", "true")`
+     `}`
+   - Ensure the project's existing `@Module @ComponentScan("ROOT_PACKAGE")` covers every package containing a
+     `@GenerateReducerFactory`-annotated reducer.
+   - Do NOT add `includes(generatedReducerFactoryModule)` — the aggregator is not generated in this mode.
+   - Inject the generated factory directly as a `@Factory`-registered type. No `@Provided` is needed on the presenter
+     constructor because the compiler plugin's compile-safety check sees the annotated factory.
+
+   Option B — classic DSL module (recommended when the project is still on runtime Koin DSL, has no
+   `io.insert-koin.compiler.plugin` applied, or mixes presenter-ksp factories with other hand-written DSL `module { }`
+   declarations).
+   - Add the KSP flags:
+     `ksp {`
+     `    arg("studio.lunabee.presenter.generateKoinModule", "true")`
+     `    arg("studio.lunabee.presenter.koinModulePackage", "YOUR_MODULE_ROOT_PACKAGE")`
+     `}`
+   - In the project's `startKoin { ... }` / app module, add: `includes(generatedReducerFactoryModule)`
+   - If several generated `generatedReducerFactoryModule` values collide, use import aliases.
+
+5. Record the selected mode — you must report it in the final summary.
 6. Annotate reducers that should get generated factories with `@GenerateReducerFactory`.
 7. Mark every reducer constructor parameter that is not DI-provided and must be supplied by the presenter at creation time with
    `@FactoryArg`.
@@ -59,10 +81,13 @@ Target migration:
       ` */`
     - if the presenter class already has KDoc, keep the existing text and append the `@see` lines at the end of the KDoc block
 12. Update DI registrations so presenters receive `reducerFactory = get()` when needed.
-    - do not modify the Koin module beyond:
+    - In **Option A** (Koin compiler plugin), do NOT add a DSL `includes(...)` for presenter factories — `@ComponentScan` handles
+      registration. Just remove old presenter constructor arguments that the reducer factory migration made redundant.
+    - In **Option B** (DSL aggregator), do not modify the Koin module beyond:
       `includes(generatedReducerFactoryModule)`
-      removing old presenter constructor arguments that are no longer needed after reducer factory migration
-    - if several generated Koin modules named `generatedReducerFactoryModule` are imported in the same file, use import aliases to avoid collisions
+      plus removing old presenter constructor arguments that are no longer needed after reducer factory migration.
+    - In **Option B**, if several generated Koin modules named `generatedReducerFactoryModule` are imported in the same file, use
+      import aliases to avoid collisions.
 13. If the repo has templates/snippets/sample presenter files that still generate the old `initReducer()` pattern, update them too.
 
 Implementation guidance:
@@ -83,6 +108,7 @@ Verification:
 
 In your final summary, include:
 
+- which reducer-factory registration mode was selected (Option A — Koin compiler plugin, or Option B — DSL aggregator)
 - which presenters were converted to `LBFactorySinglePresenter`
 - which presenters stayed on `LBSinglePresenter` with generated `FactoryArgs`
 - which reducers gained `@GenerateReducerFactory`
