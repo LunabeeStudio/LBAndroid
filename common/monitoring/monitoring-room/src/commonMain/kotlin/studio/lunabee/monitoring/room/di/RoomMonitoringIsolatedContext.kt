@@ -16,14 +16,17 @@
 
 package studio.lunabee.monitoring.room.di
 
-import studio.lunabee.monitoring.room.RoomMonitoringDatabase
-import studio.lunabee.monitoring.room.dao.RoomRequestDao
-import studio.lunabee.monitoring.room.getRoomDb
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
+import org.koin.core.annotation.ComponentScan
+import org.koin.core.annotation.Module
 import org.koin.core.component.KoinComponent
 import org.koin.dsl.koinApplication
-import org.koin.dsl.module
+import studio.lunabee.monitoring.room.dao.RoomRequestDao
+
+@Module
+@ComponentScan("studio.lunabee.monitoring.room")
+internal class RoomMonitoringModule
 
 internal object RoomMonitoringKoinProvider : RoomMonitoringIsolatedComponent {
     val requestDao: RoomRequestDao
@@ -39,12 +42,7 @@ internal object RoomMonitoringIsolatedContext {
     fun init(block: KoinApplication.() -> Unit) {
         koinApp = koinApplication {
             block()
-            modules(
-                module {
-                    single { getRoomDb(builder = get(), dispatcher = get()) }
-                    single { get<RoomMonitoringDatabase>().requestDao() }
-                },
-            )
+            modules(RoomMonitoringModule().module())
         }
     }
 }

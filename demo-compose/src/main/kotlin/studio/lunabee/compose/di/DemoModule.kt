@@ -14,32 +14,16 @@
  * limitations under the License.
  */
 
-package studio.lunabee.monitoring.ui.di
+package studio.lunabee.compose.di
 
-import org.koin.core.Koin
-import org.koin.core.KoinApplication
 import org.koin.core.annotation.ComponentScan
 import org.koin.core.annotation.Module
-import org.koin.dsl.koinApplication
+import org.koin.core.annotation.Singleton
+import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
+
+@Singleton
+fun provideTimerInjectedParam(): TimerInjectedParam = TimerInjectedParam(prefix = "Current time = ")
 
 @Module
-@ComponentScan("studio.lunabee.monitoring.ui")
-internal class UiMonitoringModule
-
-internal object UiMonitoringIsolatedContext {
-    private var koinApp: KoinApplication? = null
-
-    val koin: Koin
-        get() = getSafeKoinApp().koin
-
-    fun getSafeKoinApp(): KoinApplication {
-        return checkNotNull(koinApp) { "Did you call start()?" }
-    }
-
-    fun init(block: KoinApplication.() -> Unit) {
-        koinApp = koinApplication {
-            block()
-            modules(UiMonitoringModule().module())
-        }
-    }
-}
+@ComponentScan("studio.lunabee.compose")
+class DemoModule

@@ -19,6 +19,8 @@ package studio.lunabee.monitoring.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
+import org.koin.core.annotation.KoinViewModel
+import org.koin.core.annotation.Provided
 import studio.lunabee.monitoring.core.LBMonitoring
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +28,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@KoinViewModel
 internal class NetworkRequestListViewModel(
-    private val monitoring: LBMonitoring,
+    @Provided private val monitoring: LBMonitoring,
 ) : ViewModel() {
 
     private val pagingRequests = monitoring

@@ -17,6 +17,7 @@
 plugins {
     id("com.android.application")
     id(libs.plugins.composePlugin.get().pluginId)
+    alias(libs.plugins.koinCompiler)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlinxSerialization)
@@ -107,6 +108,7 @@ dependencies {
     implementation(libs.composeMaterialIconsExtended)
     implementation(libs.googleAndroidMaterial)
     implementation(libs.hiltAndroid)
+    implementation(libs.koinAnnotations)
     implementation(libs.koinCompose)
     implementation(libs.koinComposeViewmodel)
     implementation(libs.ktorClientAndroid)

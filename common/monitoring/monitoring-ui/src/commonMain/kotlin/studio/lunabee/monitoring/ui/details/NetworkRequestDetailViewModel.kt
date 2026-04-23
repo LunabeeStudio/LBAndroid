@@ -20,6 +20,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import org.koin.core.annotation.KoinViewModel
+import org.koin.core.annotation.Provided
 import studio.lunabee.monitoring.core.LBMonitoring
 import studio.lunabee.monitoring.core.LBRequest
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,9 +30,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
+@KoinViewModel
 internal class NetworkRequestDetailViewModel(
-    private val monitoring: LBMonitoring,
-    savedStateHandle: SavedStateHandle,
+    @Provided private val monitoring: LBMonitoring,
+    @Provided savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val params: NetworkRequestDetailDestination = savedStateHandle.toRoute()
 

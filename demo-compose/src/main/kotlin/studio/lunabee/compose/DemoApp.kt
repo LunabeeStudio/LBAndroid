@@ -19,10 +19,8 @@ package studio.lunabee.compose
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 import org.koin.core.context.startKoin
-import org.koin.core.module.dsl.viewModelOf
-import org.koin.dsl.module
-import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
-import studio.lunabee.compose.demo.presenter.timer.TimerKoinPresenter
+import studio.lunabee.compose.di.DemoModule
+import studio.lunabee.compose.di.module
 
 @HiltAndroidApp
 class DemoApp : Application() {
@@ -30,12 +28,7 @@ class DemoApp : Application() {
         super.onCreate()
 
         startKoin {
-            modules(
-                module {
-                    single { TimerInjectedParam(prefix = "Current time = ") }
-                    viewModelOf(::TimerKoinPresenter)
-                },
-            )
+            modules(DemoModule().module())
             modules(generatedReducerFactoryModule)
         }
     }

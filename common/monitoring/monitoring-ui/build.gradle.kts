@@ -19,6 +19,7 @@ plugins {
     id("lunabee.library-publish-conventions")
     id(libs.plugins.composePlugin.get().pluginId)
     alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.koinCompiler)
     alias(libs.plugins.kotlinxSerialization)
 }
 
@@ -49,6 +50,7 @@ kotlin {
             implementation(libs.jetbrainsMaterial3)
             implementation(libs.jetbrainsRuntime)
             implementation(libs.jetbrainsUi)
+            implementation(libs.koinAnnotations)
             implementation(libs.koinCompose)
             implementation(libs.koinCore)
             implementation(libs.koinViewmodel)

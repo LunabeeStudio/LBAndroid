@@ -18,6 +18,7 @@ plugins {
     id("lunabee.kmp-android-library-conventions")
     id("lunabee.library-publish-conventions")
     alias(libs.plugins.androidxRoom)
+    alias(libs.plugins.koinCompiler)
     alias(libs.plugins.ksp)
 }
 
@@ -46,6 +47,7 @@ kotlin {
             implementation(libs.androidxRoomPaging)
             implementation(libs.androidxRoomRuntime)
             implementation(libs.androidxSqliteBundled)
+            implementation(libs.koinAnnotations)
             implementation(libs.koinCore)
             implementation(libs.kotlinxDatetime)
 
