@@ -44,6 +44,9 @@ import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import kotlinx.coroutines.launch
 import studio.lunabee.compose.navigation.ModalSceneStrategy.Companion.modal
+import studio.lunabee.compose.navigation.utils.LocalModalBackgroundColor
+import studio.lunabee.compose.navigation.utils.LocalNavHostAnimatedVisibilityScope
+import studio.lunabee.compose.navigation.utils.LocalNavHostSharedTransitionScope
 import studio.lunabee.compose.navigation.utils.normalPopTransition
 import studio.lunabee.compose.navigation.utils.normalPushTransition
 import kotlin.uuid.ExperimentalUuidApi
@@ -85,6 +88,7 @@ internal class ModalScene<T : Any>(
             ModalBottomSheet(
                 onDismissRequest = requestDismiss,
                 sheetState = sheetState,
+                containerColor = LocalModalBackgroundColor.current,
                 properties = modalBottomSheetProperties,
                 dragHandle = { Spacer(modifier = Modifier.height(8.dp)) },
                 contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
@@ -108,8 +112,8 @@ internal class ModalScene<T : Any>(
                             }
                         }
                         CompositionLocalProvider(
-                            LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                            LocalAnimatedVisibilityScope provides this@AnimatedContent,
+                            LocalNavHostSharedTransitionScope provides this@SharedTransitionLayout,
+                            LocalNavHostAnimatedVisibilityScope provides this@AnimatedContent,
                         ) {
                             state.entry.Content()
                         }

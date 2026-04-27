@@ -16,29 +16,56 @@
 
 package studio.lunabee.compose.navigation
 
+import android.content.Context
 import androidx.navigation3.runtime.NavBackStack
 import kotlin.reflect.KClass
 import kotlin.uuid.Uuid
 
-class NavigationHelper internal constructor(
+class NavigationHelper(
+    private val parentContext: Context,
     private val backStack: NavBackStack<LbcNavigationKey>,
 ) {
 
-    fun popBackStack(popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
-        popupTo?.let {
-            if (backStack.any { it.destination::class == popupTo }) {
-                while (backStack.lastOrNull()?.let { it.destination::class != popupTo } == true) {
-                    backStack.removeLastOrNull()
+    val context
+        get() = parentContext
+
+    fun popBackStack(popupTo: PopUpTo? = null) {
+        when (popupTo) {
+            is PopUpTo.Class -> {
+                if (backStack.any { it.destination::class == popupTo.clazz }) {
+                    while (backStack.lastOrNull()?.let { it.destination::class != popupTo.clazz } == true) {
+                        backStack.removeLastOrNull()
+                    }
+                    if (popupTo.inclusive) backStack.removeLastOrNull()
                 }
-                if (inclusive) backStack.removeLastOrNull()
             }
-        } ?: run {
+
+            is PopUpTo.Instance -> {
+                if (backStack.any { it.destination != popupTo.destination }) {
+                    while (backStack.lastOrNull()?.let { it.destination == popupTo } == true) {
+                        backStack.removeLastOrNull()
+                    }
+                    if (popupTo.inclusive) backStack.removeLastOrNull()
+                }
+            }
+
+            null -> backStack.removeLastOrNull()
+        }
+    }
+
+    /**
+     * Pop every modal entry on top of the stack, leaving the topmost non-modal entry in place.
+     * Useful for flows whose terminal screens need to close the whole modal group without
+     * hard-coding a specific host destination class.
+     */
+    fun popAllModals() {
+        while (backStack.lastOrNull()?.isModal == true) {
             backStack.removeLastOrNull()
         }
     }
 
-    fun navigate(lbcDestination: LbcDestination<*>, popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
-        popupTo?.let { popBackStack(popupTo, inclusive) }
+    fun navigate(lbcDestination: LbcDestination<*>, popupTo: PopUpTo? = null) {
+        popupTo?.let { popBackStack(popupTo) }
         val actualScreen = backStack.lastOrNull()
         if (actualScreen?.isModal == true) {
             backStack.add(
@@ -54,8 +81,8 @@ class NavigationHelper internal constructor(
         }
     }
 
-    fun modal(lbcDestination: LbcDestination<*>, popupTo: KClass<out LbcDestination<*>>? = null, inclusive: Boolean = false) {
-        popupTo?.let { popBackStack(popupTo, inclusive) }
+    fun modal(lbcDestination: LbcDestination<*>, popupTo: PopUpTo? = null) {
+        popupTo?.let { popBackStack(popupTo) }
         val actualScreen = backStack.lastOrNull()
         backStack.add(
             LbcNavigationKey(
@@ -70,4 +97,11 @@ class NavigationHelper internal constructor(
             ),
         )
     }
+}
+
+sealed interface PopUpTo {
+    val inclusive: Boolean
+
+    data class Class(val clazz: KClass<out LbcDestination<*>>, override val inclusive: Boolean = false) : PopUpTo
+    data class Instance(val destination: LbcDestination<*>, override val inclusive: Boolean = false) : PopUpTo
 }

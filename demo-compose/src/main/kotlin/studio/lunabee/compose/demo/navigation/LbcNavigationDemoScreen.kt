@@ -16,15 +16,18 @@
 
 package studio.lunabee.compose.demo.navigation
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import studio.lunabee.compose.navigation.LbcDestination
-import studio.lunabee.compose.navigation.LbcNavigationKey
 import studio.lunabee.compose.navigation.LbcNavHost
+import studio.lunabee.compose.navigation.LbcNavigationKey
+import studio.lunabee.compose.navigation.NavigationHelper
 import studio.lunabee.compose.navigation.rememberLbcNavBackStack
 
 @Composable
@@ -43,7 +46,13 @@ fun LbcNavigationDemoScreen() {
         serializersModule = destinationSerializersModule,
         LbcNavigationKey(false, ScreenA()),
     )
-    LbcNavHost(backStack)
+    val context = LocalContext.current
+    val navigationHelper = remember { NavigationHelper(context, backStack) }
+    LbcNavHost(
+        backStack,
+        navigationHelper,
+        MaterialTheme.colorScheme.background,
+    )
 
     LaunchedEffect(backStack.size) {
         println("backstack -> ${backStack.joinToString { "%s %s".format(it.destination.toString(), it.id.toString()) }}")

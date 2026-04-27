@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.navigation
+package studio.lunabee.compose.navigation.utils
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 
 @ExperimentalSharedTransitionApi
-val LocalSharedTransitionScope: ProvidableCompositionLocal<SharedTransitionScope?> = staticCompositionLocalOf { null }
+val LocalNavHostSharedTransitionScope: ProvidableCompositionLocal<SharedTransitionScope?> = staticCompositionLocalOf { null }
 
-val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope?> = staticCompositionLocalOf { null }
+val LocalNavHostAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope?> = staticCompositionLocalOf { null }
+
+internal val LocalModalBackgroundColor: ProvidableCompositionLocal<Color> = staticCompositionLocalOf {
+    error("no modal background color provided")
+}

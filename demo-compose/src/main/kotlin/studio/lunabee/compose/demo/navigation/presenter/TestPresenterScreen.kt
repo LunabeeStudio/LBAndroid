@@ -23,8 +23,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import studio.lunabee.compose.core.LbcTextSpec
@@ -58,6 +61,13 @@ fun TestPresenterScreen(
             ) {
                 Text(text = "Pop")
             }
+            val value = remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = value.value,
+                onValueChange = {
+                    value.value = it
+                },
+            )
         }
     }
 }

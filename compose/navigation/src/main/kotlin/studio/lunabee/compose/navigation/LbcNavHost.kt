@@ -19,12 +19,18 @@ package studio.lunabee.compose.navigation
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
@@ -32,6 +38,9 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEvent
+import studio.lunabee.compose.navigation.utils.LocalModalBackgroundColor
+import studio.lunabee.compose.navigation.utils.LocalNavHostAnimatedVisibilityScope
+import studio.lunabee.compose.navigation.utils.LocalNavHostSharedTransitionScope
 import studio.lunabee.compose.navigation.utils.normalPopTransition
 import studio.lunabee.compose.navigation.utils.normalPredictivePopTransition
 import studio.lunabee.compose.navigation.utils.normalPushTransition
@@ -40,14 +49,16 @@ import studio.lunabee.compose.navigation.utils.normalPushTransition
 @Composable
 fun LbcNavHost(
     backStack: NavBackStack<LbcNavigationKey>,
+    navigationHelper: NavigationHelper,
+    modalBackgroundColor: Color,
     onBack: () -> Unit = { backStack.removeLastOrNull() },
 ) {
     val bottomSheetStrategy = remember { ModalSceneStrategy<LbcNavigationKey>() }
-    val navigationHelper = remember { NavigationHelper(backStack) }
 
     Box {
         CompositionLocalProvider(
             LocalBackStack provides backStack,
+            LocalModalBackgroundColor provides modalBackgroundColor,
         ) {
             SharedTransitionLayout {
                 NavDisplay(
@@ -70,7 +81,14 @@ fun LbcNavHost(
                                     groupId = route.resolvedModalGroupId(),
                                 ),
                             ) {
-                                Box(modifier = Modifier.fillMaxHeight(route.modalHeightFraction)) {
+                                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                                val padding = screenHeight * (1f - route.modalHeightFraction)
+                                val density = LocalDensity.current
+                                val imeHeight = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+                                Box(
+                                    modifier = Modifier
+                                        .height(screenHeight - padding - imeHeight),
+                                ) {
                                     route.destination.Present(navigationHelper)
                                 }
                             }
@@ -80,8 +98,8 @@ fun LbcNavHost(
                                 contentKey = route.id,
                             ) {
                                 CompositionLocalProvider(
-                                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                                    LocalAnimatedVisibilityScope provides LocalNavAnimatedContentScope.current,
+                                    LocalNavHostSharedTransitionScope provides this@SharedTransitionLayout,
+                                    LocalNavHostAnimatedVisibilityScope provides LocalNavAnimatedContentScope.current,
                                 ) {
                                     route.destination.Present(navigationHelper)
                                 }

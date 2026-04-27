@@ -21,13 +21,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import studio.lunabee.compose.navigation.LocalAnimatedVisibilityScope
-import studio.lunabee.compose.navigation.LocalSharedTransitionScope
 
 fun Modifier.animatedTopBarModifier(): Modifier = composed {
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+    val sharedTransitionScope = LocalNavHostSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavHostAnimatedVisibilityScope.current
     return@composed if (sharedTransitionScope != null && animatedVisibilityScope != null) {
         with(sharedTransitionScope) {
             this@composed.sharedBounds(

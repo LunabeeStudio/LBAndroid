@@ -24,6 +24,7 @@ import studio.lunabee.compose.demo.navigation.presenter.TestPresenterNavScope
 import studio.lunabee.compose.demo.navigation.presenter.TestPresenterPresenter
 import studio.lunabee.compose.navigation.LbcDestination
 import studio.lunabee.compose.navigation.NavigationHelper
+import studio.lunabee.compose.navigation.PopUpTo
 
 @Serializable
 data class ScreenA(
@@ -43,7 +44,7 @@ data class ScreenA(
                 navigationHelper.navigate(ScreenB())
             }
             override val popAllModal: () -> Unit = {
-                navigationHelper.popBackStack(BottomSheet::class)
+                navigationHelper.popBackStack(PopUpTo.Class(BottomSheet::class, false))
             }
         }
     }
@@ -67,7 +68,7 @@ data class ScreenB(
                 navigationHelper.modal(BottomSheet())
             }
             override val popAllModal: () -> Unit = {
-                navigationHelper.popBackStack(BottomSheet::class)
+                navigationHelper.popBackStack(PopUpTo.Class(BottomSheet::class))
             }
         }
     }
@@ -91,7 +92,7 @@ data class BottomSheet(
                 navigationHelper.navigate(BottomSheet2())
             }
             override val popAllModal: () -> Unit = {
-                navigationHelper.popBackStack(BottomSheet::class)
+                navigationHelper.popBackStack(PopUpTo.Class(BottomSheet::class))
             }
         }
     }
@@ -115,7 +116,7 @@ data class BottomSheet2(
                 navigationHelper.modal(BottomSheet2())
             }
             override val popAllModal: () -> Unit = {
-                navigationHelper.popBackStack(BottomSheet::class)
+                navigationHelper.popBackStack(PopUpTo.Class(BottomSheet::class))
             }
         }
     }
