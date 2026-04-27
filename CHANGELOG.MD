@@ -15,8 +15,13 @@ LbcpresenterKsp 2.0.0-rc03
   `@Factory` (and propagate `@Named` qualifiers) so Koin's compiler plugin auto-discovers them via `@ComponentScan`, removing the
   need for a hand-wired `generatedReducerFactoryModule` and `@Provided` workarounds on presenter constructors. The classic DSL
   aggregator path (`generateKoinModule`) is preserved for projects not yet on the Koin K2 compiler plugin.
+- Recognize `org.koin.core.annotation.InjectedParam` and `dagger.assisted.Assisted` as aliases for `@FactoryArg` on reducer
+  constructor parameters. Consumers can now use whichever annotation is idiomatic for their DI stack without pulling extra
+  dependencies into `presenter-annotations`. JSR-330 deliberately does not standardize this concept, so multi-FQN recognition
+  mirrors the existing pattern used for `@Named` qualifiers.
 - Update [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) so the migration agent asks the user which reducer-factory
-  registration mode to use based on whether the target project has adopted the Koin K2 compiler plugin.
+  registration mode to use based on whether the target project has adopted the Koin K2 compiler plugin, and to list the three
+  accepted "supplied at construction" annotations.
 
 ## 2026-04-17
 

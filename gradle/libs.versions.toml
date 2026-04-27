@@ -117,6 +117,7 @@ composeUiTestJunit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 composeUiTestManifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 composeUiUnit = { module = "androidx.compose.ui:ui-unit" }
 core = { group = "androidx.core", name = "core", version.ref = "core" }
+dagger = { group = "com.google.dagger", name = "dagger", version.ref = "dagger" }
 desugarJdk = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "androidToolsDesugarJdkLibs" }
 dokkaGradlePlugin = { group = "org.jetbrains.dokka", name = "dokka-gradle-plugin", version.ref = "dokka" }
 googleAndroidMaterial = { group = "com.google.android.material", name = "material", version.ref = "googleAndroidMaterial" }

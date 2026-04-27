@@ -26,6 +26,16 @@ The recommended data flow is:
 
 ## Presenter guidelines
 
+### Marking presenter-supplied reducer parameters
+
+`presenter-ksp` recognises any of the following annotations on a reducer constructor parameter as "supplied by the presenter at creation time" (i.e. not DI-resolved):
+
+- `@studio.lunabee.compose.presenter.FactoryArg` (framework-agnostic, no extra dependency)
+- `@org.koin.core.annotation.InjectedParam` (Koin-annotated projects)
+- `@dagger.assisted.Assisted` (Dagger / Hilt projects)
+
+JSR-330 doesn't cover this concept, so each DI stack ships its own. Use whichever is already on the module's classpath; the generated factory's `create(context, args)` shape is identical.
+
 ### Prefer `LBSinglePresenter` for a single-state screen
 
 Use `LBSinglePresenter` when one reducer handles the whole screen lifecycle.

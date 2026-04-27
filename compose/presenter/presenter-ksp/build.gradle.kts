@@ -24,12 +24,16 @@ description = "KSP integration for LBPresenter"
 version = AndroidConfig.LBCPRESENTER_KSP_VERSION
 
 dependencies {
+    testImplementation(platform(libs.koinBom))
+
     implementation(libs.kotlinPoet)
     implementation(libs.kotlinPoetKsp)
     implementation(libs.kspApi)
 
     implementation(projects.compose.presenterAnnotations)
 
+    testImplementation(libs.dagger)
     testImplementation(libs.junit4)
+    testImplementation(libs.koinAnnotations)
     testImplementation(libs.kotlinTest)
 }

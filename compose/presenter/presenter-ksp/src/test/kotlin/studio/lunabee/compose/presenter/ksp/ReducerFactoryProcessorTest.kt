@@ -20,6 +20,9 @@ import com.google.devtools.ksp.processing.PlatformInfo
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
+import dagger.assisted.Assisted
+import org.koin.core.annotation.InjectedParam
+import studio.lunabee.compose.presenter.FactoryArg
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -147,6 +150,13 @@ class ReducerFactoryProcessorTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun factory_arg_annotations_recognize_standard_aliases_test() {
+        assertTrue(FactoryArg::class.qualifiedName in factoryArgAnnotations)
+        assertTrue(InjectedParam::class.qualifiedName in factoryArgAnnotations)
+        assertTrue(Assisted::class.qualifiedName in factoryArgAnnotations)
     }
 
     @Test

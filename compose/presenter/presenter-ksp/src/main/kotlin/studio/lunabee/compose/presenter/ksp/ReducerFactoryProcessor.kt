@@ -42,7 +42,11 @@ import studio.lunabee.compose.presenter.FactoryArg
 import studio.lunabee.compose.presenter.GenerateReducerFactory
 
 private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
-private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
+internal val factoryArgAnnotations: Set<String> = setOf(
+    checkNotNull(FactoryArg::class.qualifiedName),
+    "org.koin.core.annotation.InjectedParam",
+    "dagger.assisted.Assisted",
+)
 private val namedQualifierAnnotations: Set<String> = setOf(
     "jakarta.inject.Named",
     "javax.inject.Named",
@@ -271,7 +275,7 @@ internal class ReducerFactoryProcessor(
                         ?: throw InvalidReducerFactoryException("Reducer constructor parameters must be named"),
                     typeName = parameter.type.toTypeName(),
                     hasRuntimeAnnotation = parameter.annotations.any {
-                        it.annotationType.resolve().declaration.qualifiedName?.asString() == factoryArgAnnotation
+                        it.annotationType.resolve().declaration.qualifiedName?.asString() in factoryArgAnnotations
                     },
                     hasDefault = parameter.hasDefault,
                     isVararg = parameter.isVararg,
@@ -299,7 +303,7 @@ internal class ReducerFactoryProcessor(
     private fun KSAnnotation.toKoinQualifier(): KoinQualifier? {
         val annotationDeclaration = annotationType.resolve().declaration as? KSClassDeclaration ?: return null
         val annotationQualifiedName = annotationDeclaration.qualifiedName?.asString() ?: return null
-        if (annotationQualifiedName == factoryArgAnnotation) return null
+        if (annotationQualifiedName in factoryArgAnnotations) return null
 
         if (annotationQualifiedName in namedQualifierAnnotations) {
             return resolveNamedQualifier(

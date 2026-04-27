@@ -49,12 +49,17 @@ Target migration:
 5. Record the selected mode — you must report it in the final summary.
 6. Annotate reducers that should get generated factories with `@GenerateReducerFactory`.
 7. Mark every reducer constructor parameter that is not DI-provided and must be supplied by the presenter at creation time with
-   `@FactoryArg`.
-   Typical examples:
+   one of the recognised "supplied at construction" annotations. presenter-ksp accepts any of these — pick whichever is most
+   idiomatic for the project's DI stack and keep usage consistent within a module:
+    - `@studio.lunabee.compose.presenter.FactoryArg` (framework-agnostic, no extra dependency)
+    - `@org.koin.core.annotation.InjectedParam` (Koin-annotated projects)
+    - `@dagger.assisted.Assisted` (Dagger / Hilt projects)
+
+   Typical examples of params to annotate:
     - route / nav args from `SavedStateHandle`
     - callbacks / lambdas created in the presenter
     - presenter-owned values computed at runtime
-   - put `@FactoryArg` on the same line as the parameter
+   - put the annotation on the same line as the parameter
 8. Migrate presenters using these rules:
     - If the reducer only needs DI dependencies plus `LBPresenterContext`, convert the presenter to `LBFactorySinglePresenter` and inject
       the generated reducer factory. ⚠️ presenter instanciate with koin param `parameterOf` must be migrate with `@FactoryArg`
