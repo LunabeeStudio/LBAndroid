@@ -47,7 +47,7 @@ fun LbcNavigationDemoScreen() {
         LbcNavigationKey(false, ScreenA()),
     )
     val context = LocalContext.current
-    val navigationHelper = remember { NavigationHelper(context, backStack) }
+    val navigationHelper = remember(backStack) { NavigationHelper(context, backStack) }
     LbcNavHost(
         backStack,
         navigationHelper,
