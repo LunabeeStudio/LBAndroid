@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-04-17
+
+```
+LbcpresenterKsp 2.0.0-rc02
+```
+
+- Add debug logs to `ReducerFactoryProcessor`
+
+## 2026-04-16
+
+```
+core 4.10.0
+monitoring 4.9.1
+```
+
+- Add `firstFailure` extension on `LBResult` collection to extract the first failure
+- Fix `monitoring-ui` missing dependency to lifecycle lib
+
 ## 2026-03-31
 
 ```
