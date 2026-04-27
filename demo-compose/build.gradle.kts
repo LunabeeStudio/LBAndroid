@@ -84,6 +84,7 @@ ksp {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
+        optIn.add("kotlin.uuid.ExperimentalUuidApi")
     }
 }
 
@@ -102,6 +103,7 @@ dependencies {
     implementation(libs.androidxHiltNavigationCompose)
     implementation(libs.androidxLifecycleRuntimeCompose)
     implementation(libs.androidxUiToolingPreview)
+    implementation(libs.androidx.navigation3.runtime)
     implementation(libs.composeFoundation)
     implementation(libs.composeMaterial3)
     implementation(libs.composeMaterialIconsExtended)
@@ -120,6 +122,7 @@ dependencies {
     implementation(projects.compose.glance)
     implementation(projects.compose.haptic)
     implementation(projects.compose.image)
+    implementation(projects.compose.navigation)
     implementation(projects.compose.presenter)
     implementation(projects.compose.presenterKoin)
     implementation(projects.compose.theme)
