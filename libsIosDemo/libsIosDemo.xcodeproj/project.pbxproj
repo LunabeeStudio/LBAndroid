@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		84DF40D72D6DEE3100CDCC0E /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		84DF40D72D6DEE3100CDCC0E /* Exceptions for "libsIosDemo" folder in "libsIosDemo" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +24,7 @@
 		84DF40C02D6DED3900CDCC0E /* libsIosDemo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				84DF40D72D6DEE3100CDCC0E /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				84DF40D72D6DEE3100CDCC0E /* Exceptions for "libsIosDemo" folder in "libsIosDemo" target */,
 			);
 			path = libsIosDemo;
 			sourceTree = "<group>";
@@ -145,7 +145,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\n# Type a script or drag a script file from your workspace to insert its path.\ncd \"$SRCROOT/..\"\n./gradlew :iosDemo:embedAndSignAppleFrameworkForXcode";
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\n# Type a script or drag a script file from your workspace to insert its path.\ncd \"$SRCROOT/..\"\n./gradlew :ios-demo:embedSwiftExportForXcode";
 		};
 /* End PBXShellScriptBuildPhase section */
 

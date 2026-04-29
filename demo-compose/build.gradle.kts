@@ -110,10 +110,11 @@ dependencies {
     implementation(libs.hiltAndroid)
     implementation(libs.koinCompose)
     implementation(libs.koinComposeViewmodel)
+    implementation(libs.kotlinMetadataJvm)
     implementation(libs.ktorClientAndroid)
     implementation(libs.ktorClientCore)
     implementation(libs.navigationCompose)
-    implementation(libs.kotlinMetadataJvm)
+
     implementation(projects.compose.accessibility)
     implementation(projects.compose.core)
     implementation(projects.compose.crop)

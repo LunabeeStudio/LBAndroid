@@ -27,8 +27,7 @@ import studio.lunabee.ktor.LBKtorKermit
 import studio.lunabee.monitoring.core.LBMonitoring
 import studio.lunabee.monitoring.ktor.LBKtorMonitoring
 
-@Suppress("unused") // used directly in iosApp
-class DemoRemoteDatasource(
+internal class DemoRemoteDatasourceImpl(
     monitoring: LBMonitoring,
 ) {
     private val httpClient: HttpClient = HttpClient {
@@ -64,18 +63,18 @@ class DemoRemoteDatasource(
 }
 
 @Serializable
-data class ApiDogFact(
+internal data class ApiDogFact(
     val data: List<ApiDogFactData>,
 )
 
 @Serializable
-data class ApiDogFactData(
+internal data class ApiDogFactData(
     val attributes: ApiDogFactAttributes,
 )
 
 @Serializable
-data class ApiDogFactAttributes(
+internal data class ApiDogFactAttributes(
     val body: String,
 )
 
-class AppException : Throwable()
+internal class AppException : Throwable()

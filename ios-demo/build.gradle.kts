@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import org.jetbrains.kotlin.gradle.swiftexport.ExperimentalSwiftExportDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     alias(libs.plugins.kotlinxSerialization)
@@ -22,17 +24,13 @@ plugins {
 }
 
 kotlin {
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach {
-        it.binaries.framework {
-            baseName = "iosDemo"
-            isStatic = true
-            export(projects.monitoringCore)
-            export(projects.monitoringUi)
-            export(projects.monitoringRoom)
-        }
+    iosArm64()
+    iosSimulatorArm64()
+
+    @OptIn(ExperimentalSwiftExportDsl::class)
+    swiftExport {
+        moduleName = "iosDemo"
+        flattenPackage = "com.lunabee.demo"
     }
 
     sourceSets {
@@ -42,10 +40,10 @@ kotlin {
             implementation(projects.ktorCore)
             implementation(projects.ktorJson)
             implementation(projects.ktorKermit)
-            api(projects.monitoringCore)
+            implementation(projects.monitoringCore)
             implementation(projects.monitoringKtor)
-            api(projects.monitoringRoom)
-            api(projects.monitoringUi)
+            implementation(projects.monitoringRoom)
+            implementation(projects.monitoringUi)
         }
     }
 }
