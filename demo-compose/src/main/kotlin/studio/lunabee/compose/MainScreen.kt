@@ -78,6 +78,11 @@ fun MainScreen(
                 subtitle = LbcTextSpec.StringResource(R.string.core_description),
                 direction = directions.navigateToCoreScreen,
             ),
+            MenuDescription(
+                title = LbcTextSpec.StringResource(R.string.navigation_title),
+                subtitle = LbcTextSpec.StringResource(R.string.navigation_description),
+                direction = directions.navigateToLbcNavigation,
+            ),
         ),
     )
 }

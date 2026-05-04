@@ -28,6 +28,7 @@ import studio.lunabee.compose.demo.glance.GlanceScreen
 import studio.lunabee.compose.demo.haptic.HapticScreen
 import studio.lunabee.compose.demo.image.ImageScreen
 import studio.lunabee.compose.demo.monitoring.KtorDemoScreen
+import studio.lunabee.compose.demo.navigation.LbcNavigationDemoScreen
 import studio.lunabee.compose.demo.presenter.multistate.MultiStateDestination
 import studio.lunabee.compose.demo.presenter.multistate.MultiStateNavScope
 import studio.lunabee.compose.demo.presenter.presenternav.PresenterDemoList
@@ -116,6 +117,12 @@ fun MainNavGraph(
             route = Destinations.CoreRoute,
         ) {
             CoreScreen()
+        }
+
+        composable(
+            route = Destinations.LbcNavigation,
+        ) {
+            LbcNavigationDemoScreen()
         }
 
         SimpleExampleDestination.composable(this, object : SimpleExampleNavScope {})
