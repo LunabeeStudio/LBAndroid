@@ -28,9 +28,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
@@ -81,7 +80,7 @@ fun LbcNavHost(
                                     groupId = route.resolvedModalGroupId(),
                                 ),
                             ) {
-                                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                                val screenHeight = LocalWindowInfo.current.containerDpSize.height
                                 val padding = screenHeight * (1f - route.modalHeightFraction)
                                 val density = LocalDensity.current
                                 val imeHeight = with(density) { WindowInsets.ime.getBottom(density).toDp() }
