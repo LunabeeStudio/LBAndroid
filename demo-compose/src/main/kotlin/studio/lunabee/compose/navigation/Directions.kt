@@ -72,4 +72,8 @@ class Directions(navController: NavHostController) {
     val navigateToCoreScreen: ToDirection = {
         navController.navigate(route = Destinations.CoreRoute)
     }
+
+    val navigateToLbcNavigation: ToDirection = {
+        navController.navigate(route = Destinations.LbcNavigation)
+    }
 }

@@ -108,7 +108,7 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
     abstract val content: @Composable (UiState) -> Unit
 
     /**
-     * StateFlow of the current [UiState] collected in the the [invoke] composable.
+     * StateFlow of the current [UiState] collected in the [invoke] composable.
      * Handles the reducer change automatically
      */
     @OptIn(ExperimentalCoroutinesApi::class)

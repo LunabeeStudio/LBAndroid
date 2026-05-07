@@ -93,6 +93,7 @@ addComposeModule(
     "haptic",
     "image",
     "theme",
+    "navigation",
     "test/robolectrictest",
     "presenter/presenter",
     "presenter/presenter-annotations",
