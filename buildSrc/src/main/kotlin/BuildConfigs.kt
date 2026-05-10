@@ -16,6 +16,6 @@
 
 object BuildConfigs {
     const val LunabeeCompose: String = "_"
-    const val CompileSdk: Int = 36
+    const val CompileSdk: Int = 37
     const val MinSdk: Int = 23
 }
