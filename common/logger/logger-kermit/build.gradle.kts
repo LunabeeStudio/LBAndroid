@@ -25,6 +25,10 @@ version = AndroidConfig.LOGGER_KERMIT_VERSION
 kotlin {
     jvm()
 
+    macosArm64()
+    linuxX64()
+    mingwX64()
+
     sourceSets {
         commonMain.dependencies {
             api(libs.touchlabKermit)

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-05-13
+
+```
+core 4.11.0
+logger-kermit 4.10.0
+```
+
+- Add Kotlin/Native desktop targets (`macosArm64`, `linuxX64`, `mingwX64`) to `core` and `logger-kermit` so they can be consumed from native CLI binaries.
+- Add `demo-cli` module: a minimal Kotlin/Native CLI chronometer that demonstrates `LBFlowResult` + coroutines on native targets, with optional `--verbose` Kermit logging.
+
 ## 2026-04-17
 
 ```
