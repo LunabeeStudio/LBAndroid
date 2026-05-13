@@ -41,13 +41,6 @@ kotlin {
             implementation(libs.kotlinTest)
             implementation(libs.kotlinxCoroutinesTest)
         }
-        jvmTest.dependencies {
-            implementation(project.dependencies.platform(libs.junitJupiterBom))
-
-            implementation(libs.junitJupiter)
-            implementation(libs.kotlinTest)
-            implementation(libs.kotlinxCoroutinesTest)
-        }
         nativeMain {
         }
     }
