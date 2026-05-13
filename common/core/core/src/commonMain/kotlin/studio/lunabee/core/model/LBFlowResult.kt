@@ -94,13 +94,13 @@ sealed class LBFlowResult<out T> {
          */
         @OptIn(ExperimentalTypeInference::class)
         inline fun <T, R> Flow<LBFlowResult<T>>.transformResult(
-            @BuilderInference crossinline transformError:
+            crossinline transformError:
             suspend FlowCollector<LBFlowResult<R>>.(value: Failure<T>) -> Unit =
                 FlowCollector<LBFlowResult<R>>::transformError,
-            @BuilderInference crossinline transformLoading:
+            crossinline transformLoading:
             suspend FlowCollector<LBFlowResult<R>>.(value: Loading<T>) -> Unit =
                 FlowCollector<LBFlowResult<R>>::transformLoading,
-            @BuilderInference crossinline transform: suspend FlowCollector<LBFlowResult<R>>.(value: Success<T>) -> Unit =
+            crossinline transform: suspend FlowCollector<LBFlowResult<R>>.(value: Success<T>) -> Unit =
                 FlowCollector<LBFlowResult<R>>::transformSuccess,
         ): Flow<LBFlowResult<R>> = flow {
             collect { result ->
