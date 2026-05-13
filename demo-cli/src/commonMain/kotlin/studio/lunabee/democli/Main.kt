@@ -35,6 +35,9 @@ private const val EmptyBarChar: Char = '░'
 private const val ExitInvalidArgs: Int = 2
 private const val ExitFailure: Int = 1
 
+// ANSI: move cursor up one line, clear that line, return cursor to column 0.
+private const val ClearLineUp: String = "[1A[2K\r"
+
 fun main(args: Array<String>) {
     val total = parseTotal(args) ?: run {
         println(Usage)
@@ -59,31 +62,22 @@ private fun parseTotal(args: Array<String>): Duration? {
     return seconds.seconds
 }
 
-private suspend fun runChronometer(total: Duration, logger: Logger?): Int {
-    var lastLoggedSecond = -1L
-    var failed = false
-    chronometer(total = total, tick = TickMs.milliseconds).collect { state ->
-        when (state) {
-            is LBFlowResult.Loading -> {
-                val elapsed = state.partialData ?: Duration.ZERO
-                val progress = state.progress ?: 0f
-                println(formatLine(elapsed = elapsed, total = total, progress = progress, done = false))
-                lastLoggedSecond = maybeLogTick(
-                    logger = logger,
-                    elapsed = elapsed,
-                    progress = progress,
-                    lastLoggedSecond = lastLoggedSecond,
-                )
-            }
+private class RenderState {
+    var hasPendingTickLine: Boolean = false
+    var lastLoggedSecond: Long = -1L
+}
 
-            is LBFlowResult.Success -> {
-                println(formatLine(elapsed = state.successData, total = total, progress = 1f, done = true))
-                logger?.i { "Chronometer completed: ${state.successData.toDisplay()}" }
-            }
+private suspend fun runChronometer(total: Duration, logger: Logger?): Int {
+    val state = RenderState()
+    var failed = false
+    chronometer(total = total, tick = TickMs.milliseconds).collect { result ->
+        when (result) {
+            is LBFlowResult.Loading -> handleLoading(result = result, total = total, logger = logger, state = state)
+
+            is LBFlowResult.Success -> handleSuccess(result = result, total = total, logger = logger, state = state)
 
             is LBFlowResult.Failure -> {
-                println("error: ${state.throwable?.message ?: "unknown failure"}")
-                logger?.e("Chronometer failed", state.throwable ?: Exception("unknown failure"))
+                handleFailure(result = result, logger = logger, state = state)
                 failed = true
             }
         }
@@ -91,12 +85,43 @@ private suspend fun runChronometer(total: Duration, logger: Logger?): Int {
     return if (failed) ExitFailure else 0
 }
 
-private fun maybeLogTick(logger: Logger?, elapsed: Duration, progress: Float, lastLoggedSecond: Long): Long {
-    if (logger == null) return lastLoggedSecond
+private fun handleLoading(
+    result: LBFlowResult.Loading<Duration>,
+    total: Duration,
+    logger: Logger?,
+    state: RenderState,
+) {
+    val elapsed = result.partialData ?: Duration.ZERO
+    val progress = result.progress ?: 0f
     val whole = elapsed.inWholeSeconds
-    if (whole <= lastLoggedSecond) return lastLoggedSecond
-    logger.i { "tick elapsed=${elapsed.toDisplay()} progress=${(progress * 100).toInt()}%" }
-    return whole
+    if (logger != null && whole > state.lastLoggedSecond) {
+        if (state.hasPendingTickLine) print(ClearLineUp)
+        logger.i { "tick elapsed=${elapsed.toDisplay()} progress=${(progress * 100).toInt()}%" }
+        state.lastLoggedSecond = whole
+        state.hasPendingTickLine = false
+    }
+    if (state.hasPendingTickLine) print(ClearLineUp)
+    println(formatLine(elapsed = elapsed, total = total, progress = progress, done = false))
+    state.hasPendingTickLine = true
+}
+
+private fun handleSuccess(
+    result: LBFlowResult.Success<Duration>,
+    total: Duration,
+    logger: Logger?,
+    state: RenderState,
+) {
+    if (state.hasPendingTickLine) print(ClearLineUp)
+    println(formatLine(elapsed = result.successData, total = total, progress = 1f, done = true))
+    state.hasPendingTickLine = false
+    logger?.i { "Chronometer completed: ${result.successData.toDisplay()}" }
+}
+
+private fun handleFailure(result: LBFlowResult.Failure<Duration>, logger: Logger?, state: RenderState) {
+    if (state.hasPendingTickLine) print(ClearLineUp)
+    println("error: ${result.throwable?.message ?: "unknown failure"}")
+    logger?.e("Chronometer failed", result.throwable ?: Exception("unknown failure"))
+    state.hasPendingTickLine = false
 }
 
 private fun formatLine(elapsed: Duration, total: Duration, progress: Float, done: Boolean): String {
