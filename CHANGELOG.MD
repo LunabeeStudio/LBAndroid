@@ -12,8 +12,10 @@ core 4.11.0
 logger-kermit 4.10.0
 ```
 
-- Add Kotlin/Native desktop targets (`macosArm64`, `linuxX64`, `mingwX64`) to `core` and `logger-kermit` so they can be consumed from native CLI binaries.
-- Add `demo-cli` module: a minimal Kotlin/Native CLI chronometer that demonstrates `LBFlowResult` + coroutines on native targets, with optional `--verbose` Kermit logging.
+- Add Kotlin/Native desktop targets (`macosArm64`, `linuxX64`, `mingwX64`) to `core` and `logger-kermit` so they can be consumed from native
+  CLI binaries.
+- Add `demo-cli` module: a minimal Kotlin/Native CLI chronometer that demonstrates `LBFlowResult` + coroutines on native targets, with
+  optional `--verbose` Kermit logging.
 
 ## 2026-04-17
 
@@ -38,6 +40,7 @@ monitoring 4.9.1
 ```
 LbcNavigation 1.0.0
 ```
+
 - Introduce LbcNavigation using Nav3.
 
 ## 2026-03-31
