@@ -25,6 +25,10 @@ version = AndroidConfig.KTOR_VERSION
 kotlin {
     jvm()
 
+    macosArm64()
+    linuxX64()
+    mingwX64()
+
     sourceSets {
         commonMain.dependencies {
             api(libs.ktorClientCore)
