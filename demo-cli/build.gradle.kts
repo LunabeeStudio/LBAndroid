@@ -37,7 +37,7 @@ kotlin {
                     demoArgs.orNull
                         ?.split(' ')
                         ?.filter { it.isNotBlank() }
-                        .orEmpty()
+                        .orEmpty(),
                 )
             }
         }
