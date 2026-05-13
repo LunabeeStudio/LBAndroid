@@ -17,8 +17,6 @@
 package studio.lunabee.core.helper
 
 import co.touchlab.kermit.Logger
-import studio.lunabee.core.model.AtomicBoolean
-import studio.lunabee.logger.LBLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,6 +24,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import studio.lunabee.logger.LBLogger
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -60,7 +60,7 @@ class LBLoadingVisibilityDelayDelegate(
             return // ignore multiple call
         }
 
-        if (pendingShow.getAndSet(false)) {
+        if (pendingShow.exchange(false)) {
             showJob?.cancel("State hide called")
             coroutineScope.launch {
                 hideLoading()
@@ -93,12 +93,12 @@ class LBLoadingVisibilityDelayDelegate(
             return // ignore multiple call
         }
 
-        if (pendingShow.compareAndSet(expect = false, update = true)) {
+        if (pendingShow.compareAndSet(expectedValue = false, newValue = true)) {
             showJob = coroutineScope.launch {
                 delay(delayBeforeShow)
                 showLoading()
                 updateLoading()
-                pendingShow.getAndSet(false)
+                pendingShow.exchange(false)
                 delay(minLoadingShowDuration)
             }
         }
