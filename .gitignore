@@ -101,5 +101,8 @@ lint/tmp/
 .DS_Store
 *.salive
 
+# Local issue tracker (matt-pocock skills)
+.scratch/
+
 # iOS
 *.xcuserdatad
