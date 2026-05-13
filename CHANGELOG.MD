@@ -10,10 +10,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ```
 core 4.11.0
 logger-kermit 4.10.0
+Lbextensions 4.10.0
+Lbktor 4.10.0
+Lbloading 4.10.0
 ```
 
-- Add Kotlin/Native desktop targets (`macosArm64`, `linuxX64`, `mingwX64`) to `core` and `logger-kermit` so they can be consumed from native
-  CLI binaries.
+- Add Kotlin/Native desktop targets (`macosArm64`, `linuxX64`, `mingwX64`) to `core`, `logger-kermit`, `extension`, `ktor`, and `loading` so they can be consumed from native CLI binaries.
 - Add `demo-cli` module: a minimal Kotlin/Native CLI chronometer that demonstrates `LBFlowResult` + coroutines on native targets, with
   optional `--verbose` Kermit logging.
 
