@@ -20,6 +20,10 @@ plugins {
 
 description = "Lunabee Studio Kotlin/Native CLI chronometer demo"
 
+// Forward `-Pargs="5 --verbose"` to the runDebug/Release executable tasks
+// (Kotlin/Native run tasks do not accept Gradle's `--args` flag).
+val demoArgs: Provider<String> = providers.gradleProperty("args")
+
 kotlin {
     listOf(
         macosArm64(),
@@ -28,6 +32,14 @@ kotlin {
     ).forEach { target ->
         target.binaries.executable {
             entryPoint = "studio.lunabee.democli.main"
+            runTaskProvider?.configure {
+                args(
+                    demoArgs.orNull
+                        ?.split(' ')
+                        ?.filter { it.isNotBlank() }
+                        .orEmpty()
+                )
+            }
         }
     }
 

@@ -35,21 +35,20 @@ fun chronometer(
                 ),
             ),
         )
-        return@flow
-    }
-    val start = TimeSource.Monotonic.markNow()
-    while (true) {
-        delay(tick)
-        val elapsed = start.elapsedNow()
-        if (elapsed >= total) {
-            emit(LBFlowResult.Success(total))
-            return@flow
+    } else {
+        emit(LBFlowResult.Loading(partialData = Duration.ZERO, progress = 0f))
+        val start = TimeSource.Monotonic.markNow()
+        var elapsed = start.elapsedNow()
+        while (elapsed < total) {
+            delay(tick)
+            elapsed += tick
+            emit(
+                LBFlowResult.Loading(
+                    partialData = elapsed,
+                    progress = (elapsed / total).toFloat(),
+                ),
+            )
         }
-        emit(
-            LBFlowResult.Loading(
-                partialData = elapsed,
-                progress = (elapsed / total).toFloat(),
-            ),
-        )
+        emit(LBFlowResult.Success(total))
     }
 }
