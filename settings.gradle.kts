@@ -49,6 +49,7 @@ includeBuild("build-logic")
 
 include(
     "demo-compose",
+    "demo-cli",
     "ios-demo",
 )
 

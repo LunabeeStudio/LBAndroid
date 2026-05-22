@@ -23,9 +23,9 @@ import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,12 +37,12 @@ class LBLoadingVisibilityDelayDelegateTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
     }
 
-    @AfterEach
+    @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }

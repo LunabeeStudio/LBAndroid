@@ -25,6 +25,10 @@ version = AndroidConfig.CORE_VERSION
 kotlin {
     jvm()
 
+    macosArm64()
+    linuxX64()
+    mingwX64()
+
     sourceSets {
         commonMain.dependencies {
             implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
@@ -34,13 +38,6 @@ kotlin {
             api(projects.loggerKermit)
         }
         commonTest.dependencies {
-            implementation(libs.kotlinTest)
-            implementation(libs.kotlinxCoroutinesTest)
-        }
-        jvmTest.dependencies {
-            implementation(project.dependencies.platform(libs.junitJupiterBom))
-
-            implementation(libs.junitJupiter)
             implementation(libs.kotlinTest)
             implementation(libs.kotlinxCoroutinesTest)
         }
