@@ -71,6 +71,18 @@ jreleaser {
                         artifactId.set("${project.name.get()}-iossimulatorarm64")
                         this.jar = false
                     }
+                    artifactOverride {
+                        artifactId.set("${project.name.get()}-macosarm64")
+                        this.jar = false
+                    }
+                    artifactOverride {
+                        artifactId.set("${project.name.get()}-linuxx64")
+                        this.jar = false
+                    }
+                    artifactOverride {
+                        artifactId.set("${project.name.get()}-mingwx64")
+                        this.jar = false
+                    }
                 }
             }
         }
