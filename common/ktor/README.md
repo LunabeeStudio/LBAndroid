@@ -51,10 +51,10 @@ This plugin installs, under the hood, `Logging` plugin configured with our Kermi
 
 To use it in your application (KMP or not), you need to add the following dependencies (depending on your need):
 ```libs.gradle.toml
-lunabee-bom = { group = "studio.lunabee", name = "lunabee-bom", version.ref = "lunabee-bom" }
-lbktor-core = { group = "studio.lunabee", name = "lbktor-core" }
-lbktor-json = { group = "studio.lunabee", name = "lbktor-json" }
-lbktor-kermit = { group = "studio.lunabee", name = "lbktor-kermit" }
+lunabee-bom = { group = "studio.lunabee", name = "bom", version.ref = "lunabee-bom" }
+lbktor-core = { group = "studio.lunabee.ktor", name = "ktor-core" }
+lbktor-json = { group = "studio.lunabee.ktor", name = "ktor-json" }
+lbktor-kermit = { group = "studio.lunabee.ktor", name = "ktor-kermit" }
 
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktor-client-ios = { group = "io.ktor", name = "ktor-client-ios", version.ref = "ktor" }

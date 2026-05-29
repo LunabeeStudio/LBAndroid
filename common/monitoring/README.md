@@ -50,7 +50,7 @@ setContent {
 
 To use it in your application (KMP or not), you need to add the following dependencies (depending on your need):
 ```libs.gradle.toml
-lunabee-bom = { group = "studio.lunabee", name = "lunabee-bom", version.ref = "lunabee-bom" }
+lunabee-bom = { group = "studio.lunabee", name = "bom", version.ref = "lunabee-bom" }
 monitoring-core = { group = "studio.lunabee.monitoring", name = "monitoring-core" }
 monitoring-room = { group = "studio.lunabee.monitoring", name = "monitoring-room" }
 monitoring-ui = { group = "studio.lunabee.monitoring", name = "monitoring-ui" }
@@ -75,7 +75,7 @@ private val httpClient: HttpClient = HttpClient(Android) {
 ```
 
 ```libs.gradle.toml
-lunabee-bom = { group = "studio.lunabee", name = "lunabee-bom", version.ref = "lunabee-bom" }
-monitoring-ktor = { group = "studio.lunabee", name = "monitoring-ktor" }
+lunabee-bom = { group = "studio.lunabee", name = "bom", version.ref = "lunabee-bom" }
+monitoring-ktor = { group = "studio.lunabee.monitoring", name = "monitoring-ktor" }
 ```
 
