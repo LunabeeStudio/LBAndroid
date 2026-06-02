@@ -57,6 +57,7 @@ private val kotlinUnitClassName: ClassName = ClassName("kotlin", "Unit")
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
+private const val AnnotateFactoryOption = "studio.lunabee.presenter.annotateFactory"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
@@ -76,6 +77,7 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
             logger = environment.logger,
             generateKoinModule = generateKoinModule,
             configuredKoinModulePackageName = environment.options[KoinModulePackageOption]?.trim()?.takeIf { it.isNotEmpty() },
+            annotateFactory = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull() == true,
         )
     }
 }
@@ -87,9 +89,10 @@ internal class ReducerFactoryProcessor(
     private val logger: KSPLogger,
     private val generateKoinModule: Boolean,
     private val configuredKoinModulePackageName: String?,
+    annotateFactory: Boolean = false,
 ) : SymbolProcessor {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
-    private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
+    private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator(annotateFactory = annotateFactory)
     private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
     private val moduleSourcePackageNames: LinkedHashSet<String> = linkedSetOf()
     private var moduleRootPackageName: String? = null

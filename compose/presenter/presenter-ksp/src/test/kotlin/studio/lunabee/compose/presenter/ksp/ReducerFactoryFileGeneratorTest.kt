@@ -336,6 +336,114 @@ class ReducerFactoryFileGeneratorTest {
     }
 
     @Test
+    fun generate_annotated_factory_file_test() {
+        val annotatingGenerator = ReducerFactoryFileGenerator(annotateFactory = true)
+        val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+        val qualifierType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier")
+        val validSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "AnnotatedTimerReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                actionTypeName = actionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "plainDependency",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerPlainDependency"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "apiClient",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerApiClient"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = KoinQualifier.Named("api"),
+                    ),
+                    RawReducerParameter(
+                        name = "qualifierScopedDependency",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifierScopedDependency"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = KoinQualifier.Typed(qualifierType),
+                    ),
+                    RawReducerParameter(
+                        name = "external",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerExternalRuntimeArg"),
+                        hasRuntimeAnnotation = true,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = annotatingGenerator.render(annotatingGenerator.generate(validSignature))
+
+        assertTrue(generatedSource.contains("org.koin.core.`annotation`.Factory"))
+        assertTrue(generatedSource.contains("@Factory\npublic class AnnotatedTimerReducerFactory"))
+        assertTrue(generatedSource.contains("@Named(\"api\")"))
+        assertTrue(generatedSource.contains("@TimerQualifier"))
+        // @FactoryArg params stay out of the injectable constructor (they live in the FactoryArgs data class).
+        assertFalse(generatedSource.contains("private val `external`"))
+    }
+
+    @Test
+    fun generate_factory_without_annotation_by_default_test() {
+        val actionType = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerAction")
+        val validSignature = validator.validate(
+            RawReducerSignature(
+                packageName = "studio.lunabee.compose.demo.presenter.timer",
+                reducerClassName = ClassName("studio.lunabee.compose.demo.presenter.timer", "PlainTimerReducer"),
+                uiStateTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerUiState"),
+                navScopeTypeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerNavScope"),
+                actionTypeName = actionType,
+                constructorVisibility = Visibility.Public,
+                constructorParameters = listOf(
+                    RawReducerParameter(
+                        name = "coroutineScope",
+                        typeName = ClassName("kotlinx.coroutines", "CoroutineScope"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                    RawReducerParameter(
+                        name = "emitUserAction",
+                        typeName = LambdaTypeName.get(parameters = arrayOf(actionType), returnType = Unit::class.asTypeName()),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = generator.render(generator.generate(validSignature))
+
+        assertFalse(generatedSource.contains("org.koin.core.annotation.Factory"))
+        assertFalse(generatedSource.contains("@Factory"))
+    }
+
+    @Test
     fun common_package_name_test() {
         assertEquals(
             "studio.lunabee.compose.demo",

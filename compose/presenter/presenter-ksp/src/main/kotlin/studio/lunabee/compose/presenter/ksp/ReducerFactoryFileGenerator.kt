@@ -16,6 +16,7 @@
 
 package studio.lunabee.compose.presenter.ksp
 
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
@@ -31,13 +32,23 @@ private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.pr
 private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
 private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
 private val koinNamedMember: MemberName = MemberName("org.koin.core.qualifier", "named")
+private val koinFactoryAnnotation: ClassName = ClassName("org.koin.core.annotation", "Factory")
+private val koinNamedAnnotation: ClassName = ClassName("org.koin.core.annotation", "Named")
 private const val ContextParam = "context"
 private const val FactoryArgsParam = "factoryArgs"
 private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
 private const val GeneratedKoinModuleFileName = "GeneratedReducerFactoryModule"
 private const val GeneratedKoinModulePropertyName = "generatedReducerFactoryModule"
 
-internal class ReducerFactoryFileGenerator {
+internal class ReducerFactoryFileGenerator(
+    /**
+     * When true, the generated factory class is annotated with [org.koin.core.annotation.Factory] so it can be picked up by a
+     * Koin `@ComponentScan` (including across module boundaries from compiled jars), instead of relying on same-module
+     * unannotated auto-binding. Koin qualifiers declared on injected reducer constructor parameters are propagated onto the
+     * generated factory constructor parameters.
+     */
+    private val annotateFactory: Boolean = false,
+) {
     fun generate(signature: ValidReducerSignature): FileSpec {
         val fileSpec = FileSpec.builder(signature.packageName, signature.factoryClassName.simpleName)
             .indent("    ")
@@ -92,11 +103,18 @@ internal class ReducerFactoryFileGenerator {
 
     private fun generateFactoryType(signature: ValidReducerSignature): TypeSpec {
         val typeBuilder = TypeSpec.classBuilder(signature.factoryClassName)
+        if (annotateFactory) {
+            typeBuilder.addAnnotation(koinFactoryAnnotation)
+        }
         signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
         val constructorBuilder = FunSpec.constructorBuilder()
 
         signature.injectedParameters.forEach { parameter ->
-            constructorBuilder.addParameter(parameter.name, parameter.typeName)
+            val parameterBuilder = ParameterSpec.builder(parameter.name, parameter.typeName)
+            if (annotateFactory) {
+                qualifierAnnotation(parameter.qualifier)?.let { annotation -> parameterBuilder.addAnnotation(annotation) }
+            }
+            constructorBuilder.addParameter(parameterBuilder.build())
             typeBuilder.addProperty(
                 PropertySpec.builder(parameter.name, parameter.typeName)
                     .addModifiers(KModifier.PRIVATE)
@@ -222,6 +240,16 @@ internal class ReducerFactoryFileGenerator {
         ParameterKind.EmitUserAction -> CodeBlock.of("$ContextParam.emitUserAction")
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
+    }
+
+    private fun qualifierAnnotation(qualifier: KoinQualifier?): AnnotationSpec? = when (qualifier) {
+        null -> null
+
+        is KoinQualifier.Named -> AnnotationSpec.builder(koinNamedAnnotation)
+            .addMember("%S", qualifier.value)
+            .build()
+
+        is KoinQualifier.Typed -> AnnotationSpec.builder(qualifier.annotationClassName).build()
     }
 
     private fun injectedParameterResolution(parameter: ValidatedReducerParameter): CodeBlock = when (val qualifier = parameter.qualifier) {
