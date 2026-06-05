@@ -75,3 +75,7 @@ The template already shows the expected presenter shape with:
 ## Koin integration
 
 If your project uses Koin, `presenter-koin` provides `PresentScreen` to resolve the presenter as a ViewModel and invoke it with the screen navigation scope.
+
+For generated reducer factories, apply the `presenter-koin-ksp` processor instead of `presenter-ksp` (it pulls `presenter-ksp` transitively). It additionally generates the Koin bindings, driven by the KSP options:
+- `studio.lunabee.presenter.generateKoinModule` + `studio.lunabee.presenter.koinModulePackage`: generate the `generatedReducerFactoryModule` Koin module registering every generated factory
+- `studio.lunabee.presenter.annotateFactory`: annotate generated factories with `org.koin.core.annotation.Factory` so a Koin `@ComponentScan` picks them up
