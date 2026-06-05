@@ -99,6 +99,7 @@ addComposeModule(
     "presenter/presenter",
     "presenter/presenter-annotations",
     "presenter/presenter-koin",
+    "presenter/presenter-koin-ksp",
     "presenter/presenter-ksp",
     "uifield/uifield-core",
     "uifield/uifield-countrypicker",

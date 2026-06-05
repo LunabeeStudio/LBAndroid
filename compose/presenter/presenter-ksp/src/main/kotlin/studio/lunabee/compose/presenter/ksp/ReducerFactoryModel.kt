@@ -25,7 +25,10 @@ import com.squareup.kotlinpoet.TypeName
 private val coroutineScopeType: ClassName = ClassName("kotlinx.coroutines", "CoroutineScope")
 private val kotlinUnitType: ClassName = ClassName("kotlin", "Unit")
 
-internal data class RawReducerSignature(
+/**
+ * Reducer signature extracted from an annotated reducer declaration, before validation.
+ */
+data class RawReducerSignature(
     val packageName: String,
     val reducerClassName: ClassName,
     val uiStateTypeName: TypeName,
@@ -36,16 +39,22 @@ internal data class RawReducerSignature(
     val constructorParameters: List<RawReducerParameter>,
 )
 
-internal data class RawReducerParameter(
+/**
+ * Reducer constructor parameter extracted from an annotated reducer declaration, before validation.
+ */
+data class RawReducerParameter(
     val name: String,
     val typeName: TypeName,
     val hasRuntimeAnnotation: Boolean,
     val hasDefault: Boolean,
     val isVararg: Boolean,
-    val qualifier: KoinQualifier? = null,
+    val qualifier: DiQualifier? = null,
 )
 
-internal data class ValidReducerSignature(
+/**
+ * Validated reducer signature used to generate the reducer factory.
+ */
+data class ValidReducerSignature(
     val packageName: String,
     val reducerClassName: ClassName,
     val uiStateTypeName: TypeName,
@@ -60,47 +69,71 @@ internal data class ValidReducerSignature(
     val factoryArgParameters: List<ValidatedReducerParameter> = constructorParameters.filter { it.kind == ParameterKind.FactoryArg }
 }
 
-internal data class GeneratedReducerFactoryFiles(
-    val signature: ValidReducerSignature,
-    val fileSpec: com.squareup.kotlinpoet.FileSpec,
-)
-
-internal data class ValidatedReducerParameter(
+/**
+ * Validated reducer constructor parameter with its resolved [ParameterKind].
+ */
+data class ValidatedReducerParameter(
     val name: String,
     val typeName: TypeName,
     val kind: ParameterKind,
-    val qualifier: KoinQualifier? = null,
+    val qualifier: DiQualifier? = null,
 )
 
-internal sealed interface KoinQualifier {
+/**
+ * Dependency injection qualifier declared on an injected reducer constructor parameter.
+ */
+sealed interface DiQualifier {
+    /**
+     * String qualifier declared with a `@Named` annotation.
+     */
     data class Named(
         val value: String,
-    ) : KoinQualifier
+    ) : DiQualifier
 
+    /**
+     * Custom qualifier annotation type, meta-annotated with `@Qualifier`.
+     */
     data class Typed(
         val annotationClassName: ClassName,
-    ) : KoinQualifier
+    ) : DiQualifier
 }
 
-internal enum class ParameterKind {
+/**
+ * How a reducer constructor parameter is provided by the generated factory.
+ */
+enum class ParameterKind {
     CoroutineScope,
     EmitUserAction,
     Injected,
     FactoryArg,
 }
 
-internal enum class Visibility {
+/**
+ * Kotlin visibility of a reducer declaration or its primary constructor.
+ */
+enum class Visibility {
     Public,
     Internal,
     Protected,
     Private,
 }
 
-internal class InvalidReducerFactoryException(
+/**
+ * Thrown when an annotated reducer does not match the supported factory generation contract.
+ */
+class InvalidReducerFactoryException(
     override val message: String,
 ) : IllegalArgumentException(message)
 
-internal class ReducerFactorySignatureValidator {
+/**
+ * Validates a [RawReducerSignature] against the factory generation contract.
+ */
+class ReducerFactorySignatureValidator {
+    /**
+     * Validates [signature] and returns the resolved [ValidReducerSignature].
+     *
+     * @throws InvalidReducerFactoryException when the reducer signature is not supported
+     */
     fun validate(signature: RawReducerSignature): ValidReducerSignature {
         ensureValid(
             condition = signature.reducerVisibility == Visibility.Public || signature.reducerVisibility == Visibility.Internal,

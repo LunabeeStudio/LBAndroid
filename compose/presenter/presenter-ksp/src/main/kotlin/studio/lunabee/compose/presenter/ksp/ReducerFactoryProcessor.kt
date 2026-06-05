@@ -19,101 +19,123 @@ package studio.lunabee.compose.presenter.ksp
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
-import com.google.devtools.ksp.processing.PlatformInfo
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
-import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSValueParameter
-import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.validate
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toTypeName
-import studio.lunabee.compose.presenter.FactoryArg
-import studio.lunabee.compose.presenter.GenerateReducerFactory
+import com.squareup.kotlinpoet.FileSpec
 
-private val generateReducerFactoryAnnotation: String = checkNotNull(GenerateReducerFactory::class.qualifiedName)
-private val factoryArgAnnotation: String = checkNotNull(FactoryArg::class.qualifiedName)
-private val namedQualifierAnnotations: Set<String> = setOf(
-    "jakarta.inject.Named",
-    "javax.inject.Named",
-    "org.koin.core.annotation.Named",
-)
-private val qualifierMetaAnnotations: Set<String> = setOf(
-    "jakarta.inject.Qualifier",
-    "javax.inject.Qualifier",
-    "org.koin.core.annotation.Qualifier",
-)
-private val kotlinUnitClassName: ClassName = ClassName("kotlin", "Unit")
-private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
-private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
+private const val AnnotateFactoryOption = "studio.lunabee.presenter.annotateFactory"
 
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
      * Creates the processor used to generate reducer factories.
      */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val koinModuleGenerationRequested = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true
-        val generateKoinModule = koinModuleGenerationRequested && shouldGenerateKoinModuleForCompilation(environment.platforms)
-        if (koinModuleGenerationRequested && !generateKoinModule) {
-            environment.logger.info(
-                "Skipping reducer Koin module generation for this compilation because it cannot aggregate all factories. " +
-                    "A platform compilation will generate the shared module instead.",
+        val annotateFactoryRequested = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull() == true
+        if (annotateFactoryRequested) {
+            environment.logger.warn(
+                "KSP option '$AnnotateFactoryOption' is enabled: factory generation is delegated to the lbcpresenter-koin-ksp " +
+                    "processor. Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
+            )
+        }
+        if (environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true) {
+            environment.logger.warn(
+                "KSP option '$GenerateKoinModuleOption' is handled by the lbcpresenter-koin-ksp processor. " +
+                    "Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
             )
         }
         return ReducerFactoryProcessor(
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
-            generateKoinModule = generateKoinModule,
-            configuredKoinModulePackageName = environment.options[KoinModulePackageOption]?.trim()?.takeIf { it.isNotEmpty() },
+            generateFactories = !annotateFactoryRequested,
         )
     }
 }
 
-internal fun shouldGenerateKoinModuleForCompilation(platforms: List<PlatformInfo>): Boolean = platforms.size == 1
-
-internal class ReducerFactoryProcessor(
+/**
+ * Generates a reducer factory for every class annotated with
+ * [studio.lunabee.compose.presenter.GenerateReducerFactory].
+ *
+ * DI specific processors (e.g. lbcpresenter-koin-ksp) can extend this processor to decorate the generated factories and
+ * produce extra aggregating files through [onProcessStart], [onProcessEnd] and [SymbolProcessor.finish].
+ */
+open class ReducerFactoryProcessor(
     private val codeGenerator: CodeGenerator,
-    private val logger: KSPLogger,
-    private val generateKoinModule: Boolean,
-    private val configuredKoinModulePackageName: String?,
+    /**
+     * Logger usable by subclasses to report DI specific diagnostics.
+     */
+    protected val logger: KSPLogger,
+    private val generateFactories: Boolean = true,
+    factoryDecorator: GeneratedFactoryDecorator? = null,
 ) : SymbolProcessor {
+    /**
+     * Parser shared with subclasses to extract reducer signatures from declarations.
+     */
+    protected val parser: ReducerSignatureParser = ReducerSignatureParser()
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
-    private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator()
-    private val koinModuleSignatures: LinkedHashMap<String, ValidReducerSignature> = linkedMapOf()
-    private val moduleSourcePackageNames: LinkedHashSet<String> = linkedSetOf()
-    private var moduleRootPackageName: String? = null
-    private var hasWarnedAboutMissingKoinModulePackageOption: Boolean = false
+    private val fileGenerator: ReducerFactoryFileGenerator = ReducerFactoryFileGenerator(decorator = factoryDecorator)
 
-    override fun process(resolver: Resolver): List<KSAnnotated> {
-        collectKoinModuleContext(resolver)
+    final override fun process(resolver: Resolver): List<KSAnnotated> {
+        onProcessStart(resolver)
         val deferred = mutableListOf<KSAnnotated>()
-        resolver.getSymbolsWithAnnotation(generateReducerFactoryAnnotation)
-            .forEach { symbol -> processSymbol(symbol, deferred) }
-        collectKoinModuleSignatures(resolver, deferred)
+        if (generateFactories) {
+            resolver.getSymbolsWithAnnotation(GenerateReducerFactoryAnnotationName)
+                .forEach { symbol -> processSymbol(symbol, deferred) }
+        }
+        onProcessEnd(resolver, deferred)
 
         return deferred.distinct()
     }
 
-    override fun finish() {
-        if (!shouldGenerateKoinModuleAtFinish(generateKoinModule, koinModuleSignatures.values)) return
+    /**
+     * Called at the beginning of every processing round, before factory generation.
+     */
+    protected open fun onProcessStart(resolver: Resolver) {
+        // no-op by default
+    }
 
-        val fileSpec = fileGenerator.generateKoinModule(
-            signatures = koinModuleSignatures.values.toList(),
-            moduleRootPackageName = moduleRootPackageName
-                ?: commonPackageName(koinModuleSignatures.values.map { it.packageName }),
-        )
-        writeGeneratedAggregatingFile(fileSpec)
+    /**
+     * Called at the end of every processing round, after factory generation. Subclasses can append symbols to [deferred]
+     * to postpone them to the next round.
+     */
+    protected open fun onProcessEnd(
+        resolver: Resolver,
+        deferred: MutableList<KSAnnotated>,
+    ) {
+        // no-op by default
+    }
+
+    /**
+     * Parses and validates the reducer signature of [declaration], reporting a KSP error and returning null on failure.
+     */
+    protected fun buildValidSignature(declaration: KSClassDeclaration): ValidReducerSignature? =
+        runCatching {
+            validator.validate(parser.parse(declaration))
+        }.getOrElse { throwable ->
+            logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
+            null
+        }
+
+    /**
+     * Writes [fileSpec] through the KSP code generator with the given incremental [dependencies].
+     */
+    protected fun writeGeneratedFile(
+        fileSpec: FileSpec,
+        dependencies: Dependencies,
+    ) {
+        codeGenerator.createNewFile(
+            dependencies = dependencies,
+            packageName = fileSpec.packageName,
+            fileName = fileSpec.name,
+        ).bufferedWriter().use { writer ->
+            writer.write(fileGenerator.render(fileSpec))
+        }
     }
 
     private fun processSymbol(
@@ -132,241 +154,19 @@ internal class ReducerFactoryProcessor(
             return
         }
 
-        val generatedFactoryFiles = buildFileSpec(declaration) ?: return
+        val signature = buildValidSignature(declaration) ?: return
         logger.info("Reducer factory generated", symbol)
-        writeGeneratedFile(generatedFactoryFiles.fileSpec, declaration.containingFile)
-    }
-
-    private fun collectKoinModuleContext(resolver: Resolver) {
-        if (!generateKoinModule) return
-
-        moduleSourcePackageNames += resolver.getAllFiles().map { it.packageName.asString() }.toList()
-        moduleRootPackageName = resolveModuleRootPackageName(
-            configuredPackageName = configuredKoinModulePackageName,
-            sourcePackageNames = moduleSourcePackageNames.toList(),
+        writeGeneratedFile(
+            fileSpec = fileGenerator.generate(signature),
+            dependenciesFile = declaration.containingFile,
         )
-        warnAboutMissingKoinModulePackageOptionIfNeeded()
-    }
-
-    private fun warnAboutMissingKoinModulePackageOptionIfNeeded() {
-        if (configuredKoinModulePackageName != null) return
-        if (hasWarnedAboutMissingKoinModulePackageOption) return
-        logger.warn(
-            "KSP option '$KoinModulePackageOption' is not set. Falling back to package inference from source files for " +
-                "generatedReducerFactoryModule. Add the option to make the generated Koin module package explicit and stable.",
-        )
-        hasWarnedAboutMissingKoinModulePackageOption = true
-    }
-
-    private fun collectKoinModuleSignatures(
-        resolver: Resolver,
-        deferred: MutableList<KSAnnotated>,
-    ) {
-        if (!generateKoinModule) return
-
-        koinModuleSignatures.clear()
-        // KSP incremental runs may not surface every annotated reducer in getSymbolsWithAnnotation().
-        // Rebuilding the aggregating module from all visible source files keeps the shared Koin module stable.
-        resolver.getAllFiles()
-            .asSequence()
-            .flatMap { file -> file.annotatedReducerDeclarations() }
-            .forEach { declaration ->
-                if (!declaration.validate()) {
-                    deferred += declaration
-                    return@forEach
-                }
-
-                val signature = buildValidSignature(declaration) ?: return@forEach
-                koinModuleSignatures[signature.factoryClassName.canonicalName] = signature
-            }
     }
 
     private fun writeGeneratedFile(
-        fileSpec: com.squareup.kotlinpoet.FileSpec,
+        fileSpec: FileSpec,
         dependenciesFile: KSFile?,
     ) {
         val dependencies = dependenciesFile?.let { Dependencies(false, it) } ?: Dependencies(false)
         writeGeneratedFile(fileSpec, dependencies)
     }
-
-    private fun writeGeneratedAggregatingFile(fileSpec: com.squareup.kotlinpoet.FileSpec) {
-        // The shared Koin module needs full-source invalidation so KSP does not drop it on unrelated incremental reruns.
-        writeGeneratedFile(fileSpec, Dependencies.ALL_FILES)
-    }
-
-    private fun writeGeneratedFile(
-        fileSpec: com.squareup.kotlinpoet.FileSpec,
-        dependencies: Dependencies,
-    ) {
-        codeGenerator.createNewFile(
-            dependencies = dependencies,
-            packageName = fileSpec.packageName,
-            fileName = fileSpec.name,
-        ).bufferedWriter().use { writer ->
-            writer.write(fileGenerator.render(fileSpec))
-        }
-    }
-
-    private fun buildFileSpec(declaration: KSClassDeclaration) =
-        runCatching {
-            val signature = validator.validate(declaration.toRawSignature())
-            GeneratedReducerFactoryFiles(
-                signature = signature,
-                fileSpec = fileGenerator.generate(signature),
-            )
-        }.getOrElse { throwable ->
-            logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
-            null
-        }
-
-    private fun buildValidSignature(declaration: KSClassDeclaration): ValidReducerSignature? =
-        runCatching {
-            validator.validate(declaration.toRawSignature())
-        }.getOrElse { throwable ->
-            logger.error(throwable.message ?: "Failed to generate reducer factory", declaration)
-            null
-        }
-
-    private fun KSClassDeclaration.toRawSignature(): RawReducerSignature {
-        if (!isConcreteReducerClass(classKind = classKind, modifiers = modifiers)) {
-            throw InvalidReducerFactoryException("Reducer factory generation only supports concrete classes")
-        }
-
-        val primaryConstructor: KSFunctionDeclaration = primaryConstructor
-            ?: throw InvalidReducerFactoryException("Reducer factory generation requires a primary constructor")
-
-        val reducerSuperType = superTypes
-            .map { it.resolve() }
-            .firstOrNull { it.declaration.qualifiedName?.asString() == SingleReducerQualifiedName }
-            ?: throw InvalidReducerFactoryException("Annotated reducers must directly extend LBSingleReducer")
-
-        val reducerTypeArguments = reducerSuperType.arguments.mapNotNull { it.type?.resolve() }
-        if (reducerTypeArguments.size != 3) {
-            throw InvalidReducerFactoryException("Unable to resolve reducer generic arguments")
-        }
-
-        return RawReducerSignature(
-            packageName = packageName.asString(),
-            reducerClassName = toClassName(),
-            uiStateTypeName = reducerTypeArguments[0].toTypeName(),
-            navScopeTypeName = reducerTypeArguments[1].toTypeName(),
-            actionTypeName = reducerTypeArguments[2].toTypeName(),
-            reducerVisibility = toVisibility(),
-            constructorVisibility = primaryConstructor.toVisibility(),
-            constructorParameters = primaryConstructor.parameters.map { parameter ->
-                RawReducerParameter(
-                    name = parameter.name?.asString()
-                        ?: throw InvalidReducerFactoryException("Reducer constructor parameters must be named"),
-                    typeName = parameter.type.toTypeName(),
-                    hasRuntimeAnnotation = parameter.annotations.any {
-                        it.annotationType.resolve().declaration.qualifiedName?.asString() == factoryArgAnnotation
-                    },
-                    hasDefault = parameter.hasDefault,
-                    isVararg = parameter.isVararg,
-                    qualifier = parameter.toKoinQualifier(),
-                )
-            },
-        )
-    }
-
-    private fun KSDeclaration.toVisibility(): Visibility = when {
-        Modifier.PRIVATE in modifiers -> Visibility.Private
-        Modifier.PROTECTED in modifiers -> Visibility.Protected
-        Modifier.INTERNAL in modifiers -> Visibility.Internal
-        else -> Visibility.Public
-    }
-
-    private fun KSValueParameter.toKoinQualifier(): KoinQualifier? {
-        val qualifiers = annotations.mapNotNull { it.toKoinQualifier() }.toList()
-        if (qualifiers.size > 1) {
-            throw InvalidReducerFactoryException("Reducer constructor parameters support at most one qualifier annotation")
-        }
-        return qualifiers.singleOrNull()
-    }
-
-    private fun KSAnnotation.toKoinQualifier(): KoinQualifier? {
-        val annotationDeclaration = annotationType.resolve().declaration as? KSClassDeclaration ?: return null
-        val annotationQualifiedName = annotationDeclaration.qualifiedName?.asString() ?: return null
-        if (annotationQualifiedName == factoryArgAnnotation) return null
-
-        if (annotationQualifiedName in namedQualifierAnnotations) {
-            return resolveNamedQualifier(
-                value = stringArgumentValue(),
-                type = classArgumentValue(argumentName = "type"),
-            )
-        }
-
-        return if (annotationDeclaration.isQualifierAnnotation()) {
-            KoinQualifier.Typed(annotationDeclaration.toClassName())
-        } else {
-            null
-        }
-    }
-
-    private fun KSClassDeclaration.isQualifierAnnotation(): Boolean =
-        annotations.any { annotation ->
-            annotation.annotationType.resolve().declaration.qualifiedName?.asString() in qualifierMetaAnnotations
-        }
-
-    private fun KSAnnotation.stringArgumentValue(): String? =
-        arguments.firstOrNull { argument ->
-            argument.name?.asString() == "value" || argument.name == null
-        }?.value as? String
-
-    private fun KSAnnotation.classArgumentValue(argumentName: String): ClassName? {
-        val value = arguments.firstOrNull { argument -> argument.name?.asString() == argumentName }?.value as? KSType
-        val declaration = value?.declaration as? KSClassDeclaration ?: return null
-        return declaration.toClassName()
-    }
-
-    private fun KSFile.annotatedReducerDeclarations(): Sequence<KSClassDeclaration> =
-        declarations.asSequence().flatMap { declaration -> declaration.annotatedReducerDeclarations() }
-
-    private fun KSDeclaration.annotatedReducerDeclarations(): Sequence<KSClassDeclaration> = sequence {
-        val classDeclaration = this@annotatedReducerDeclarations as? KSClassDeclaration ?: return@sequence
-        if (classDeclaration.hasGenerateReducerFactoryAnnotation()) {
-            yield(classDeclaration)
-        }
-        classDeclaration.declarations.forEach { declaration ->
-            yieldAll(declaration.annotatedReducerDeclarations())
-        }
-    }
-
-    private fun KSClassDeclaration.hasGenerateReducerFactoryAnnotation(): Boolean =
-        annotations.any { annotation ->
-            annotation.annotationType.resolve().declaration.qualifiedName?.asString() == generateReducerFactoryAnnotation
-        }
-}
-
-internal fun resolveNamedQualifier(
-    value: String?,
-    type: ClassName?,
-): KoinQualifier {
-    value?.takeIf { it.isNotEmpty() }?.let { qualifierName ->
-        return KoinQualifier.Named(qualifierName)
-    }
-    type?.takeUnless { it == kotlinUnitClassName }?.let { qualifierType ->
-        return KoinQualifier.Typed(qualifierType)
-    }
-    throw InvalidReducerFactoryException("@Named qualifier must declare a non-empty String value or a type")
-}
-
-internal fun shouldGenerateKoinModuleAtFinish(
-    generateKoinModule: Boolean,
-    signatures: Collection<ValidReducerSignature>,
-): Boolean = generateKoinModule && signatures.isNotEmpty()
-
-internal fun isConcreteReducerClass(
-    classKind: ClassKind,
-    modifiers: Set<Modifier>,
-): Boolean = classKind == ClassKind.CLASS && Modifier.ABSTRACT !in modifiers
-
-internal fun resolveModuleRootPackageName(
-    configuredPackageName: String?,
-    sourcePackageNames: List<String>,
-): String {
-    configuredPackageName?.takeIf { it.isNotBlank() }?.let { return it }
-
-    val normalizedSourcePackageNames = sourcePackageNames.filter { it.isNotBlank() }
-    return normalizedSourcePackageNames.firstOrNull()?.let { commonPackageName(normalizedSourcePackageNames) } ?: ""
 }

@@ -20,15 +20,11 @@ plugins {
     id("lunabee.library-publish-conventions")
 }
 
-description = "KSP integration for LBPresenter"
-version = AndroidConfig.LBCPRESENTER_KSP_VERSION
+description = "Koin KSP integration for LBPresenter"
+version = AndroidConfig.LBCPRESENTER_KOIN_KSP_VERSION
 
 dependencies {
-    api(libs.kotlinPoet)
-    implementation(libs.kotlinPoetKsp)
-    api(libs.kspApi)
-
-    implementation(projects.compose.presenterAnnotations)
+    api(projects.compose.presenterKsp)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinTest)

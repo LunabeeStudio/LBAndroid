@@ -13,11 +13,13 @@ Target migration:
 1. Update the presenter version entry in `libs.versions.toml` to the latest version (2.0.0+) published on Maven Central before changing
    code.
     - Check Maven Central for `studio.lunabee.compose.presenter:presenter`, `studio.lunabee.compose.presenter:presenter-koin`,
-      `studio.lunabee.compose.presenter:presenter-ksp` and `studio.lunabee.compose.presenter:presenter-annotations`
+      `studio.lunabee.compose.presenter:presenter-ksp`, `studio.lunabee.compose.presenter:presenter-koin-ksp` and
+      `studio.lunabee.compose.presenter:presenter-annotations`
     - If the project uses a shared presenter version alias, update that alias once and reuse it for every presenter dependency, except if
       you found more recent versions for specific artifacts
 2. Upgrade each affected module to use LBPresenter reducer factory generation.
-3. Add the KSP dependency for the presenter processor where needed.
+3. Add the KSP dependency for the presenter processor where needed: `presenter-koin-ksp` if the project uses Koin (it pulls
+   `presenter-ksp` transitively), `presenter-ksp` otherwise.
 4. If the project uses Koin, add the exact KSP flags:
    `ksp {`
    `    arg("studio.lunabee.presenter.generateKoinModule", "true")`

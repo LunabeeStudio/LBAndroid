@@ -14,6 +14,7 @@
 | `studio.lunabee.compose.presenter:presenter`             | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter?style=for-the-badge)             |
 | `studio.lunabee.compose.presenter:presenter-annotations` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-annotations?style=for-the-badge) |
 | `studio.lunabee.compose.presenter:presenter-koin`        | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-koin?style=for-the-badge)        |
+| `studio.lunabee.compose.presenter:presenter-koin-ksp`    | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-koin-ksp?style=for-the-badge)    |
 | `studio.lunabee.compose.presenter:presenter-ksp`         | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-ksp?style=for-the-badge)         |
 | `studio.lunabee.compose.test:androidtest`                | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.test/androidtest?style=for-the-badge)                |
 | `studio.lunabee.compose.test:robolectrictest`            | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.test/robolectrictest?style=for-the-badge)            |
