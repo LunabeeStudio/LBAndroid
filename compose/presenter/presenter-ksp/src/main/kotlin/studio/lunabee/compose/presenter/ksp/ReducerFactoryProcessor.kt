@@ -39,13 +39,13 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
         val annotateFactoryRequested = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull() == true
         if (annotateFactoryRequested) {
-            environment.logger.info(
+            environment.logger.warn(
                 "KSP option '$AnnotateFactoryOption' is enabled: factory generation is delegated to the lbcpresenter-koin-ksp " +
                     "processor. Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
             )
         }
         if (environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true) {
-            environment.logger.info(
+            environment.logger.warn(
                 "KSP option '$GenerateKoinModuleOption' is handled by the lbcpresenter-koin-ksp processor. " +
                     "Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
             )
