@@ -24,9 +24,6 @@ description = "Koin KSP integration for LBPresenter"
 version = AndroidConfig.LBCPRESENTER_KOIN_KSP_VERSION
 
 dependencies {
-    implementation(libs.kotlinPoet)
-    implementation(libs.kspApi)
-
     api(projects.compose.presenterKsp)
 
     testImplementation(libs.junit4)
