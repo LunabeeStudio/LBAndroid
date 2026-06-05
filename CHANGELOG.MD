@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-06-05
+
+```
+LbcpresenterKsp 2.0.0-rc03
+LbcpresenterKoinKsp 2.0.0-rc03
+```
+
+- Add optional `studio.lunabee.presenter.annotateFactory` KSP option to annotate generated reducer factories with
+  `org.koin.core.annotation.Factory` so they can be picked up by a Koin `@ComponentScan`
+- **break:** Split Koin generation out of `lbcpresenter-ksp` into the new `lbcpresenter-koin-ksp` module. `lbcpresenter-ksp` now only
+  generates Koin-free reducer factories; Koin projects must apply `ksp(lbcpresenter-koin-ksp)` instead (it pulls `lbcpresenter-ksp`
+  transitively) to keep the `generatedReducerFactoryModule` generation driven by the unchanged
+  `studio.lunabee.presenter.generateKoinModule` / `studio.lunabee.presenter.koinModulePackage` KSP options
+
 ## 2026-05-13
 
 ```

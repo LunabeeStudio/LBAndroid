@@ -22,33 +22,44 @@ import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 
 private val presenterContextType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBPresenterContext")
 private val reducerFactoryType: ClassName = ClassName("studio.lunabee.compose.presenter", "LBSingleReducerFactory")
-private val koinModuleType: ClassName = ClassName("org.koin.core.module", "Module")
-private val koinModuleMember: MemberName = MemberName("org.koin.dsl", "module")
-private val koinNamedMember: MemberName = MemberName("org.koin.core.qualifier", "named")
-private val koinFactoryAnnotation: ClassName = ClassName("org.koin.core.annotation", "Factory")
-private val koinNamedAnnotation: ClassName = ClassName("org.koin.core.annotation", "Named")
 private const val ContextParam = "context"
 private const val FactoryArgsParam = "factoryArgs"
 private const val ContextParamKdoc = "@param $ContextParam Values owned by the presenter\n"
-private const val GeneratedKoinModuleFileName = "GeneratedReducerFactoryModule"
-private const val GeneratedKoinModulePropertyName = "generatedReducerFactoryModule"
 
-internal class ReducerFactoryFileGenerator(
+/**
+ * Hook allowing DI specific processors (e.g. Koin) to decorate the generated factory with extra annotations without
+ * coupling the core generator to any DI framework.
+ */
+interface GeneratedFactoryDecorator {
     /**
-     * When true, the generated factory class is annotated with [org.koin.core.annotation.Factory] so it can be picked up by a
-     * Koin `@ComponentScan` (including across module boundaries from compiled jars), instead of relying on same-module
-     * unannotated auto-binding. Koin qualifiers declared on injected reducer constructor parameters are propagated onto the
-     * generated factory constructor parameters.
+     * Annotations to add on the generated factory class for [signature].
      */
-    private val annotateFactory: Boolean = false,
+    fun classAnnotations(signature: ValidReducerSignature): List<AnnotationSpec>
+
+    /**
+     * Annotations to add on the generated factory constructor [parameter].
+     */
+    fun parameterAnnotations(parameter: ValidatedReducerParameter): List<AnnotationSpec>
+}
+
+/**
+ * Generates the reducer factory file of a validated reducer signature.
+ */
+class ReducerFactoryFileGenerator(
+    /**
+     * Optional decorator adding DI specific annotations on the generated factory class and its constructor parameters.
+     */
+    private val decorator: GeneratedFactoryDecorator? = null,
 ) {
+    /**
+     * Builds the factory (and optional factory args) file of [signature].
+     */
     fun generate(signature: ValidReducerSignature): FileSpec {
         val fileSpec = FileSpec.builder(signature.packageName, signature.factoryClassName.simpleName)
             .indent("    ")
@@ -59,26 +70,10 @@ internal class ReducerFactoryFileGenerator(
         return fileSpec.build()
     }
 
+    /**
+     * Renders [fileSpec] as Kotlin source code.
+     */
     fun render(fileSpec: FileSpec): String = fileSpec.toString()
-
-    fun generateKoinModule(
-        signatures: List<ValidReducerSignature>,
-        moduleRootPackageName: String,
-    ): FileSpec {
-        require(signatures.isNotEmpty()) { "Koin module generation requires at least one reducer signature" }
-
-        val sortedSignatures = signatures.sortedBy { it.factoryClassName.canonicalName }
-        return FileSpec.builder(
-            packageName = moduleRootPackageName,
-            fileName = GeneratedKoinModuleFileName,
-        ).indent("    ")
-            .addProperty(
-                PropertySpec.builder(GeneratedKoinModulePropertyName, koinModuleType)
-                    .initializer(buildKoinModuleInitializer(sortedSignatures))
-                    .build(),
-            )
-            .build()
-    }
 
     private fun generateFactoryArgsType(
         signature: ValidReducerSignature,
@@ -103,17 +98,13 @@ internal class ReducerFactoryFileGenerator(
 
     private fun generateFactoryType(signature: ValidReducerSignature): TypeSpec {
         val typeBuilder = TypeSpec.classBuilder(signature.factoryClassName)
-        if (annotateFactory) {
-            typeBuilder.addAnnotation(koinFactoryAnnotation)
-        }
+        decorator?.classAnnotations(signature)?.forEach { annotation -> typeBuilder.addAnnotation(annotation) }
         signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
         val constructorBuilder = FunSpec.constructorBuilder()
 
         signature.injectedParameters.forEach { parameter ->
             val parameterBuilder = ParameterSpec.builder(parameter.name, parameter.typeName)
-            if (annotateFactory) {
-                qualifierAnnotation(parameter.qualifier)?.let { annotation -> parameterBuilder.addAnnotation(annotation) }
-            }
+            decorator?.parameterAnnotations(parameter)?.forEach { annotation -> parameterBuilder.addAnnotation(annotation) }
             constructorBuilder.addParameter(parameterBuilder.build())
             typeBuilder.addProperty(
                 PropertySpec.builder(parameter.name, parameter.typeName)
@@ -205,23 +196,6 @@ internal class ReducerFactoryFileGenerator(
         return functionBuilder.build()
     }
 
-    private fun buildKoinModuleInitializer(signatures: List<ValidReducerSignature>): CodeBlock =
-        CodeBlock.builder()
-            .add("%M {\n", koinModuleMember)
-            .indent()
-            .apply {
-                signatures.forEach { signature ->
-                    add("factory { %T(", signature.factoryClassName)
-                    signature.injectedParameters.forEachIndexed { index, parameter ->
-                        if (index > 0) add(", ")
-                        add("%L", injectedParameterResolution(parameter))
-                    }
-                    add(") }\n")
-                }
-            }.unindent()
-            .add("}")
-            .build()
-
     private fun buildReducerCall(signature: ValidReducerSignature): CodeBlock {
         return CodeBlock.builder()
             .add("return %T(\n", signature.reducerClassName)
@@ -241,28 +215,6 @@ internal class ReducerFactoryFileGenerator(
         ParameterKind.Injected -> CodeBlock.of("this.%L", parameter.name)
         ParameterKind.FactoryArg -> CodeBlock.of("$FactoryArgsParam.%L", parameter.name)
     }
-
-    private fun qualifierAnnotation(qualifier: KoinQualifier?): AnnotationSpec? = when (qualifier) {
-        null -> null
-
-        is KoinQualifier.Named -> AnnotationSpec.builder(koinNamedAnnotation)
-            .addMember("%S", qualifier.value)
-            .build()
-
-        is KoinQualifier.Typed -> AnnotationSpec.builder(qualifier.annotationClassName).build()
-    }
-
-    private fun injectedParameterResolution(parameter: ValidatedReducerParameter): CodeBlock = when (val qualifier = parameter.qualifier) {
-        null -> CodeBlock.of("get()")
-
-        is KoinQualifier.Named -> CodeBlock.of("get(qualifier = %M(%S))", koinNamedMember, qualifier.value)
-
-        is KoinQualifier.Typed -> CodeBlock.of(
-            "get(qualifier = %M<%T>())",
-            koinNamedMember,
-            qualifier.annotationClassName,
-        )
-    }
 }
 
 private fun Visibility.toKModifier(): KModifier? = when (this) {
@@ -273,20 +225,4 @@ private fun Visibility.toKModifier(): KModifier? = when (this) {
     Visibility.Protected,
     Visibility.Private,
     -> error("Unsupported generated visibility: $this")
-}
-
-internal fun commonPackageName(packageNames: List<String>): String {
-    require(packageNames.isNotEmpty()) { "At least one package name is required" }
-
-    val normalizedPackageNames = packageNames.filter { it.isNotBlank() }
-    if (normalizedPackageNames.isEmpty()) return packageNames.first()
-
-    val firstPackageSegments = normalizedPackageNames.first().split('.')
-    val commonSegments = firstPackageSegments.indices.takeWhile { index ->
-        normalizedPackageNames.drop(1).all { candidate ->
-            candidate.split('.').getOrNull(index) == firstPackageSegments[index]
-        }
-    }.map { firstPackageSegments[it] }
-
-    return commonSegments.joinToString(".").ifEmpty { normalizedPackageNames.first() }
 }

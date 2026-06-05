@@ -95,7 +95,7 @@ dependencies {
     implementation(platform(libs.koinBom))
 
     ksp(libs.hiltAndroidCompiler)
-    ksp(projects.compose.presenterKsp)
+    ksp(projects.compose.presenterKoinKsp)
 
     implementation(libs.androidxActivityCompose)
     implementation(libs.androidxAppcompat)
