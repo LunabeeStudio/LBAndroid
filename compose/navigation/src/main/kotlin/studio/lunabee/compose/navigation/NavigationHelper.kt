@@ -54,7 +54,6 @@ class NavigationHelper(
                     backStack.clear()
                 } else {
                     backStack.subList(1, backStack.size).clear()
-
                 }
             }
 
