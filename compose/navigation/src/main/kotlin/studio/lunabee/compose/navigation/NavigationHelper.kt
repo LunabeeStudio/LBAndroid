@@ -52,9 +52,8 @@ class NavigationHelper(
             is PopUpTo.Root -> {
                 if (popupTo.inclusive) {
                     backStack.clear()
-                } else {
+                } else if (backStack.size > 1) {
                     backStack.subList(1, backStack.size).clear()
-
                 }
             }
 
