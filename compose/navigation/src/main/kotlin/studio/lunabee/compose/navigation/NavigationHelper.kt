@@ -49,6 +49,15 @@ class NavigationHelper(
                 }
             }
 
+            is PopUpTo.Root -> {
+                if (popupTo.inclusive) {
+                    backStack.clear()
+                } else {
+                    backStack.subList(1, backStack.size).clear()
+
+                }
+            }
+
             null -> backStack.removeLastOrNull()
         }
     }
@@ -104,4 +113,5 @@ sealed interface PopUpTo {
 
     data class Class(val clazz: KClass<out LbcDestination<*>>, override val inclusive: Boolean = false) : PopUpTo
     data class Instance(val destination: LbcDestination<*>, override val inclusive: Boolean = false) : PopUpTo
+    data class Root(override val inclusive: Boolean = true) : PopUpTo
 }
