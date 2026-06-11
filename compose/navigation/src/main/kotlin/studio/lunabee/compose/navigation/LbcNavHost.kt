@@ -16,6 +16,8 @@
 
 package studio.lunabee.compose.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
@@ -35,6 +37,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEvent
 import studio.lunabee.compose.navigation.utils.LocalModalBackgroundColor
@@ -51,6 +54,11 @@ fun LbcNavHost(
     navigationHelper: NavigationHelper,
     modalBackgroundColor: Color,
     onBack: () -> Unit = { backStack.removeLastOrNull() },
+    transitionSpec: AnimatedContentTransitionScope<Scene<LbcNavigationKey>>.() -> ContentTransform = { normalPushTransition() },
+    popTransitionSpec: AnimatedContentTransitionScope<Scene<LbcNavigationKey>>.() -> ContentTransform = { normalPopTransition() },
+    predictivePopTransitionSpec:
+    AnimatedContentTransitionScope<Scene<LbcNavigationKey>>.(@NavigationEvent.SwipeEdge Int) -> ContentTransform =
+        { _: @NavigationEvent.SwipeEdge Int -> normalPredictivePopTransition() },
 ) {
     val bottomSheetStrategy = remember { ModalSceneStrategy<LbcNavigationKey>() }
 
@@ -64,9 +72,9 @@ fun LbcNavHost(
                     backStack = backStack,
                     sceneStrategies = listOf(bottomSheetStrategy),
                     onBack = onBack,
-                    transitionSpec = { normalPushTransition() },
-                    popTransitionSpec = { normalPopTransition() },
-                    predictivePopTransitionSpec = { _: @NavigationEvent.SwipeEdge Int -> normalPredictivePopTransition() },
+                    transitionSpec = transitionSpec,
+                    popTransitionSpec = popTransitionSpec,
+                    predictivePopTransitionSpec = predictivePopTransitionSpec,
                     entryDecorators = listOf(
                         rememberSaveableStateHolderNavEntryDecorator(),
                         rememberViewModelStoreNavEntryDecorator(),
