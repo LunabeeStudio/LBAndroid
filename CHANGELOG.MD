@@ -13,6 +13,9 @@ LbcNavigation 1.1.0
 
 Add a `Root` option to the `popupTo` to argument allowing to clear the backstack up until the first destination.
 
+Expose `transitionSpec`, `popTransitionSpec` and `predictivePopTransitionSpec` parameters on `LbcNavHost` so callers can
+override the navigation animations, keeping the existing ones as defaults.
+
 ## 2026-06-05
 
 ```
