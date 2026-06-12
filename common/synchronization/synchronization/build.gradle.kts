@@ -36,6 +36,12 @@ kotlin {
         commonMain.dependencies {
             // api: SyncTimestampStore exposes DataStore<Preferences> in its public constructor signature.
             api(libs.androidxDatastorePreferencesCore)
+            // SyncRunner uses Mutex / CoroutineScope / async / delay; pin the dependency explicitly rather
+            // than relying on the transitive DataStore coroutines.
+            implementation(libs.kotlinxCoroutinesCore)
+
+            // api: SyncRunner exposes LBResult in its public run() signature.
+            api(projects.core)
         }
         commonTest.dependencies {
             implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
