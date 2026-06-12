@@ -16,10 +16,9 @@
 
 package studio.lunabee.synchronization
 
-import bolts.Task
-import bolts.TaskCompletionSource
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
@@ -41,20 +40,14 @@ class LBSyncGroup(
 ) {
 
     /**
-     * Use this to enable the sync for specifics conditions
-     * example : you can enable the sync only if user is logged in
+     * Use this to gate the whole group's synchronization. Evaluated exactly once per [syncManagers]
+     * attempt; when it returns false every manager is marked [LBSyncProcessStatus.Disabled] and the
+     * attempt fails with [LBSyncClosureException].
+     *
+     * Being a suspend closure, it subsumes both the legacy synchronous and asynchronous enablement
+     * checks (e.g. gate the sync on a session call) without any callback bridging.
      */
-    var isEnableClosure: () -> Boolean = {
-        true
-    }
-
-    /**
-     * Use this to enable the sync for specifics conditions that need to be computed asynchronously
-     * example : you can enable the sync only if a call to a web service succeed
-     * */
-    var isEnableClosureAsync: suspend (completion: (Boolean) -> Unit) -> Unit = { completion ->
-        completion(true)
-    }
+    var isEnabled: suspend () -> Boolean = { true }
 
     /**
      * The lastSuccessfulSync of the oldest successfully synchronized sync manager or
@@ -69,110 +62,68 @@ class LBSyncGroup(
         }
 
     /**
-     * Synchronize all the managers of the group
-     * @param completion: provide nullable Exception
-     */
-    @Suppress("MemberVisibilityCanBePrivate")
-    fun syncManagers(completion: ((error: Exception?) -> Unit)? = null) {
-        val task = syncManagerTask()
-        task.continueWith(
-            { continueTask: Task<Void>? ->
-                completion?.invoke(continueTask?.error)
-            },
-            Task.UI_THREAD_EXECUTOR,
-        )
-    }
-
-    /**
-     * Synchronize all the managers of the group
-     * ⚠ This is caller responsibility to switch coroutine context
+     * Synchronize all the managers of the group in parallel.
+     *
+     * The [isEnabled] gate is evaluated exactly once: when it returns false every manager is marked
+     * [LBSyncProcessStatus.Disabled] and the result is [LBResult.Failure] carrying an
+     * [LBSyncClosureException].
+     *
+     * Otherwise every manager runs to completion via `async`/`awaitAll` — because each
+     * [LBGenericSyncManager.synchronize] returns its failure as a value, a failing sibling never
+     * cancels the others (parity with the legacy Bolts `whenAll`). The per-manager results are then
+     * combined:
+     * - no failure → [LBResult.Success];
+     * - exactly one failure → [LBResult.Failure] carrying that manager's error;
+     * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
+     *
+     * @return the combined synchronization result.
      */
     suspend fun syncManagers(): LBResult<Unit> {
-        val task = syncManagerTask()
-        task.waitForCompletion()
-        return if (task.isFaulted) {
-            LBResult.Failure(task.error)
-        } else {
-            LBResult.Success(Unit)
-        }
-    }
-
-    /**
-     * @return the Bolt Task to sync all the managers of the group
-     */
-    fun syncManagerTask(): Task<Void> {
-        val task = getTasksIfClosureIsEnabled {
-            // TODO(#04): remove Bolts bridge
-            Task.whenAll(syncManagers.map(LBGenericSyncManager::synchronizeBoltsBridge))
+        if (!isEnabled()) {
+            syncManagers.forEach { it.setStatusInternal(LBSyncProcessStatus.Disabled) }
+            return LBResult.Failure(LBSyncClosureException())
         }
 
-        if (task.isCompleted && task.result == null) {
+        val results: List<LBResult<Unit>> = coroutineScope {
             syncManagers
-                .filter { it.currentSyncStatus != LBSyncProcessStatus.Disabled }
-                .forEach {
-                    it.setStatusInternal(LBSyncProcessStatus.Disabled)
-                }
+                .map { manager -> async { manager.synchronize() } }
+                .awaitAll()
         }
 
-        return task
-    }
+        val errors: List<Throwable> = results.mapNotNull { (it as? LBResult.Failure)?.throwable }
 
-    /**
-     * @return the Bolt Task to start all the serverNotificationListener available of the group
-     */
-    fun startServerNotificationListeners(): Task<Void> {
-        return if (syncManagers.any { it.supportChangeNotificationFromServer() }) {
-            getTasksIfClosureIsEnabled {
-                // TODO(#04): remove Bolts bridge
-                Task.whenAll(
-                    syncManagers.filter { it.supportChangeNotificationFromServer() }
-                        .map(LBGenericSyncManager::startServerNotificationListenerBoltsBridge),
-                )
-            }
-        } else {
-            Task.forResult(null)
+        return when (errors.size) {
+            0 -> LBResult.Success(Unit)
+            1 -> LBResult.Failure(errors.first())
+            else -> LBResult.Failure(LBSyncAggregateException(errors = errors))
         }
     }
 
     /**
-     * @return the Bolt Task given only if isEnableClosure and isEnableClosureAsync allows it.
+     * Start every available server notification listener of the group, filtering on
+     * [LBGenericSyncManager.supportChangeNotificationFromServer]. Listeners are started in parallel.
      */
-    private fun getTasksIfClosureIsEnabled(getTaskToFollow: () -> Task<Void>): Task<Void> {
-        return if (isEnableClosure()) {
-            val taskIsEnabledClosureAsync = TaskCompletionSource<Boolean>()
-            GlobalScope.launch {
-                isEnableClosureAsync { isEnable ->
-                    if (isEnable) {
-                        taskIsEnabledClosureAsync.setResult(isEnable)
-                    } else {
-                        syncManagers.forEach {
-                            it.setStatusInternal(LBSyncProcessStatus.Disabled)
-                        }
-                        taskIsEnabledClosureAsync.setError(LBSyncClosureException())
-                    }
-                }
-            }
-            taskIsEnabledClosureAsync.task.onSuccessTask {
-                if (isEnableClosure()) {
-                    getTaskToFollow()
-                } else {
-                    Task.forError(LBSyncClosureException())
-                }
-            }
-        } else {
-            Task.forError(LBSyncClosureException())
+    suspend fun startServerNotificationListeners() {
+        coroutineScope {
+            syncManagers
+                .filter { it.supportChangeNotificationFromServer() }
+                .map { manager -> async { manager.startServerNotificationListener() } }
+                .awaitAll()
         }
     }
 
     /**
-     * @return the Bolt Task to stop all the serverNotificationListener available of the group
+     * Stop every available server notification listener of the group, filtering on the same
+     * [LBGenericSyncManager.supportChangeNotificationFromServer] set as
+     * [startServerNotificationListeners]. Listeners are stopped in parallel.
      */
-    fun stopServerNotificationListeners(): Task<Void> {
-        // TODO(#04): remove Bolts bridge
-        val tasks = syncManagers.filter(LBGenericSyncManager::supportChangeNotificationFromServer).map(
-            LBGenericSyncManager::stopServerNotificationListenerBoltsBridge,
-        )
-        return Task.whenAll(tasks)
+    suspend fun stopServerNotificationListeners() {
+        coroutineScope {
+            syncManagers
+                .filter { it.supportChangeNotificationFromServer() }
+                .map { manager -> async { manager.stopServerNotificationListener() } }
+                .awaitAll()
+        }
     }
 
     /**
