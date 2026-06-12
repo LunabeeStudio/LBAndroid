@@ -51,7 +51,7 @@ the full bitmap into memory, fixing high memory usage on heavy drawables.
 ## 2026-06-12
 
 ```
-Synchronization 2.0.0
+Synchronization 2.0.0-beta01
 ```
 
 Move the `synchronization` module from the `Libraries_Android` repository into `LBAndroid`. The package is renamed from
@@ -92,7 +92,7 @@ callback/observer surface are all gone (`LBSyncToken`, `LBSyncChangeStatusClosur
 - `kotlin-reflect` is dropped from the module (only stdlib `KClass`/`::class` are used).
 
 ```
-SynchronizationParseRoom 2.0.0
+SynchronizationParseRoom 2.0.0-beta01
 ```
 
 Add the `synchronization-parse-room` module: a generic Parse↔Room synchronization framework built on
