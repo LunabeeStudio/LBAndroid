@@ -8,7 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-0612
 
 ```
-Synchronization 2.0.0
+Synchronization 2.0.0-beta01
 ```
 
 Move the `synchronization` module from the `Libraries_Android` repository into `LBAndroid`. The package is renamed from
@@ -49,7 +49,7 @@ callback/observer surface are all gone (`LBSyncToken`, `LBSyncChangeStatusClosur
 - `kotlin-reflect` is dropped from the module (only stdlib `KClass`/`::class` are used).
 
 ```
-SynchronizationParseRoom 2.0.0
+SynchronizationParseRoom 2.0.0-beta01
 ```
 
 Add the `synchronization-parse-room` module: a generic Parse↔Room synchronization framework built on
