@@ -91,6 +91,7 @@ androidxActivityCompose = { group = "androidx.activity", name = "activity-compos
 androidxAppcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "androidxAppcompat" }
 androidxComposeUiTestJunit = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidxCore = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidxDatastorePreferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDatastore" }
 androidxDatastorePreferencesCore = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "androidxDatastore" }
 androidxExifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "androidxExifinterface" }
 androidxFragmentKtx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "androidxFragment" }
