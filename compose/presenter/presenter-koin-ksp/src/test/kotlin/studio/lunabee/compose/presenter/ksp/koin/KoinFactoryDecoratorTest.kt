@@ -90,6 +90,14 @@ class KoinFactoryDecoratorTest {
                         hasDefault = false,
                         isVararg = false,
                     ),
+                    RawReducerParameter(
+                        name = "providedDependency",
+                        typeName = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerProvidedDependency"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        isProvided = true,
+                    ),
                 ),
             ),
         )
@@ -100,6 +108,9 @@ class KoinFactoryDecoratorTest {
         assertTrue(generatedSource.contains("@Factory\npublic class AnnotatedTimerReducerFactory"))
         assertTrue(generatedSource.contains("@Named(\"api\")"))
         assertTrue(generatedSource.contains("@TimerQualifier"))
+        // @Provided is forwarded so the dependency stays excluded from Koin compile-time safety on the factory.
+        assertTrue(generatedSource.contains("org.koin.core.`annotation`.Provided"))
+        assertTrue(generatedSource.contains("@Provided"))
         // @FactoryArg params stay out of the injectable constructor (they live in the FactoryArgs data class).
         assertFalse(generatedSource.contains("private val `external`"))
     }
