@@ -180,8 +180,8 @@ class LBSyncGroup(
     /**
      * Reset the timeStamp of all sync managers of the group
      */
-    fun resetAllTimestamps() {
-        syncManagers.forEach(LBGenericSyncManager::resetTimeStamp)
+    suspend fun resetAllTimestamps() {
+        syncManagers.forEach { it.resetTimeStamp() }
     }
 
     /**

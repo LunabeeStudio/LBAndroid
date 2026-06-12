@@ -61,6 +61,16 @@ convention (`lbConnectivityManager` → `connectivity`, `lbSyncManager` → `syn
 The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` are removed; use
 `studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
 
+Sync-cursor persistence is now backed by AndroidX DataStore Preferences through a new multiplatform
+`commonMain` store, `SyncTimestampStore`, instead of SharedPreferences. The timestamp read/reset API is now
+`suspend`: `LBSyncManager.lastSuccessfulSyncDate()`, `LBSyncManager.resetTimeStamp()`,
+`LBSyncOperator.resetAllTimestamps()` and `LBSyncGroup.resetAllTimestamps()`. The status is no longer seeded in the
+manager constructor; seed it via the new `suspend LBSyncManager.load()` (or `LBSyncOperator.loadAllStatuses()` to seed
+every managed manager at once). A new per-manager `open val syncKey` replaces the class-name-derived preference keys —
+its default preserves the legacy scheme, and overriding it makes a manager rename-safe. SharedPreferences (and the old
+default-prefs migration) are removed, so an app upgrading from the `Libraries_Android` `lb-synchronization` will re-sync
+once.
+
 ```
 SynchronizationParseRoom 2.0.0
 ```

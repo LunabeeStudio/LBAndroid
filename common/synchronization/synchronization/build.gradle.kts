@@ -47,8 +47,8 @@ kotlin {
             // AndroidX
             implementation(libs.androidxAppcompat)
             implementation(libs.androidxCore)
+            implementation(libs.androidxDatastorePreferences)
             implementation(libs.androidxLifecycleProcess)
-            implementation(libs.androidxPreferenceKtx)
             // Kotlin
             implementation(libs.kotlinReflect)
             implementation(libs.kotlinxCoroutinesAndroid)
