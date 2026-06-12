@@ -18,20 +18,28 @@ package studio.lunabee.synchronization.syncmanager
 
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent.AppForeground
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent.InternetIsBack
-import java.util.Date
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Instant
 
 /**
  * There is the list of event than can triggered and sync manager refresh
  * [AppForeground] and [InternetIsBack] are managed in LBSyncOperator
  * You can use NOTIFICATION_FROM_SERVER in LiveQueries for example
+ *
+ * @param minimumDelay the minimum debounce duration that must elapse since the last successful sync
+ * before this event triggers a refresh.
  */
+sealed class LBSyncRefreshEvent(private val minimumDelay: Duration) {
 
-sealed class LBSyncRefreshEvent(private val minimumDelayMs: Long) {
+    /**
+     * @param lastSuccessfulSync the instant of the last successful sync to debounce against.
+     * @return true if at least [minimumDelay] has elapsed since [lastSuccessfulSync].
+     */
+    internal fun isDelayElapsed(lastSuccessfulSync: Instant): Boolean =
+        lastSuccessfulSync + minimumDelay < Clock.System.now()
 
-    internal fun isDelayElapsed(lastSuccessfulSync: Date): Boolean =
-        lastSuccessfulSync.time + minimumDelayMs < Date().time
+    class AppForeground(minimumDelay: Duration = Duration.ZERO) : LBSyncRefreshEvent(minimumDelay)
 
-    class AppForeground(minimumDelayMs: Long = 0L) : LBSyncRefreshEvent(minimumDelayMs)
-
-    class InternetIsBack(minimumDelayMs: Long = 0L) : LBSyncRefreshEvent(minimumDelayMs)
+    class InternetIsBack(minimumDelay: Duration = Duration.ZERO) : LBSyncRefreshEvent(minimumDelay)
 }

@@ -17,23 +17,21 @@
 package studio.lunabee.synchronization.syncmanager
 
 import android.content.Context
-import bolts.Task
-import bolts.TaskCompletionSource
 import co.touchlab.kermit.Logger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.SyncTimestampStore
 import studio.lunabee.synchronization.store.syncTimestampStore
-import java.util.Date
-import java.util.Timer
-import java.util.TimerTask
-import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Generic [LBSyncManager]
@@ -49,17 +47,37 @@ typealias LBDefaultSyncManager<ServerData, LocalData> = LBSyncManager<ServerData
  * LBSyncManager abstract class.
  * Subclass it to implement every SyncManager you need.
  *
+ * Coroutine-native engine: [synchronize] is a suspend function returning [LBResult], status is exposed
+ * as a [StateFlow], and run scheduling (collapse-and-join + automatic retry) is delegated to
+ * [SyncRunner]. The detached-from-caller execution of the old `GlobalScope.launch` is preserved by the
+ * injected [scope].
+ *
  * @param ServerData The type of data returned by the server
  * @param LocalData The type of data to be mapped from [ServerData]
  * @param PageInfo The type of data returned by the server to handle pagination. Could be [Nothing] if non applicable.
- * @param context Context used to access shared preferences
+ * @param timestampStore DataStore-backed persistence for this manager's sync cursors, shared
+ * process-wide with every other manager and the operator.
+ * @param scope the scope every sync run and automatic retry is launched in. The `Context`-based
+ * secondary constructor passes the shared library [defaultSyncScope].
  * @param logging Enable LBSM logs
  */
-@Suppress("unused")
+@Suppress("unused", "TooManyFunctions")
 abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
-    context: Context,
+    private val timestampStore: SyncTimestampStore,
+    internal val scope: CoroutineScope,
     private var logging: Boolean = true,
 ) {
+
+    /**
+     * Convenience constructor preserving the legacy call shape: the cursor store is resolved from the
+     * shared process-wide DataStore provider and runs are launched in the shared library
+     * [defaultSyncScope].
+     *
+     * @param context Context used to access the shared timestamp store.
+     * @param logging Enable LBSM logs.
+     */
+    constructor(context: Context, logging: Boolean = true) :
+        this(context.applicationContext.syncTimestampStore, defaultSyncScope, logging)
 
     /**
      * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name to
@@ -69,95 +87,62 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     open val syncKey: String get() = this::class.simpleName.orEmpty()
 
     /**
-     * DataStore-backed persistence for this manager's sync cursors, shared process-wide with every
-     * other manager and the operator.
-     */
-    private val timestampStore: SyncTimestampStore = context.applicationContext.syncTimestampStore
-
-    /**
-     * This is used to "post" cancel a request.
-     * Case of use : You trigger a sync, you logout, you logging and
-     * you don't want to get the result from the previous account
-     */
-    private var requestId: String? = null
-
-    /**
-     * The timer in case of retry
-     */
-    private var retryTimer: Timer? = null
-
-    /**
-     * The task to execute in case of retry
-     */
-    private var retryTimerTask: TimerTask? = null
-
-    /**
-     * HashSet of observers -> notify when sync status change
-     */
-    private var syncObservers: ConcurrentLinkedQueue<LBSyncToken> = ConcurrentLinkedQueue()
-
-    /**
      * Used to log : You can manage log in constructor with the field logging
      */
     protected var logger: Logger? = if (logging) LBLogger.get("LBSM ${this::class.simpleName} ${this.hashCode()}") else null
 
     /**
-     * Is the sync manager is in a dirty state
-     * Setting the value automatically cancel any current retry timer
-     * If the new value is true, a new retry timer is created
+     * Drives this manager's single in-flight run: concurrent [synchronize] calls collapse into one
+     * follow-up whose real result every caller receives, and a failed run is retried after [retryTempo].
      */
-    private var syncIsDirty: Boolean = false
-        set(value) {
-            field = value
-            retryTimer?.cancel()
-            retryTimer = null
-            retryTimerTask?.cancel()
-            retryTimerTask = null
-            if (value) {
-                retryTimerTask = retryTimerTask()
-                retryTempoInMs?.let {
-                    retryTimer = Timer()
-                    try {
-                        retryTimer?.schedule(retryTimerTask, it)
-                    } catch (e: Exception) {
-                        // retryTimerTask as been set to null as syncIsDirty has be reassigned before the schedule is launched
-                        // exception can be NullPointerException if retryTimerTask == null
-                        // or IllegalStateException if retryTimerTask has been canceled
-                    }
-                }
-            }
-        }
+    private val syncRunner: SyncRunner = SyncRunner(scope = scope, retryDelay = { retryTempo })
+
     /*===============
      * Public Fields
      ===============*/
 
     /**
-     * Can be modified to change retry tempo, value is in milliseconds
+     * The delay before an automatic retry of a failed sync, re-read each time a retry is scheduled.
+     * Set to `null` to disable automatic retry. Defaults to 30 seconds.
      */
-    open var retryTempoInMs: Long? = 30 * 1000
+    open var retryTempo: Duration? = 30.seconds
 
-    /**The sync manager's current status : please see LBSyncProcessStatus
-     * Every time this value is changed, all the LBSyncTokens are notify
-     * **MUST NOT** be edited outside a LBSyncManager (sub)class
-     */
-    var currentSyncStatus: LBSyncProcessStatus = LBSyncProcessStatus.NeverSync
-        internal set(value) {
-            field = value
-            syncObservers.forEach { token ->
-                token.changeStatusClosure(value)
-            }
-            logger?.v(value.fullDescription())
-        }
+    private val _status: MutableStateFlow<LBSyncProcessStatus> = MutableStateFlow(LBSyncProcessStatus.NeverSync)
 
     /**
-     * Seed [currentSyncStatus] from the persisted last successful sync date. Status stays
+     * The sync manager's status as a state flow. Collect it to observe transitions; conflation applies
+     * (status is state, not an event stream).
+     */
+    val status: StateFlow<LBSyncProcessStatus> = _status.asStateFlow()
+
+    /**
+     * Read-only alias for the current value of [status]. **MUST NOT** be edited outside a
+     * [LBSyncManager] (sub)class; the engine mutates it internally.
+     */
+    val currentSyncStatus: LBSyncProcessStatus get() = _status.value
+
+    /**
+     * Engine-internal status mutator: publishes [status] on the state flow and logs its description.
+     * Visible to [studio.lunabee.synchronization.LBSyncGroup] and
+     * [studio.lunabee.synchronization.LBSyncOperator] so they can set `Disabled`/`PendingSync` while
+     * still routing every mutation through one place.
+     */
+    internal fun setStatusInternal(status: LBSyncProcessStatus) {
+        _status.value = status
+        logger?.v(status.fullDescription())
+    }
+
+    /**
+     * Seed [status] from the persisted last successful sync date. Status stays
      * [LBSyncProcessStatus.NeverSync] until this is called (the cursor read is suspending, so it can no
      * longer run synchronously in `init`).
      */
     suspend fun load() {
-        currentSyncStatus = timestampStore.lastSuccessfulSyncDate(syncKey)?.let {
-            LBSyncProcessStatus.SyncSuccessfully(Date(it))
-        } ?: LBSyncProcessStatus.NeverSync
+        setStatusInternal(
+            timestampStore.lastSuccessfulSyncDate(syncKey)?.let {
+                LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(it))
+            } ?: LBSyncProcessStatus.NeverSync,
+        )
     }
 
     /*=============================
@@ -181,26 +166,30 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
      ===============================*/
 
     /**
-     * How to fetch the data from the server
-     * **WARNING** : Data returned must be ordered by updatedAt
+     * How to fetch one page of data from the server. Throw on error: the engine catches at the pipeline
+     * boundary and maps the failure to [LBSyncProcessStatus.DownloadFinishWithError].
      *
-     * @param page: current page value
-     * @param sinceLastDate: date to get only the last records
-     * @param completion: data & information returned by the server
+     * **WARNING** : objects returned must be ordered by ascending `updatedAt` when incremental sync is
+     * enabled.
+     *
+     * @param page: current page value, starting at 0.
+     * @param cursor: opaque cursor returned by the previous page's [FetchPage.nextCursor], or `null` for
+     * the first page.
+     * @param sinceLastDate: the last server `updatedAt` cursor, or `null` to fetch from the beginning.
+     * @return the fetched page.
      */
-    protected abstract fun fetchRequest(
+    protected abstract suspend fun fetchRequest(
         page: Int = 0,
         cursor: String? = null,
-        sinceLastDate: Date?,
-        completion: LBSyncManagerFetchCompletion<ServerData, PageInfo>,
-    )
+        sinceLastDate: Instant?,
+    ): FetchPage<ServerData, PageInfo>
 
     /**
      * How to get the updatedAt information from the record coming from the server
      * @param obj: server object
-     * @return the nullable updatedAt date
+     * @return the nullable updatedAt instant
      */
-    protected abstract fun updatedAt(obj: ServerData): Date?
+    protected abstract fun updatedAt(obj: ServerData): Instant?
 
     /**
      * How to know whether an object is in sync with the server
@@ -215,15 +204,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     protected abstract suspend fun objectToBeUploaded(): List<LocalData>
 
     /**
-     * How to upload objects to the server
-     * **WARNING** : Must be in a backgroundThread to avoid block the UI
-     * @param objects: the object list to push
-     * @param completion: provide function success and nullable Exception
+     * How to upload objects to the server. Throw on failure: the engine catches at the pipeline boundary
+     * and maps the failure to [LBSyncProcessStatus.UploadFinishWithError].
+     *
+     * **WARNING** : Must run on a background thread to avoid blocking the UI.
+     *
+     * @param objects: the object list to push.
      */
-    protected abstract suspend fun pushObjectsToServer(
-        objects: List<LocalData>,
-        completion: (error: Exception?) -> Unit,
-    )
+    protected abstract suspend fun pushObjectsToServer(objects: List<LocalData>)
 
     /**
      * @return true if some objects need to be uploaded to the server
@@ -252,135 +240,46 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     open fun supportChangeNotificationFromServer(): Boolean = false
 
     /**
-     * Start the listener for the server notifications
+     * Start the listener for the server notifications.
      * eg: Start the Parse LiveQuery
+     *
+     * @return true once the listener is started.
      */
-    open fun startServerNotificationListener(): Task<Boolean> {
-        val task = TaskCompletionSource<Boolean>()
-        task.setResult(true)
-        return task.task
-    }
+    open suspend fun startServerNotificationListener(): Boolean = true
 
     /**
-     * Stop the listener for the server notifications
+     * Stop the listener for the server notifications.
      * eg: stop the Parse LiveQuery
+     *
+     * @return true once the listener is stopped.
      */
-    open fun stopServerNotificationListener(): Task<Boolean> {
-        val task = TaskCompletionSource<Boolean>()
-        task.setResult(true)
-        return task.task
-    }
+    open suspend fun stopServerNotificationListener(): Boolean = true
     /*================
      * Public methods
      ================*/
 
     /**
-     * Add a LBSyncToken to get notify for every sync manager status changes
-     * @param block: the completion block to execute at every sync manager status changes. The block
-     * might be call from background thread.
-     * @return the LBSyncToken associated
-     */
-    fun observe(block: LBSyncChangeStatusClosure): LBSyncToken {
-        val token = LBSyncToken(this, block)
-        syncObservers.add(token)
-        return token
-    }
-
-    /**
-     * Remove a specific LBSyncToken
-     * @param token: the LBSyncToken to remove
-     */
-    fun removeObserver(token: LBSyncToken) {
-        syncObservers.remove(token)
-    }
-
-    /**
-     * Invalidate the requestId to cancel every current synchronization
+     * Cancel the in-flight sync run and any pending automatic retry. The terminal status surfaced is
+     * [LBSyncProcessStatus.DownloadFinishSuccessfully] (parity with the legacy soft-cancel path).
+     *
+     * An in-flight [synchronize] call returns an [LBResult.Failure] carrying the cancellation cause
+     * (this is how [SyncRunner] resolves cancelled awaiters so they never hang); the important parity is
+     * the terminal **status**, not the returned result. A [CancellationException] never escapes the
+     * engine.
      */
     fun cancelAllRequests() {
-        requestId = null
-
-        retryTimer?.cancel()
-        retryTimer = null
-        retryTimerTask?.cancel()
-        retryTimerTask = null
+        setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
+        syncRunner.cancel()
     }
 
     /**
-     * Synchronize the sync manager and return the Bolt Task associated
+     * Synchronize the sync manager: download data, then upload data if needed, then (unless the server
+     * notifies of changes) re-download. Concurrent calls collapse into a single follow-up run via
+     * [SyncRunner]; a failed run is retried automatically after [retryTempo].
+     *
+     * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the cause.
      */
-    fun synchronize(): Task<Boolean> {
-        val task = TaskCompletionSource<Boolean>()
-        synchronize { error ->
-            error?.let(task::setError) ?: task.setResult(error == null)
-        }
-        return task.task
-    }
-
-    /**
-     * Synchronize the manager and wait for the result
-     */
-    suspend fun synchronizeWait(): LBResult<Unit> {
-        return suspendCoroutine { continuation ->
-            synchronize { error ->
-                if (error != null) {
-                    continuation.resume(LBResult.Failure(error))
-                } else {
-                    continuation.resume(LBResult.Success(Unit))
-                }
-            }
-        }
-    }
-
-    @Deprecated("use synchronize(completion: (error: Exception?) -> Unit)")
-    fun synchronize(completion: ((succeeded: Boolean, error: Exception?) -> Unit)) {
-        synchronize { error ->
-            if (error == null) {
-                completion(true, null)
-            } else {
-                completion(false, error)
-            }
-        }
-    }
-
-    /**
-     * Synchronize the sync manager
-     * Download data then upload data if needed
-     * @param completion: provide function success and nullable Exception
-     */
-    fun synchronize(completion: (error: Exception?) -> Unit) {
-        if (currentSyncStatus.isProcessing()) {
-            logger?.v("Synchronization has been cancelled as another is still running...")
-            syncIsDirty = true
-            completion.invoke(null)
-        } else {
-            GlobalScope.launch(Dispatchers.IO) {
-                download { downloadSucceeded, downloadError ->
-                    if (downloadSucceeded) {
-                        upload { uploadSucceeded, uploadError ->
-                            if (uploadSucceeded) {
-                                currentSyncStatus = LBSyncProcessStatus.SyncSuccessfully(Date())
-                                completion.invoke(null)
-                                if (syncIsDirty) {
-                                    synchronize()
-                                }
-                            } else {
-                                completion.invoke(
-                                    uploadError
-                                        ?: Exception("Something wrong happen during upload"),
-                                )
-                            }
-                        }
-                    } else {
-                        completion.invoke(
-                            downloadError
-                                ?: Exception("Something wrong happen during download"),
-                        )
-                    }
-                }
-            }
-        }
-    }
+    suspend fun synchronize(): LBResult<Unit> = syncRunner.run { runPipeline() }
 
     /**
      * Reset the sync manager
@@ -389,13 +288,11 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     suspend fun resetData() {
         resetTimeStamp()
         clearData()
-        currentSyncStatus = LBSyncProcessStatus.NeverSync
-        syncIsDirty = false
+        setStatusInternal(LBSyncProcessStatus.NeverSync)
     }
 
     fun resetSyncStatus() {
-        currentSyncStatus = LBSyncProcessStatus.NeverSync
-        syncIsDirty = false
+        setStatusInternal(LBSyncProcessStatus.NeverSync)
     }
 
     suspend fun resetTimeStamp() {
@@ -403,101 +300,136 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
         timestampStore.clear(syncKey)
         logger?.v("Reset last updated date")
     }
+
+    /**
+     * Get the last successful sync date (device version) from the timestamp store.
+     * @return the nullable last device sync instant.
+     */
+    @Suppress("MemberVisibilityCanBePrivate")
+    suspend fun lastSuccessfulSyncDate(): Instant? =
+        timestampStore.lastSuccessfulSyncDate(syncKey)?.let { Instant.fromEpochMilliseconds(it) }
+
     /*=================
      * Private methods
      =================*/
 
     /**
-     * Generate the retry task
+     * Runs the full sync pipeline once, linearizing the legacy download → upload → conditional
+     * re-download flow. SPI throws are caught at this boundary, mapped to the matching `*WithError`
+     * status, and returned as [LBResult.Failure] so [SyncRunner] schedules a retry.
+     *
+     * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the SPI
+     * error.
      */
-    private fun retryTimerTask(): TimerTask = object : TimerTask() {
-        override fun run() {
-            logger?.v("Retry to sync, next attempt will be in $retryTempoInMs ms")
-            synchronize()
+    private suspend fun runPipeline(): LBResult<Unit> {
+        return try {
+            download()
+            val uploaded = upload()
+            if (uploaded && !supportChangeNotificationFromServer()) {
+                download()
+            }
+            setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
+            LBResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LBResult.Failure(e)
         }
     }
 
     /**
-     * Save the last download date in the timestamp store.
-     * @param date A date from the server to save, can be null
-     * Automatically save the device date alongside it.
+     * Uploads the pending objects, if any. On a non-empty push the status transitions
+     * `UploadStarted` → `UploadFinishSuccessfully`; a push failure maps to `UploadFinishWithError` and
+     * rethrows.
+     *
+     * @return true if a push was attempted (so a re-download may follow), false if nothing was pending.
      */
-    private suspend fun saveDownloadDate(date: Date?) {
+    private suspend fun upload(): Boolean {
+        val objects = objectToBeUploaded()
+        if (objects.isEmpty()) return false
+
+        setStatusInternal(LBSyncProcessStatus.UploadStarted(Clock.System.now()))
+        try {
+            pushObjectsToServer(objects)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            setStatusInternal(LBSyncProcessStatus.UploadFinishWithError(error = e, at = Clock.System.now()))
+            throw e
+        }
+        setStatusInternal(LBSyncProcessStatus.UploadFinishSuccessfully(processedObjectCount = objects.size, at = Clock.System.now()))
+        return true
+    }
+
+    /**
+     * Downloads every page from the server. Status transitions `DownloadStarted` →
+     * `DownloadUpdated` (per page) → `DownloadFinishSuccessfully`; a fetch failure maps to
+     * `DownloadFinishWithError` and rethrows. The incremental cursor is saved per page only when
+     * [supportIncrementalSync]; the local sync date is always saved on terminal success (parity).
+     */
+    private suspend fun download() {
+        setStatusInternal(LBSyncProcessStatus.DownloadStarted(Clock.System.now()))
+
+        val lastUpdatedDate: Instant? = lastServerUpdatedDate()
+        var page = 0
+        var cursor: String? = null
+        var maxDate: Instant? = lastUpdatedDate
+
+        try {
+            while (true) {
+                val fetchPage = fetchRequest(page = page, cursor = cursor, sinceLastDate = lastUpdatedDate)
+                val objects = fetchPage.objects
+
+                maxDate = listOfNotNull(
+                    objects.mapNotNull(::updatedAt).maxOrNull(),
+                    maxDate,
+                ).maxOrNull()
+
+                updateData(objects)
+                if (supportIncrementalSync()) {
+                    saveDownloadDate(maxDate)
+                }
+                setStatusInternal(LBSyncProcessStatus.DownloadUpdated(processedObjectCount = objects.size, at = Clock.System.now()))
+
+                if (hasNextPage(objects.size, fetchPage.pageInfo)) {
+                    page += 1
+                    cursor = fetchPage.nextCursor
+                } else {
+                    break
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            setStatusInternal(LBSyncProcessStatus.DownloadFinishWithError(error = e, at = Clock.System.now()))
+            throw e
+        }
+
+        setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
+        // Terminal save always records the local sync date; the server cursor is only persisted for
+        // incremental sync (the next run resumes from it).
+        saveDownloadDate(if (supportIncrementalSync()) maxDate else null)
+    }
+
+    /**
+     * Save the last download date in the timestamp store: always the device date, and the server
+     * [instant] when non-null (the [SyncTimestampStore] leaves a `null` server value unchanged).
+     * @param instant A server instant to save, or null to leave the server cursor untouched.
+     */
+    private suspend fun saveDownloadDate(instant: Instant?) {
         timestampStore.saveSyncDates(
             syncKey = syncKey,
-            serverDateMillis = date?.time,
-            localDateMillis = Date().time,
+            serverDateMillis = instant?.toEpochMilliseconds(),
+            localDateMillis = Clock.System.now().toEpochMilliseconds(),
         )
     }
 
     /**
      * Get the last download date (server version) from the timestamp store.
-     * @return the nullable last server download date
+     * @return the nullable last server download instant.
      */
-    private suspend fun lastServerUpdatedDate(): Date? =
-        timestampStore.lastServerSyncDate(syncKey)?.let { Date(it) }
-
-    /**
-     * Get the last download date (device version) from the timestamp store.
-     * @return the nullable last device download date
-     */
-    @Suppress("MemberVisibilityCanBePrivate")
-    public suspend fun lastSuccessfulSyncDate(): Date? =
-        timestampStore.lastSuccessfulSyncDate(syncKey)?.let { Date(it) }
-
-    /**
-     * Fetch the data
-     * Manage paging if needed
-     * @param lastUpdatedDate: the nullable last update date
-     * @param page: the page number you want to fetch
-     * @param requestId: the current request id
-     * @param maxDateFromPreviousPage: the max date from the previous page fetch
-     * @param updateData: return the objects gotten with page number and date
-     * @param completion: is called if fetching has failed/has been canceled/has reached the last page
-     */
-    private fun fetch(
-        lastUpdatedDate: Date?,
-        page: Int = 0,
-        cursor: String? = null,
-        requestId: String,
-        maxDateFromPreviousPage: Date? = null,
-        updateData: (suspend (List<ServerData>, Int, Date?) -> Unit)?,
-        completion: ((maxDate: Date?, hasBeenCanceled: Boolean, error: Exception?) -> Unit)?,
-    ) {
-        fetchRequest(page, cursor, lastUpdatedDate) { objects, error, pageInfo, newCursor ->
-            when {
-                this.requestId != requestId -> completion?.invoke(null, true, null)
-
-                objects != null -> GlobalScope.launch {
-                    val updatedDates: List<Date> = objects.mapNotNull(this@LBSyncManager::updatedAt)
-                    val maxDate = updatedDates.maxOrNull()
-                    val maxTimeDate = arrayListOf(
-                        maxDate,
-                        maxDateFromPreviousPage,
-                        lastUpdatedDate,
-                    ).mapNotNull { it }.maxOrNull()
-                    updateData?.invoke(objects, page, maxTimeDate)
-                    GlobalScope.launch(Dispatchers.IO) {
-                        if (hasNextPage(objects.size, pageInfo)) {
-                            fetch(
-                                lastUpdatedDate,
-                                page + 1,
-                                newCursor,
-                                requestId,
-                                maxTimeDate,
-                                updateData,
-                                completion,
-                            )
-                        } else {
-                            completion?.invoke(maxTimeDate, false, null)
-                        }
-                    }
-                }
-
-                else -> completion?.invoke(null, false, error)
-            }
-        }
-    }
+    private suspend fun lastServerUpdatedDate(): Instant? =
+        timestampStore.lastServerSyncDate(syncKey)?.let { Instant.fromEpochMilliseconds(it) }
 
     /**
      * Called to know if the sync manager should query the next page using a custom data.
@@ -513,96 +445,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
             // Fallback to objects size if pageInfo has not been specified, default behavior
             queryPageSize() == objectCount
         }
-    }
-
-    /**
-     * Upload the data to the server
-     * If nothing to upload, completion success without doing anything
-     * @param completion: provide function success and nullable Exception
-     */
-    private fun upload(completion: ((succeeded: Boolean, error: Exception?) -> Unit)? = null) {
-        GlobalScope.launch(Dispatchers.IO) {
-            val objects = objectToBeUploaded()
-            if (objects.isEmpty()) {
-                // nothing to do
-                completion?.invoke(true, null)
-            } else {
-                currentSyncStatus = LBSyncProcessStatus.UploadStarted(Date())
-                pushObjectsToServer(objects) { error ->
-                    GlobalScope.launch(Dispatchers.IO) {
-                        if (error != null) {
-                            currentSyncStatus = LBSyncProcessStatus.UploadFinishWithError(
-                                error,
-                                Date(),
-                            )
-                            syncIsDirty = true
-                            completion?.invoke(false, error)
-                        } else {
-                            currentSyncStatus = LBSyncProcessStatus.UploadFinishSuccessfully(
-                                objects.size,
-                                Date(),
-                            )
-                            if (supportChangeNotificationFromServer()) {
-                                completion?.invoke(true, null)
-                            } else {
-                                download(completion)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Download data from the server
-     * Call the fetch() method to do the work
-     * @param completion: provide function success and nullable Exception
-     */
-    private suspend fun download(completion: ((succeeded: Boolean, error: Exception?) -> Unit)? = null) {
-        syncIsDirty = false
-        val requestId = UUID.randomUUID().toString()
-        this.requestId = requestId
-
-        currentSyncStatus = LBSyncProcessStatus.DownloadStarted(Date())
-
-        val updateData: suspend (List<ServerData>, Int, Date?) -> Unit = { objects, _, lastDate ->
-            updateData(objects)
-            if (supportIncrementalSync()) {
-                saveDownloadDate(lastDate)
-            }
-            currentSyncStatus = LBSyncProcessStatus.DownloadUpdated(objects.size, Date())
-        }
-
-        val fetchCompletion: (lastDate: Date?, hasBeenCanceled: Boolean, error: Exception?) -> Unit = { lastDate, hasBeenCanceled, error ->
-            when {
-                hasBeenCanceled -> {
-                    currentSyncStatus = LBSyncProcessStatus.DownloadFinishSuccessfully(Date())
-                    completion?.invoke(true, error)
-                }
-
-                error != null -> {
-                    currentSyncStatus = LBSyncProcessStatus.DownloadFinishWithError(error, Date())
-                    syncIsDirty = true
-                    completion?.invoke(false, error)
-                }
-
-                else -> {
-                    currentSyncStatus = LBSyncProcessStatus.DownloadFinishSuccessfully(Date())
-                    GlobalScope.launch(Dispatchers.IO) {
-                        saveDownloadDate(lastDate)
-                    }
-                    completion?.invoke(true, error)
-                }
-            }
-        }
-
-        fetch(
-            lastServerUpdatedDate(),
-            requestId = requestId,
-            updateData = updateData,
-            completion = fetchCompletion,
-        )
     }
 
     companion object {

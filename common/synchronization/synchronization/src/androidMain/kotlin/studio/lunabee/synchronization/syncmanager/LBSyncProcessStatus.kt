@@ -17,42 +17,51 @@
 package studio.lunabee.synchronization.syncmanager
 
 import studio.lunabee.synchronization.utils.DateTimeFormatter
-import java.util.Date
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
- * There is the list of different status a sync manager can have
- * Some of them can contains sync date, processed object count or error
+ * There is the list of different status a sync manager can have.
+ * Some of them carry a sync [Instant], a processed object count or an error.
+ *
+ * Statuses are immutable: a transition publishes a new instance on the status flow.
  */
 @Suppress("unused")
 sealed class LBSyncProcessStatus {
 
-    object NeverSync : LBSyncProcessStatus()
+    data object NeverSync : LBSyncProcessStatus()
 
-    object PendingSync : LBSyncProcessStatus()
+    data object PendingSync : LBSyncProcessStatus()
 
-    class SyncSuccessfully(paramLastSuccessfulSync: Date) : LBSyncProcessStatus() {
-        var lastSuccessfulSync: Date = paramLastSuccessfulSync
-            get() = field.coerceAtMost(Date())
+    /**
+     * Terminal success status.
+     *
+     * @property rawLastSuccessfulSync the persisted/produced last successful sync instant. Use
+     * [lastSuccessfulSync] to read it: it is coerced to "now" so a clock-skewed future date never leaks.
+     */
+    data class SyncSuccessfully(private val rawLastSuccessfulSync: Instant) : LBSyncProcessStatus() {
+        /** The last successful sync instant, coerced to at most the current instant (legacy quirk). */
+        val lastSuccessfulSync: Instant get() = minOf(rawLastSuccessfulSync, Clock.System.now())
     }
 
-    object Disabled : LBSyncProcessStatus()
+    data object Disabled : LBSyncProcessStatus()
 
-    class UploadStarted(var at: Date) : LBSyncProcessStatus()
+    data class UploadStarted(val at: Instant) : LBSyncProcessStatus()
 
-    class UploadFinishSuccessfully(
-        var processedObjectCount: Int,
-        var at: Date,
+    data class UploadFinishSuccessfully(
+        val processedObjectCount: Int,
+        val at: Instant,
     ) : LBSyncProcessStatus()
 
-    class UploadFinishWithError(var error: Exception, var at: Date) : LBSyncProcessStatus()
+    data class UploadFinishWithError(val error: Exception, val at: Instant) : LBSyncProcessStatus()
 
-    class DownloadStarted(var at: Date) : LBSyncProcessStatus()
+    data class DownloadStarted(val at: Instant) : LBSyncProcessStatus()
 
-    class DownloadUpdated(var processedObjectCount: Int, var at: Date) : LBSyncProcessStatus()
+    data class DownloadUpdated(val processedObjectCount: Int, val at: Instant) : LBSyncProcessStatus()
 
-    class DownloadFinishSuccessfully(var at: Date) : LBSyncProcessStatus()
+    data class DownloadFinishSuccessfully(val at: Instant) : LBSyncProcessStatus()
 
-    class DownloadFinishWithError(var error: Exception, var at: Date) : LBSyncProcessStatus()
+    data class DownloadFinishWithError(val error: Exception, val at: Instant) : LBSyncProcessStatus()
 
     /**
      * @return the status description
