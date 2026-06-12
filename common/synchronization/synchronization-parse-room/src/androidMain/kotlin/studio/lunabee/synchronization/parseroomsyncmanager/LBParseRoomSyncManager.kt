@@ -20,19 +20,18 @@ import android.content.Context
 import com.parse.ParseException
 import com.parse.ParseObject
 import com.parse.ParseQuery
+import com.parse.coroutines.getById
+import com.parse.coroutines.suspendFind
+import com.parse.coroutines.suspendSave
 import com.parse.livequery.SubscriptionHandling
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncDao
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncManager
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import java.util.Date
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.time.Instant
 
 /**
@@ -168,9 +167,9 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * **WARNING** : Data returned must be ordered by updatedAt.
      *
      * The objects are ordered by updatedAt; the {@code page} and {@code queryPageSize()} fix the
-     * limit and skip factors. The Parse callback is bridged to a suspend function via
-     * [suspendCancellableCoroutine]; a [ParseException] is rethrown so the engine maps it to a download
-     * error status.
+     * limit and skip factors. The query runs through the Parse coroutines artifact's
+     * [suspendFind] extension (which dispatches off the main thread); a [ParseException] is thrown so
+     * the engine maps it to a download error status.
      *
      * @param page the page number to fetch.
      * @param cursor unused by the Parse limit/skip paging.
@@ -191,41 +190,36 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
             query.limit = it
             query.skip = page * it
         }
-        return suspendCancellableCoroutine { continuation ->
-            query.findInBackground { objects, e ->
-                if (e != null) {
-                    continuation.resumeWithException(e)
-                } else {
-                    continuation.resume(FetchPage(objects = objects.orEmpty()))
-                }
-            }
-        }
+        val objects = query.suspendFind()
+        return FetchPage(objects = objects)
     }
 
     /**
      * How to push a Room entity to the server. Throw the [ParseException] on failure.
-     * **WARNING** : Must be in background thread.
+     *
+     * Uses the Parse coroutines artifact's [getById] and [suspendSave] extensions, which dispatch
+     * off the main thread, so no explicit dispatcher wrapping is needed. An
+     * [ParseException.OBJECT_NOT_FOUND] on the lookup means the object does not exist yet and a fresh
+     * one is created; any other [ParseException] is rethrown.
      * @param obj the Room entity to push
      */
     override suspend fun push(obj: RoomData) {
         val serverId = obj.lbServerId
         val query: ParseQuery<ParseObject> = parseQuery()
 
-        withContext(Dispatchers.IO) {
-            val result = try {
-                if (serverId != null) query.get(serverId) else null
-            } catch (e: ParseException) {
-                if (e.code != ParseException.OBJECT_NOT_FOUND) {
-                    throw e
-                } else {
-                    null
-                }
+        val result = try {
+            if (serverId != null) query.getById(serverId) else null
+        } catch (e: ParseException) {
+            if (e.code != ParseException.OBJECT_NOT_FOUND) {
+                throw e
+            } else {
+                null
             }
-
-            val objToSave = result ?: ParseObject.create(tableParseName())
-            update(objToSave, obj)
-            objToSave.save()
         }
+
+        val objToSave = result ?: ParseObject.create(tableParseName())
+        update(objToSave, obj)
+        objToSave.suspendSave()
     }
 
     override suspend fun startServerNotificationListener(): Boolean {
