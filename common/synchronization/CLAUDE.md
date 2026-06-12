@@ -25,10 +25,15 @@ Generic sync framework. **Source-set split**: the whole engine (`LBSyncManager`,
 sync-cursor persistence — `store/SyncTimestampStore`, a DataStore-backed deep module that speaks epoch
 millis and owns the legacy key scheme (`"${syncKey}lastSyncDate"` / `…_localDate`).
 
-Async primitive is **Bolts `Task`** (`parse-bolts-tasks`) plus `GlobalScope.launch` — *not*
-coroutines/Flow. Syncs run detached from any caller scope by design. Don't "modernize" this casually;
-the public surface (`Task<Boolean>`, completion callbacks) is what consumers and the parse-room layer
-extend.
+Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
+callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
+inside the Parse SDK). Each level has ONE suspend entry point returning `LBResult<Unit>`:
+`LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()`.
+Detached-from-caller execution (receiver-triggered syncs, automatic retry) is preserved by an injected,
+library-owned `CoroutineScope` — the `Context`-based manager constructor defaults it to the shared
+internal `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
+collapse-and-join + failure-retry machinery is extracted into the `SyncRunner` deep module in
+`commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time.
 
 ### Timestamp persistence (DataStore)
 
@@ -55,21 +60,30 @@ Three layers, top to bottom:
   trigger refreshes on `InternetIsBack` / `AppForeground`, and start/stop server-notification
   listeners (e.g. Parse LiveQuery) on foreground/background. `syncManager<T>()` finds a registered
   manager by type.
-- **`LBSyncGroup`** — managers in the **same group sync in parallel** (`Task.whenAll`); **groups run
-  sequentially** (chained via `continueWithTask`). So model table dependencies by putting the
-  dependency in an earlier group. `isEnableClosure` / `isEnableClosureAsync` gate a whole group (e.g.
-  only when logged in) — a blocked group sets its managers to `Disabled` and fails with
-  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce.
+- **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
+  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
+  groups sequentially**. So model table dependencies by putting the dependency in an earlier group. A
+  single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
+  evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
+  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine. Pipeline is
-  download → upload (then re-download unless `supportChangeNotificationFromServer()`). Subclass and
-  implement the abstract members; override the `open` ones for paging
+  download → upload (then re-download unless `supportChangeNotificationFromServer()`). The subclass SPI
+  is **suspend + throw-based**: `fetchRequest(...)` returns a `FetchPage`, `pushObjectsToServer(...)`,
+  and `start`/`stopServerNotificationListener(): Boolean`; errors are thrown and the engine maps them to
+  the `*WithError` statuses at the pipeline boundary. Override the `open` hooks for paging
   (`queryPageSize`/`hasNextPage`), incremental sync (`supportIncrementalSync`), and server push
-  notifications. Typealiases: `LBGenericSyncManager = <*,*,*>`, `LBDefaultSyncManager<S,L> =
-  <S,L,Nothing>`.
+  notifications. The primary constructor injects `SyncTimestampStore` + `CoroutineScope` (used by JVM
+  host tests with fakes + a `TestScope`); the secondary `Context` constructor preserves the legacy call
+  shape. Typealiases: `LBGenericSyncManager = <*,*,*>`, `LBDefaultSyncManager<S,L> = <S,L,Nothing>`.
 
-Status & observation: `LBSyncProcessStatus` (sealed) is observed via `manager.observe(closure):
-LBSyncToken`. `LBSyncApplication` (extends `LBLifecycleApplication` from `:core-android`) is the
-`Application` base class that broadcasts the foreground/background intents the operator listens for.
+Status & observation: `LBSyncProcessStatus` (sealed, immutable, `kotlin.time.Instant`-based) is exposed
+as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentSyncStatus` is a
+read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combined
+`statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and `isSyncing(): Flow<Boolean>` (snapshot of
+the registry at collection time; KDoc spells out the snapshot + `syncKey`-collision caveats). Multiple
+failures aggregate into `LBSyncAggregateException`. `LBSyncApplication` (extends `LBLifecycleApplication`
+from `:core-android`) is the `Application` base class that broadcasts the foreground/background intents
+the operator listens for.
 
 ### Sharp edges
 
@@ -80,12 +94,17 @@ LBSyncToken`. `LBSyncApplication` (extends `LBLifecycleApplication` from `:core-
   **Renaming a `SyncManager` subclass silently resets its incremental-sync cursor** unless you pin a
   stable `syncKey` — the escape hatch is to **override `syncKey`** so the persisted key survives the
   rename. Treat `syncKey` as a persisted key.
-- `currentSyncStatus` has an `internal set` — only the engine mutates it; never set it from a consumer.
+- `currentSyncStatus` is a **read-only alias** for `status.value`; only the engine mutates state (via
+  the `internal setStatusInternal`). Never try to set it from a consumer — collect `status` instead.
 - **Incremental sync requires `fetchRequest` results ordered by ascending `updatedAt`** — the cursor
-  saves the max date seen, so out-of-order results lose records.
-- Failure sets `syncIsDirty = true`, which schedules a retry `Timer` (default `retryTempoInMs = 30s`).
-- The status-change closure fires **synchronously** on the setter (changelog 1.7.1) and may run on a
-  background thread — keep observers cheap and thread-safe.
+  saves the max instant seen, so out-of-order results lose records.
+- A failed run is retried automatically by `SyncRunner` after `retryTempo` (a `Duration?`, default 30 s;
+  `null` disables retry). `cancelAllRequests()` cancels the in-flight run **and** any pending retry, and
+  surfaces the legacy terminal status `DownloadFinishSuccessfully`.
+- Concurrent `synchronize()` calls **collapse into a single follow-up run** whose real `LBResult` every
+  caller receives — the old immediate-success-while-dirty behavior is gone.
+- `StateFlow` is conflated (status is state, not an event stream) and observer threading is the
+  collector's choice — the old synchronous-background-thread closure sharp edge no longer applies.
 
 ## Changelog
 
@@ -100,9 +119,13 @@ Standard repo flow (see root `AGENTS.MD`). Quick reference:
 
 ```bash
 ./gradlew :synchronization:assemble :synchronization-parse-room:assemble
-./gradlew :synchronization:test :synchronization-parse-room:test
+./gradlew :synchronization:testAndroidHostTest   # runs the commonTest + androidHostTest engine tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed
 ```
+
+Engine unit tests (`SyncRunner`, manager pipeline, group, operator, combined flows) live in
+`commonTest` (the pure `SyncRunner`) and `androidHostTest` (the `androidMain` engine), run via the
+`withHostTest {}` setup with `runTest` + virtual time and fakes — no device needed.
 
 `:synchronization-parse-room` opts into `kotlin.time.ExperimentalTime` in all source sets, and keeps a
 distinct android namespace (`…parseroom`) from `:synchronization` so generated `R`/`BuildConfig` don't
