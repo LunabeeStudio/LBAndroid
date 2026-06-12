@@ -22,15 +22,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import androidx.core.content.edit
 import bolts.Task
 import co.touchlab.kermit.Logger
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.connectivity.NetworkState
 import studio.lunabee.synchronization.lifecycle.LBSyncApplication
+import studio.lunabee.synchronization.store.syncTimestampStore
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
-import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 import kotlin.reflect.KClass
@@ -232,16 +231,23 @@ object LBSyncOperator {
         syncManagers().any { it.hasSomethingToUpload() }
 
     /**
-     * Reset the timestamp of all sync managers
+     * Reset the timestamp of all sync managers by wiping the shared timestamp store.
      *
-     * @param context A valid context used to access shared preferences
+     * @param context A valid context used to access the timestamp store
      */
-    fun resetAllTimestamps(context: Context) {
+    suspend fun resetAllTimestamps(context: Context) {
         cancelAllRequests()
-        context.getSharedPreferences(LBSyncManager.timestampPrefFile, Context.MODE_PRIVATE).edit {
-            clear()
-        }
+        context.syncTimestampStore.clearAll()
         logger.v("Reset all SM last updated date")
+    }
+
+    /**
+     * Seed the status of all sync managers currently added in [groups] from their persisted last
+     * successful sync date. Call this once (e.g. at startup) since the status is no longer seeded
+     * synchronously in each manager's constructor.
+     */
+    suspend fun loadAllStatuses() {
+        syncManagers().forEach { it.load() }
     }
 
     /**

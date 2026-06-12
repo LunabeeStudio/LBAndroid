@@ -17,9 +17,6 @@
 package studio.lunabee.synchronization.syncmanager
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import androidx.preference.PreferenceManager
 import bolts.Task
 import bolts.TaskCompletionSource
 import co.touchlab.kermit.Logger
@@ -28,6 +25,8 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.syncTimestampStore
 import java.util.Date
 import java.util.Timer
 import java.util.TimerTask
@@ -63,19 +62,17 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
 ) {
 
     /**
-     * Shared preferences dedicated to sync managers
+     * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name to
+     * preserve the legacy SharedPreferences key scheme (`"${simpleName}lastSyncDate"`); override it to
+     * make a subclass rename-safe so the incremental-sync cursor survives a class rename.
      */
-    private var sharedPreferences: SharedPreferences = context.getSharedPreferences(timestampPrefFile, Context.MODE_PRIVATE)
+    open val syncKey: String get() = this::class.simpleName.orEmpty()
 
     /**
-     * SharedPrefs Key used for server sync date
+     * DataStore-backed persistence for this manager's sync cursors, shared process-wide with every
+     * other manager and the operator.
      */
-    private val lastSyncDateSharedPrefKey: String = "${this::class.java.simpleName}lastSyncDate"
-
-    /**
-     * SharedPrefs Key used for local sync date
-     */
-    private val lastSyncLocalDateSharedPrefKey: String by lazy { lastSyncDateSharedPrefKey + "_localDate" }
+    private val timestampStore: SyncTimestampStore = context.applicationContext.syncTimestampStore
 
     /**
      * This is used to "post" cancel a request.
@@ -152,38 +149,15 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
             logger?.v(value.fullDescription())
         }
 
-    /*
-     * LBSyncManager init
-     * Retrieve the last status
-     * Can be NeverSync of SyncSuccessfully
+    /**
+     * Seed [currentSyncStatus] from the persisted last successful sync date. Status stays
+     * [LBSyncProcessStatus.NeverSync] until this is called (the cursor read is suspending, so it can no
+     * longer run synchronously in `init`).
      */
-    init {
-        // Migration code from 3.8.0
-        migrateSharedPreferencesIfNeeded(context)
-
-        val lastSyncDate = lastSuccessfulSyncDate()
-        currentSyncStatus = lastSyncDate?.let {
-            LBSyncProcessStatus.SyncSuccessfully(it)
+    suspend fun load() {
+        currentSyncStatus = timestampStore.lastSuccessfulSyncDate(syncKey)?.let {
+            LBSyncProcessStatus.SyncSuccessfully(Date(it))
         } ?: LBSyncProcessStatus.NeverSync
-    }
-
-    private fun migrateSharedPreferencesIfNeeded(context: Context) {
-        val defaultPrefs = PreferenceManager.getDefaultSharedPreferences(context)
-
-        val migrateKey: (key: String) -> Unit = { key ->
-            if (defaultPrefs.contains(key) && !sharedPreferences.contains(key)) {
-                sharedPreferences.edit {
-                    putLong(key, defaultPrefs.getLong(key, 0L))
-                }
-                defaultPrefs.edit {
-                    remove(key)
-                }
-                logger?.i("Migration done for shared pref $key")
-            }
-        }
-
-        migrateKey(lastSyncLocalDateSharedPrefKey)
-        migrateKey(lastSyncDateSharedPrefKey)
     }
 
     /*=============================
@@ -424,12 +398,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
         syncIsDirty = false
     }
 
-    fun resetTimeStamp() {
+    suspend fun resetTimeStamp() {
         cancelAllRequests()
-        sharedPreferences.edit {
-            remove(lastSyncDateSharedPrefKey)
-            remove(lastSyncLocalDateSharedPrefKey)
-        }
+        timestampStore.clear(syncKey)
         logger?.v("Reset last updated date")
     }
     /*=================
@@ -447,51 +418,32 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     }
 
     /**
-     * Save the last download date in SharedPreferences
-     * @params date: A date from the server to save, can be null
-     * Automatically save the device date in another prefs
+     * Save the last download date in the timestamp store.
+     * @param date A date from the server to save, can be null
+     * Automatically save the device date alongside it.
      */
-    private fun saveDownloadDate(date: Date?) {
-        sharedPreferences.edit {
-            if (date != null) {
-                putLong(lastSyncDateSharedPrefKey, date.time)
-            }
-            putLong(lastSyncLocalDateSharedPrefKey, Date().time)
-        }
+    private suspend fun saveDownloadDate(date: Date?) {
+        timestampStore.saveSyncDates(
+            syncKey = syncKey,
+            serverDateMillis = date?.time,
+            localDateMillis = Date().time,
+        )
     }
 
     /**
-     * Get the last download date (server version) from the SharedPreferences
+     * Get the last download date (server version) from the timestamp store.
      * @return the nullable last server download date
      */
-    private fun lastServerUpdatedDate(): Date? {
-        val timeStamp = sharedPreferences.getLong(
-            lastSyncDateSharedPrefKey,
-            0L,
-        )
-        return if (timeStamp != 0L) {
-            Date(timeStamp)
-        } else {
-            null
-        }
-    }
+    private suspend fun lastServerUpdatedDate(): Date? =
+        timestampStore.lastServerSyncDate(syncKey)?.let { Date(it) }
 
     /**
-     * Get the last download date (device version) from the SharedPreferences
+     * Get the last download date (device version) from the timestamp store.
      * @return the nullable last device download date
      */
     @Suppress("MemberVisibilityCanBePrivate")
-    public fun lastSuccessfulSyncDate(): Date? {
-        val timeStamp = sharedPreferences.getLong(
-            lastSyncLocalDateSharedPrefKey,
-            0L,
-        )
-        return if (timeStamp != 0L) {
-            Date(timeStamp)
-        } else {
-            null
-        }
-    }
+    public suspend fun lastSuccessfulSyncDate(): Date? =
+        timestampStore.lastSuccessfulSyncDate(syncKey)?.let { Date(it) }
 
     /**
      * Fetch the data
@@ -525,7 +477,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
                         lastUpdatedDate,
                     ).mapNotNull { it }.maxOrNull()
                     updateData?.invoke(objects, page, maxTimeDate)
-                    GlobalScope.launch(Dispatchers.Main) {
+                    GlobalScope.launch(Dispatchers.IO) {
                         if (hasNextPage(objects.size, pageInfo)) {
                             fetch(
                                 lastUpdatedDate,
@@ -569,7 +521,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
      * @param completion: provide function success and nullable Exception
      */
     private fun upload(completion: ((succeeded: Boolean, error: Exception?) -> Unit)? = null) {
-        GlobalScope.launch(Dispatchers.Main) {
+        GlobalScope.launch(Dispatchers.IO) {
             val objects = objectToBeUploaded()
             if (objects.isEmpty()) {
                 // nothing to do
@@ -577,7 +529,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
             } else {
                 currentSyncStatus = LBSyncProcessStatus.UploadStarted(Date())
                 pushObjectsToServer(objects) { error ->
-                    GlobalScope.launch(Dispatchers.Main) {
+                    GlobalScope.launch(Dispatchers.IO) {
                         if (error != null) {
                             currentSyncStatus = LBSyncProcessStatus.UploadFinishWithError(
                                 error,
@@ -637,7 +589,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
 
                 else -> {
                     currentSyncStatus = LBSyncProcessStatus.DownloadFinishSuccessfully(Date())
-                    saveDownloadDate(lastDate)
+                    GlobalScope.launch(Dispatchers.IO) {
+                        saveDownloadDate(lastDate)
+                    }
                     completion?.invoke(true, error)
                 }
             }
@@ -652,6 +606,10 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     }
 
     companion object {
+        /**
+         * Base name of the DataStore Preferences file backing the sync timestamps (matches the legacy
+         * SharedPreferences file name so existing installs keep the same on-disk location).
+         */
         const val timestampPrefFile: String = "com.lunabee.lbsynchronization"
     }
 }
