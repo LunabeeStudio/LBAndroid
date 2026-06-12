@@ -170,7 +170,7 @@ object LBSyncOperator {
         } ?: groups.values
 
         availableGroups.flatMap { it.syncManagers }.forEach {
-            it.currentSyncStatus = LBSyncProcessStatus.PendingSync
+            it.setStatusInternal(LBSyncProcessStatus.PendingSync)
         }
 
         for (group in availableGroups) {

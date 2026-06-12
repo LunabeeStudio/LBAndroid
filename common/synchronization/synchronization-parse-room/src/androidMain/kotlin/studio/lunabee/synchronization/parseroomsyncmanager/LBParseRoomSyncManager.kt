@@ -17,19 +17,23 @@
 package studio.lunabee.synchronization.parseroomsyncmanager
 
 import android.content.Context
-import bolts.Task
-import bolts.TaskCompletionSource
 import com.parse.ParseException
 import com.parse.ParseObject
 import com.parse.ParseQuery
 import com.parse.livequery.SubscriptionHandling
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncDao
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncManager
-import studio.lunabee.synchronization.syncmanager.LBDefaultSyncManagerFetchCompletion
+import studio.lunabee.synchronization.syncmanager.FetchPage
 import java.util.Date
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.time.Instant
 
 /**
  * Generic [LBParseRoomSyncManager].
@@ -58,6 +62,12 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     queryDispatcher: CoroutineDispatcher = Dispatchers.Main,
     writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(context, dao, logging, queryDispatcher, writeDispatcher) {
+
+    /**
+     * Scope used to fire-and-forget a [synchronize] from the LiveQuery callback, detached from any
+     * caller.
+     */
+    private val liveQueryScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
     /**
      * The parse query to use for the synchronization and LiveQuery if needed.
@@ -127,7 +137,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
         event: SubscriptionHandling.Event,
         parseObject: ParseObject,
     ) {
-        synchronize()
+        liveQueryScope.launch { synchronize() }
     }
     /*===================
      * Overridden methods
@@ -142,9 +152,10 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     /**
      * How to get the updatedAt information from the record coming from the server.
      * @param obj server object
-     * @return the nullable updatedAt date
+     * @return the nullable updatedAt instant
      */
-    override fun updatedAt(obj: ParseObject): Date? = obj.updatedAt
+    override fun updatedAt(obj: ParseObject): Instant? =
+        obj.updatedAt?.let { Instant.fromEpochMilliseconds(it.time) }
 
     /**
      * Override this if you want to support paging.
@@ -157,35 +168,46 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * **WARNING** : Data returned must be ordered by updatedAt.
      *
      * The objects are ordered by updatedAt; the {@code page} and {@code queryPageSize()} fix the
-     * limit and skip factors.
+     * limit and skip factors. The Parse callback is bridged to a suspend function via
+     * [suspendCancellableCoroutine]; a [ParseException] is rethrown so the engine maps it to a download
+     * error status.
+     *
+     * @param page the page number to fetch.
+     * @param cursor unused by the Parse limit/skip paging.
+     * @param sinceLastDate the last server cursor; the Parse API still takes [java.util.Date].
+     * @return the fetched page of [ParseObject]s.
      */
-    override fun fetchRequest(
+    override suspend fun fetchRequest(
         page: Int,
         cursor: String?,
-        sinceLastDate: Date?,
-        completion: LBDefaultSyncManagerFetchCompletion<ParseObject>,
-    ) {
+        sinceLastDate: Instant?,
+    ): FetchPage<ParseObject, Nothing> {
         val query = parseQuery()
         query.orderByAscending("updatedAt")
         sinceLastDate?.let {
-            query.whereGreaterThan("updatedAt", it)
+            query.whereGreaterThan("updatedAt", Date(it.toEpochMilliseconds()))
         }
         queryPageSize()?.let {
             query.limit = it
             query.skip = page * it
         }
-        query.findInBackground { objects, e ->
-            completion(objects, e)
+        return suspendCancellableCoroutine { continuation ->
+            query.findInBackground { objects, e ->
+                if (e != null) {
+                    continuation.resumeWithException(e)
+                } else {
+                    continuation.resume(FetchPage(objects = objects.orEmpty()))
+                }
+            }
         }
     }
 
     /**
-     * How to push a Room entity to the server.
+     * How to push a Room entity to the server. Throw the [ParseException] on failure.
      * **WARNING** : Must be in background thread.
      * @param obj the Room entity to push
-     * @param completion provide function success and nullable Exception
      */
-    override suspend fun push(obj: RoomData, completion: (error: Exception?) -> Unit) {
+    override suspend fun push(obj: RoomData) {
         val serverId = obj.lbServerId
         val query: ParseQuery<ParseObject> = parseQuery()
 
@@ -194,26 +216,19 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
                 if (serverId != null) query.get(serverId) else null
             } catch (e: ParseException) {
                 if (e.code != ParseException.OBJECT_NOT_FOUND) {
-                    completion(e)
-                    return@withContext
+                    throw e
                 } else {
                     null
                 }
             }
 
-            try {
-                val objToSave = result ?: ParseObject.create(tableParseName())
-                update(objToSave, obj)
-                objToSave.save()
-                completion(null)
-            } catch (e: ParseException) {
-                completion(e)
-            }
+            val objToSave = result ?: ParseObject.create(tableParseName())
+            update(objToSave, obj)
+            objToSave.save()
         }
     }
 
-    override fun startServerNotificationListener(): Task<Boolean> {
-        val task = TaskCompletionSource<Boolean>()
+    override suspend fun startServerNotificationListener(): Boolean {
         LBParseLiveQueryManager.instance.unsubscribe(parseQuery!!)
         val subscriptionHandling = LBParseLiveQueryManager.instance.subscribe(parseQuery!!)
         subscriptionHandling?.let {
@@ -223,15 +238,12 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
                 }
             }
         }
-        task.setResult(subscriptionHandling != null)
-        return task.task
+        return subscriptionHandling != null
     }
 
-    override fun stopServerNotificationListener(): Task<Boolean> {
-        val task = TaskCompletionSource<Boolean>()
+    override suspend fun stopServerNotificationListener(): Boolean {
         LBParseLiveQueryManager.instance.unsubscribe(parseQuery!!)
         parseQuery = null
-        task.setResult(true)
-        return task.task
+        return true
     }
 }

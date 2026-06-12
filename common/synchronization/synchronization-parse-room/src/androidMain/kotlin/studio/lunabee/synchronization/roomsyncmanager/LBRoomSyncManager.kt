@@ -17,12 +17,11 @@
 package studio.lunabee.synchronization.roomsyncmanager
 
 import android.content.Context
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
-import java.util.Date
+import kotlin.time.Instant
 
 typealias LBGenericRoomSyncManager = LBRoomSyncManager<*, *, *>
 
@@ -63,11 +62,16 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
     protected abstract fun createObjectFrom(serverObject: ServerData): RoomData
 
     /**
+     * Pushes a single entity to the server. Throw on failure: [pushObjectsToServer] catches the first
+     * error, marks the already-succeeded subset in sync, then rethrows it.
+     *
      * **WARNING**: must run on a background thread. Default no-op (download-only); the Parse layer
      * overrides this.
+     *
+     * @param obj the entity to push.
      */
-    protected open suspend fun push(obj: RoomData, completion: (error: Exception?) -> Unit) {
-        completion(null)
+    protected open suspend fun push(obj: RoomData) {
+        // Default download-only no-op.
     }
 
     override suspend fun clearData() {
@@ -92,15 +96,17 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
         }
     }
 
-    override suspend fun pushObjectsToServer(objects: List<RoomData>, completion: (error: Exception?) -> Unit) {
+    override suspend fun pushObjectsToServer(objects: List<RoomData>) {
         val syncedIds = mutableListOf<String>()
         var firstError: Exception? = null
         objects.forEach { obj ->
-            val pushError = awaitPush(obj)
-            if (pushError == null) {
+            try {
+                push(obj)
                 syncedIds += obj.lbLocalId
-            } else if (firstError == null) {
-                firstError = pushError
+            } catch (e: Exception) {
+                if (firstError == null) {
+                    firstError = e
+                }
             }
         }
         if (syncedIds.isNotEmpty()) {
@@ -108,7 +114,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
                 dao.markInSync(syncedIds)
             }
         }
-        completion(firstError)
+        firstError?.let { throw it }
     }
 
     override suspend fun hasSomethingToUpload(): Boolean {
@@ -118,12 +124,5 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
     }
 
     /** The Parse layer overrides this to read `ParseObject.updatedAt` without building the entity. */
-    override fun updatedAt(obj: ServerData): Date? =
-        createObjectFrom(obj).lbUpdatedAt?.let { Date(it.toEpochMilliseconds()) }
-
-    private suspend fun awaitPush(obj: RoomData): Exception? {
-        val deferred = CompletableDeferred<Exception?>()
-        push(obj) { error -> deferred.complete(error) }
-        return deferred.await()
-    }
+    override fun updatedAt(obj: ServerData): Instant? = createObjectFrom(obj).lbUpdatedAt
 }
