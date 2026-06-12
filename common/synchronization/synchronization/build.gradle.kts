@@ -63,7 +63,6 @@ kotlin {
             // Kotlin
             implementation(libs.kotlinReflect)
             implementation(libs.kotlinxCoroutinesAndroid)
-            implementation(libs.parseBoltsTasks)
 
             // Lunabee
             implementation(projects.coreAndroid)

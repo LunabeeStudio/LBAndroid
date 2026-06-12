@@ -151,9 +151,9 @@ class LBSyncGroupTest {
             ),
         ).apply {
             isEnabled = {
-            gateCalls++
-            true
-        }
+                gateCalls++
+                true
+            }
         }
 
         group.syncManagers()

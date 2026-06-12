@@ -22,8 +22,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import bolts.Task
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.launch
+import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.connectivity.NetworkState
@@ -32,6 +33,7 @@ import studio.lunabee.synchronization.store.syncTimestampStore
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
+import studio.lunabee.synchronization.syncmanager.defaultSyncScope
 import kotlin.reflect.KClass
 
 /**
@@ -82,7 +84,7 @@ object LBSyncOperator {
                     if (networkState.isConnected && networkState.connectionType != null) {
                         networkLogger.v("Internet is available with type ${networkState.connectionType}")
                         if (!lastNetworkState.isConnected) {
-                            syncAllGroupTasks(LBSyncRefreshEvent.InternetIsBack::class)
+                            triggerRefresh(LBSyncRefreshEvent.InternetIsBack::class)
                         }
                     } else {
                         networkLogger.v("Internet is disable")
@@ -106,8 +108,8 @@ object LBSyncOperator {
         appLifecycleForegroundBroadcastReceiver?.let(context::unregisterReceiver)
         appLifecycleForegroundBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                syncAllGroupTasks(LBSyncRefreshEvent.AppForeground::class)
-                startServerNotificationListeners()
+                triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
+                defaultSyncScope.launch { startServerNotificationListeners() }
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -126,7 +128,7 @@ object LBSyncOperator {
         appLifecycleBackgroundBroadcastReceiver?.let(context::unregisterReceiver)
         appLifecycleBackgroundBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                stopServerNotificationListeners()
+                defaultSyncScope.launch { stopServerNotificationListeners() }
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -154,80 +156,79 @@ object LBSyncOperator {
     inline fun <reified T> syncManager(): T? = syncManagers().firstOrNull { it is T }?.let { it as T }
 
     /**
-     * Sync all LBSyncGroup managed
-     * @param eventType a optional event type that triggered the refresh
-     * @return return the Bolt Task associated
+     * Synchronize every managed [LBSyncGroup] sequentially, in registration order.
+     *
+     * Each group always attempts (a failing group never short-circuits the following ones), and the
+     * per-group failures are aggregated:
+     * - no failure → [LBResult.Success];
+     * - exactly one failure → [LBResult.Failure] carrying that group's error;
+     * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
+     *
+     * This intentionally fixes the legacy chained-continuation behavior that dropped every group's error
+     * but the last.
+     *
+     * @return the combined synchronization result across all groups.
      */
-    private fun syncAllGroupTasks(eventType: KClass<out LBSyncRefreshEvent>? = null): Task<Void>? {
-        var currentTask: Task<Void>? = null
-        val availableGroups = eventType?.let { refreshEvent ->
-            groups.values.filter {
-                it.refreshEvents.any { event ->
-                    event::class == refreshEvent &&
-                        event.isDelayElapsed(it.lastSuccessfulSync)
-                }
-            }
-        } ?: groups.values
+    suspend fun syncAllManagers(): LBResult<Unit> = runGroupsSequentially(groups.values)
 
+    /**
+     * Synchronize the given [groups] sequentially in iteration order, awaiting each
+     * [LBSyncGroup.syncManagers]. Every group always attempts; failures are collected then combined per
+     * the [syncAllManagers] aggregation rule.
+     *
+     * @param groups the groups to synchronize, in the desired sequential order.
+     * @return the combined synchronization result.
+     */
+    private suspend fun runGroupsSequentially(groups: Collection<LBSyncGroup>): LBResult<Unit> {
+        val errors: MutableList<Throwable> = mutableListOf()
+        for (group in groups) {
+            (group.syncManagers() as? LBResult.Failure)?.throwable?.let { errors += it }
+        }
+        return when (errors.size) {
+            0 -> LBResult.Success(Unit)
+            1 -> LBResult.Failure(errors.first())
+            else -> LBResult.Failure(LBSyncAggregateException(errors = errors))
+        }
+    }
+
+    /**
+     * @param eventType the refresh-event type that fired.
+     * @return the managed groups carrying a matching [LBSyncRefreshEvent] whose debounce delay has elapsed
+     * against the group's [LBSyncGroup.lastSuccessfulSync].
+     */
+    internal fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
+        groups.values.filter { group ->
+            group.refreshEvents.any { event ->
+                event::class == eventType && event.isDelayElapsed(group.lastSuccessfulSync)
+            }
+        }
+
+    /**
+     * Mark the managers of every group matching [eventType] as [LBSyncProcessStatus.PendingSync] and
+     * launch their sequential synchronization detached in the shared library [defaultSyncScope].
+     *
+     * @param eventType the refresh-event type that fired.
+     */
+    internal fun triggerRefresh(eventType: KClass<out LBSyncRefreshEvent>) {
+        val availableGroups = groupsForEvent(eventType)
         availableGroups.flatMap { it.syncManagers }.forEach {
             it.setStatusInternal(LBSyncProcessStatus.PendingSync)
         }
-
-        for (group in availableGroups) {
-            currentTask = if (currentTask != null) {
-                // TODO(#04): remove Bolts bridge
-                currentTask.continueWithTask { group.syncManagersBoltsBridge() }
-            } else {
-                // TODO(#04): remove Bolts bridge
-                group.syncManagersBoltsBridge()
-            }
-        }
-        return currentTask
+        defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
     }
 
     /**
-     * Sync all sync managers
-     * @param completion: provide nullable Exception
+     * Start all available server notifications listeners of every managed group, sequentially.
      */
-    fun syncAllManagers(completion: ((error: Exception?) -> Unit)? = null) {
-        syncAllGroupTasks()?.let {
-            it.continueWith(
-                { task: Task<Void>? -> completion?.invoke(task?.error) },
-                Task.UI_THREAD_EXECUTOR,
-            )
-        } ?: completion?.invoke(null)
+    suspend fun startServerNotificationListeners() {
+        groups.values.forEach { it.startServerNotificationListeners() }
     }
 
     /**
-     * Start all available server notifications listeners
+     * Stop all available server notifications listeners of every managed group, sequentially.
      */
-    fun startServerNotificationListeners() {
-        var currentTask: Task<Void>? = null
-        for (group in groups.values) {
-            currentTask = if (currentTask != null) {
-                // TODO(#04): remove Bolts bridge
-                currentTask.continueWithTask { group.startServerNotificationListenersBoltsBridge() }
-            } else {
-                // TODO(#04): remove Bolts bridge
-                group.startServerNotificationListenersBoltsBridge()
-            }
-        }
-    }
-
-    /**
-     * Stop all available server notifications listeners
-     */
-    fun stopServerNotificationListeners() {
-        var currentTask: Task<Void>? = null
-        for (group in groups.values) {
-            currentTask = if (currentTask != null) {
-                // TODO(#04): remove Bolts bridge
-                currentTask.continueWithTask { group.stopServerNotificationListenersBoltsBridge() }
-            } else {
-                // TODO(#04): remove Bolts bridge
-                group.stopServerNotificationListenersBoltsBridge()
-            }
-        }
+    suspend fun stopServerNotificationListeners() {
+        groups.values.forEach { it.stopServerNotificationListeners() }
     }
 
     /**
