@@ -61,7 +61,6 @@ kotlin {
             implementation(libs.androidxDatastorePreferences)
             implementation(libs.androidxLifecycleProcess)
             // Kotlin
-            implementation(libs.kotlinReflect)
             implementation(libs.kotlinxCoroutinesAndroid)
 
             // Lunabee
