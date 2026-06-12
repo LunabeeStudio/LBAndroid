@@ -49,6 +49,7 @@ data class RawReducerParameter(
     val hasDefault: Boolean,
     val isVararg: Boolean,
     val qualifier: DiQualifier? = null,
+    val isProvided: Boolean = false,
 )
 
 /**
@@ -77,6 +78,7 @@ data class ValidatedReducerParameter(
     val typeName: TypeName,
     val kind: ParameterKind,
     val qualifier: DiQualifier? = null,
+    val isProvided: Boolean = false,
 )
 
 /**
@@ -248,6 +250,7 @@ class ReducerFactorySignatureValidator {
                 typeName = parameter.typeName,
                 kind = ParameterKind.Injected,
                 qualifier = parameter.qualifier,
+                isProvided = parameter.isProvided,
             )
         }
     }

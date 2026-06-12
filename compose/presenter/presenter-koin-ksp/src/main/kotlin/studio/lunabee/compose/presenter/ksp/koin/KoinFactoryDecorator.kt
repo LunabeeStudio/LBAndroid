@@ -25,6 +25,7 @@ import studio.lunabee.compose.presenter.ksp.ValidatedReducerParameter
 
 private val koinFactoryAnnotation: ClassName = ClassName("org.koin.core.annotation", "Factory")
 private val koinNamedAnnotation: ClassName = ClassName("org.koin.core.annotation", "Named")
+private val koinProvidedAnnotation: ClassName = ClassName("org.koin.core.annotation", "Provided")
 
 /**
  * Annotates the generated factory class with [org.koin.core.annotation.Factory] so it can be picked up by a Koin
@@ -40,10 +41,18 @@ internal object KoinFactoryDecorator : GeneratedFactoryDecorator {
         listOf(AnnotationSpec.builder(koinFactoryAnnotation).build())
 
     /**
-     * Propagates the Koin qualifier of [parameter] onto the generated factory constructor parameter.
+     * Propagates the Koin qualifier and the [org.koin.core.annotation.Provided] marker of [parameter] onto the
+     * generated factory constructor parameter, so a @Provided reducer dependency stays excluded from Koin
+     * compile-time safety on the generated factory too.
      */
     override fun parameterAnnotations(parameter: ValidatedReducerParameter): List<AnnotationSpec> =
-        listOfNotNull(qualifierAnnotation(parameter.qualifier))
+        listOfNotNull(
+            qualifierAnnotation(parameter.qualifier),
+            providedAnnotation(parameter.isProvided),
+        )
+
+    private fun providedAnnotation(isProvided: Boolean): AnnotationSpec? =
+        AnnotationSpec.builder(koinProvidedAnnotation).build().takeIf { isProvided }
 
     private fun qualifierAnnotation(qualifier: DiQualifier?): AnnotationSpec? = when (qualifier) {
         null -> null
