@@ -23,6 +23,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
@@ -279,6 +286,56 @@ object LBSyncOperator {
     fun cancelAllRequests() {
         syncManagers().forEach(LBGenericSyncManager::cancelAllRequests)
     }
+
+    /**
+     * Combine the [LBSyncProcessStatus] of every managed manager (across all [groups]) into a single map
+     * keyed by [LBGenericSyncManager.syncKey]. The map carries the latest status of each member and
+     * re-emits on every member transition.
+     *
+     * Registry snapshot: the member set is read once, when collection starts. A manager (or group) added
+     * AFTER a collection has begun is NOT picked up by that already-running collection — re-collect this
+     * flow to observe a newly-registered manager.
+     *
+     * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the map
+     * (last one wins), so duplicate keys silently drop members from the combined view.
+     *
+     * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once when no manager is
+     * registered (a `combine` over an empty set of flows would otherwise never emit).
+     */
+    fun statusByKey(): Flow<Map<String, LBSyncProcessStatus>> = flow {
+        val managers = groups.values.flatMap { it.syncManagers }
+        if (managers.isEmpty()) {
+            emitAll(flowOf(emptyMap()))
+        } else {
+            emitAll(
+                combine(managers.map { manager -> manager.status.map { manager.syncKey to it } }) {
+                    it.toMap()
+                },
+            )
+        }
+    }
+
+    /**
+     * Derived from [statusByKey]: `true` while ANY managed manager status
+     * [LBSyncProcessStatus.isProcessing], and `false` once every manager is idle. Consecutive duplicate
+     * values are dropped via [distinctUntilChanged].
+     *
+     * Mind [LBSyncProcessStatus.isProcessing]'s documented quirk: the mid-pipeline
+     * [LBSyncProcessStatus.UploadFinishSuccessfully] / [LBSyncProcessStatus.DownloadFinishSuccessfully]
+     * steps count as processing.
+     *
+     * Registry snapshot: the member set is read once, when collection starts. A manager (or group) added
+     * AFTER a collection has begun is NOT picked up by that already-running collection — re-collect this
+     * flow to observe a newly-registered manager.
+     *
+     * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the
+     * underlying map (last one wins), so duplicate keys silently drop members from the combined view.
+     *
+     * @return a flow of the app-wide aggregate syncing state.
+     */
+    fun isSyncing(): Flow<Boolean> = statusByKey()
+        .map { statuses -> statuses.values.any { it.isProcessing() } }
+        .distinctUntilChanged()
 }
 
 private val logger: Logger = LBLogger.get("LBSM ${LBSyncOperator::class.simpleName}")
