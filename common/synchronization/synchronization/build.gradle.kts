@@ -15,30 +15,33 @@
  */
 
 plugins {
-    id("lunabee.android-library-conventions")
+    id("lunabee.kmp-android-library-conventions")
     id("lunabee.library-publish-conventions")
-}
-
-android {
-    namespace = "studio.lunabee.synchronization"
-    resourcePrefix = "lb_s_"
 }
 
 description = "Lunabee Studio synchronization lib"
 version = AndroidConfig.SYNCHRONIZATION_VERSION
 
-dependencies {
-    // AndroidX
-    implementation(libs.androidxAppcompat)
-    implementation(libs.androidxCore)
-    implementation(libs.androidxLifecycleProcess)
-    implementation(libs.androidxPreferenceKtx)
-    // Kotlin
-    implementation(libs.kotlinReflect)
-    implementation(libs.kotlinxCoroutinesAndroid)
-    implementation(libs.parseBoltsTasks)
+kotlin {
+    android {
+        namespace = "studio.lunabee.synchronization"
+    }
 
-    // Lunabee
-    implementation(projects.coreAndroid)
-    implementation(projects.loggerKermit)
+    sourceSets {
+        androidMain.dependencies {
+            // AndroidX
+            implementation(libs.androidxAppcompat)
+            implementation(libs.androidxCore)
+            implementation(libs.androidxLifecycleProcess)
+            implementation(libs.androidxPreferenceKtx)
+            // Kotlin
+            implementation(libs.kotlinReflect)
+            implementation(libs.kotlinxCoroutinesAndroid)
+            implementation(libs.parseBoltsTasks)
+
+            // Lunabee
+            implementation(projects.coreAndroid)
+            implementation(projects.loggerKermit)
+        }
+    }
 }
