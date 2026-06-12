@@ -27,6 +27,16 @@ convention (`lbConnectivityManager` → `connectivity`, `lbSyncManager` → `syn
 The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` are removed; use
 `studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
 
+```
+SynchronizationParseRoom 2.0.0
+```
+
+Add the `synchronization-parse-room` module: a generic Parse↔Room synchronization framework built on
+top of `:synchronization`. KMP `androidLibrary` (`commonMain` persistence contract +
+`androidMain` Parse-backed managers), package `studio.lunabee.synchronization.{roomsyncmanager,parseroomsyncmanager}`,
+android namespace `studio.lunabee.synchronization.parseroom`. Parse SDK / ParseLiveQuery are resolved
+from JitPack (repository added to `settings.gradle.kts`).
+
 ## 2026-0610
 
 ```

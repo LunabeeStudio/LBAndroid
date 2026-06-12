@@ -39,6 +39,13 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         }
+        maven {
+            // Parse SDK / ParseLiveQuery are published on JitPack only (used by :synchronization-parse-room).
+            url = uri("https://jitpack.io")
+            content {
+                includeGroupByRegex("com\\.github\\.parse-community.*")
+            }
+        }
         mavenLocal()
     }
 }
@@ -130,5 +137,6 @@ addCommonModule(
     "monitoring/monitoring-room",
     "monitoring/monitoring-ui",
     "synchronization/synchronization",
+    "synchronization/synchronization-parse-room",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")
