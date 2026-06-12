@@ -25,9 +25,24 @@ version = AndroidConfig.SYNCHRONIZATION_VERSION
 kotlin {
     android {
         namespace = "studio.lunabee.synchronization"
+
+        // Run commonTest on the JVM host so the multiplatform tests actually execute (the KMP android
+        // library plugin otherwise only compiles commonTest). Creates the `testHostTest` task.
+        withHostTest {
+        }
     }
 
     sourceSets {
+        commonMain.dependencies {
+            // api: SyncTimestampStore exposes DataStore<Preferences> in its public constructor signature.
+            api(libs.androidxDatastorePreferencesCore)
+        }
+        commonTest.dependencies {
+            implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
+
+            implementation(libs.kotlinTest)
+            implementation(libs.kotlinxCoroutinesTest)
+        }
         androidMain.dependencies {
             // AndroidX
             implementation(libs.androidxAppcompat)
