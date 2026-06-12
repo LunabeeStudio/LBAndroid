@@ -273,7 +273,7 @@ class LBSyncManagerTest {
 
     @Test
     fun load_seeds_status_from_a_pre_populated_store() = runManagerTest { store, scope ->
-        store.saveSyncDates(syncKey = FakeSyncManager.SYNC_KEY, serverDateMillis = 1_000L, localDateMillis = 7_000L)
+        store.saveSyncDates(syncKey = FakeSyncManager.SyncKey, serverDateMillis = 1_000L, localDateMillis = 7_000L)
         val manager = FakeSyncManager(store = store, scope = scope)
 
         manager.load()
@@ -394,7 +394,7 @@ private class FakeSyncManager(
     val callLog: MutableList<String> = mutableListOf()
     val updatedPageSizes: MutableList<Int> = mutableListOf()
 
-    override val syncKey: String get() = SYNC_KEY
+    override val syncKey: String get() = SyncKey
 
     override suspend fun clearData() = Unit
 
@@ -449,6 +449,6 @@ private class FakeSyncManager(
     }
 
     companion object {
-        const val SYNC_KEY: String = "FakeSyncManager"
+        const val SyncKey: String = "FakeSyncManager"
     }
 }

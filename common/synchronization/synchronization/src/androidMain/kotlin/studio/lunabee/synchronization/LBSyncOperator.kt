@@ -66,12 +66,12 @@ object LBSyncOperator {
     var connectivityBroadcastReceiver: BroadcastReceiver? = null
 
     /**
-     * Broadcast receiver for lifecycle changes : APP_FOREGROUND_ACTION
+     * Broadcast receiver for lifecycle changes : AppForegroundAction
      */
     var appLifecycleForegroundBroadcastReceiver: BroadcastReceiver? = null
 
     /**
-     * Broadcast receiver for lifecycle changes : APP_BACKGROUND_ACTION
+     * Broadcast receiver for lifecycle changes : AppBackgroundAction
      */
     var appLifecycleBackgroundBroadcastReceiver: BroadcastReceiver? = null
 
@@ -122,13 +122,13 @@ object LBSyncOperator {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             context.registerReceiver(
                 appLifecycleForegroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.APP_FOREGROUND_ACTION),
+                IntentFilter(LBSyncApplication.AppForegroundAction),
                 Context.RECEIVER_EXPORTED,
             )
         } else {
             context.registerReceiver(
                 appLifecycleForegroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.APP_FOREGROUND_ACTION),
+                IntentFilter(LBSyncApplication.AppForegroundAction),
             )
         }
         // Background
@@ -141,13 +141,13 @@ object LBSyncOperator {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             context.registerReceiver(
                 appLifecycleBackgroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.APP_BACKGROUND_ACTION),
+                IntentFilter(LBSyncApplication.AppBackgroundAction),
                 Context.RECEIVER_EXPORTED,
             )
         } else {
             context.registerReceiver(
                 appLifecycleBackgroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.APP_BACKGROUND_ACTION),
+                IntentFilter(LBSyncApplication.AppBackgroundAction),
             )
         }
     }
