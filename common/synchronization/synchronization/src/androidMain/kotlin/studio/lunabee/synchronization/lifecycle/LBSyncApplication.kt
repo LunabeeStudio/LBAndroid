@@ -24,16 +24,16 @@ open class LBSyncApplication : LBLifecycleApplication() {
 
     override fun onStart(owner: LifecycleOwner) {
         super.onStart(owner)
-        sendBroadcast(Intent(APP_FOREGROUND_ACTION))
+        sendBroadcast(Intent(AppForegroundAction))
     }
 
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
-        sendBroadcast(Intent(APP_BACKGROUND_ACTION))
+        sendBroadcast(Intent(AppBackgroundAction))
     }
 
     companion object {
-        const val APP_BACKGROUND_ACTION: String = "app.background.action"
-        const val APP_FOREGROUND_ACTION: String = "app.foreground.action"
+        const val AppBackgroundAction: String = "app.background.action"
+        const val AppForegroundAction: String = "app.foreground.action"
     }
 }
