@@ -14,7 +14,10 @@ orchestrated by the same `LBSyncOperator` groups/triggers.
 
 - **commonMain — the persistence contract** (plain Kotlin + multiplatform Room only). This lets a
   consumer keep its synced `@Entity` classes **and** the `@Database` in commonMain.
-- **androidMain — the Parse-backed sync managers** (`Context` / Parse / Bolts / `:synchronization`).
+- **androidMain — the Parse-backed sync managers** (`Context` / Parse / coroutines / `:synchronization`).
+  Parse queries use the Parse community **coroutines** extension artifact
+  (`com.github.parse-community.Parse-SDK-Android:coroutines`); there is no Bolts dependency here anymore
+  (Bolts survives only transitively inside the Parse SDK).
 
 ## Contents — `src/{commonMain,androidMain}/kotlin/studio/lunabee/synchronization/`
 
@@ -37,8 +40,9 @@ orchestrated by the same `LBSyncOperator` groups/triggers.
   `LBSyncManager`: persist (`upsert`), clear (`deleteAll`), upload (`notInSync` → `push` →
   `markInSync`). `createObjectFrom` must return pulled rows with `lbInSync = true`. The DAO is
   **constructor-injected** so managers are unit-testable with a fake DAO.
-- `parseroomsyncmanager/LBParseRoomSyncManager<R>` — bidirectional Parse↔Room: paged `fetchRequest`,
-  incremental `updatedAt` cursoring, `push`, LiveQuery listener. Abstract surface: `tableParseName()`,
+- `parseroomsyncmanager/LBParseRoomSyncManager<R>` — bidirectional Parse↔Room: paged suspend
+  `fetchRequest` (returns a `FetchPage`), incremental `updatedAt` cursoring (`kotlin.time.Instant`),
+  suspend/throw-based `push`, suspend LiveQuery listener. Abstract surface: `tableParseName()`,
   `update(parseObject, from)` (+ `createObjectFrom` from the base). `objectToBeUploaded()` returns
   full immutable entities so `push` never re-queries by primary key.
 - `parseroomsyncmanager/LBParseLiveQueryManager` — singleton Parse LiveQuery client with reconnect.
@@ -46,8 +50,10 @@ orchestrated by the same `LBSyncOperator` groups/triggers.
 
 ## Boundaries
 
-- Parse/Bolts/coroutine/`:synchronization` types leak into the public manager signatures (androidMain
-  `api`); Room-runtime leaks into the contract (commonMain `api`).
+- Parse / coroutine / `:synchronization` types leak into the public manager signatures (androidMain
+  `api`); Room-runtime leaks into the contract (commonMain `api`). The Parse coroutines extension
+  artifact is `implementation` (its extensions are called internally and never appear in a
+  subclass-visible signature).
 - **No KSP/Room compiler here**: only the abstract `@Upsert` base lives here (needs the Room
   annotations on the classpath). The concrete `@Dao` subclasses + `@Database` live in the consumer
   module and are processed by its own `kspAndroid`.
