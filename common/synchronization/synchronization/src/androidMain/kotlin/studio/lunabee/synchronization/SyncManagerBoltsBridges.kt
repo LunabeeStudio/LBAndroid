@@ -21,6 +21,7 @@ import bolts.TaskCompletionSource
 import kotlinx.coroutines.launch
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
+import studio.lunabee.synchronization.syncmanager.defaultSyncScope
 
 // TODO(#04): remove this whole file once LBSyncGroup/LBSyncOperator stop speaking Bolts.
 
@@ -71,6 +72,59 @@ internal fun LBGenericSyncManager.stopServerNotificationListenerBoltsBridge(): T
     scope.launch {
         try {
             source.setResult(stopServerNotificationListener())
+        } catch (e: Exception) {
+            source.setError(e)
+        }
+    }
+    return source.task
+}
+
+/**
+ * Bridges [LBSyncGroup.syncManagers] to a Bolts [Task] for the still-Bolts [LBSyncOperator]. The suspend
+ * run is launched in the shared library [defaultSyncScope]; success completes the task with `null`, a
+ * failure sets its error. Lives here (not on the group) so [LBSyncGroup] carries no `bolts` import.
+ */
+// TODO(#04): remove Bolts bridge
+internal fun LBSyncGroup.syncManagersBoltsBridge(): Task<Void> {
+    val source = TaskCompletionSource<Void>()
+    defaultSyncScope.launch {
+        when (val result = syncManagers()) {
+            is LBResult.Success -> source.setResult(null)
+            is LBResult.Failure -> source.setError(result.throwable.toBridgeException())
+        }
+    }
+    return source.task
+}
+
+/**
+ * Bridges [LBSyncGroup.startServerNotificationListeners] to a Bolts [Task] for the still-Bolts
+ * [LBSyncOperator].
+ */
+// TODO(#04): remove Bolts bridge
+internal fun LBSyncGroup.startServerNotificationListenersBoltsBridge(): Task<Void> {
+    val source = TaskCompletionSource<Void>()
+    defaultSyncScope.launch {
+        try {
+            startServerNotificationListeners()
+            source.setResult(null)
+        } catch (e: Exception) {
+            source.setError(e)
+        }
+    }
+    return source.task
+}
+
+/**
+ * Bridges [LBSyncGroup.stopServerNotificationListeners] to a Bolts [Task] for the still-Bolts
+ * [LBSyncOperator].
+ */
+// TODO(#04): remove Bolts bridge
+internal fun LBSyncGroup.stopServerNotificationListenersBoltsBridge(): Task<Void> {
+    val source = TaskCompletionSource<Void>()
+    defaultSyncScope.launch {
+        try {
+            stopServerNotificationListeners()
+            source.setResult(null)
         } catch (e: Exception) {
             source.setError(e)
         }

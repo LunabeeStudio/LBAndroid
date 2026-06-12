@@ -175,9 +175,11 @@ object LBSyncOperator {
 
         for (group in availableGroups) {
             currentTask = if (currentTask != null) {
-                currentTask.continueWithTask { group.syncManagerTask() }
+                // TODO(#04): remove Bolts bridge
+                currentTask.continueWithTask { group.syncManagersBoltsBridge() }
             } else {
-                group.syncManagerTask()
+                // TODO(#04): remove Bolts bridge
+                group.syncManagersBoltsBridge()
             }
         }
         return currentTask
@@ -203,9 +205,11 @@ object LBSyncOperator {
         var currentTask: Task<Void>? = null
         for (group in groups.values) {
             currentTask = if (currentTask != null) {
-                currentTask.continueWithTask { group.startServerNotificationListeners() }
+                // TODO(#04): remove Bolts bridge
+                currentTask.continueWithTask { group.startServerNotificationListenersBoltsBridge() }
             } else {
-                group.startServerNotificationListeners()
+                // TODO(#04): remove Bolts bridge
+                group.startServerNotificationListenersBoltsBridge()
             }
         }
     }
@@ -217,9 +221,11 @@ object LBSyncOperator {
         var currentTask: Task<Void>? = null
         for (group in groups.values) {
             currentTask = if (currentTask != null) {
-                currentTask.continueWithTask { group.stopServerNotificationListeners() }
+                // TODO(#04): remove Bolts bridge
+                currentTask.continueWithTask { group.stopServerNotificationListenersBoltsBridge() }
             } else {
-                group.stopServerNotificationListeners()
+                // TODO(#04): remove Bolts bridge
+                group.stopServerNotificationListenersBoltsBridge()
             }
         }
     }
