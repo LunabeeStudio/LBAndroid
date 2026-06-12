@@ -1,0 +1,44 @@
+/*
+ * Copyright (c) 2026 Lunabee Studio
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id("lunabee.android-library-conventions")
+    id("lunabee.library-publish-conventions")
+}
+
+android {
+    namespace = "studio.lunabee.synchronization"
+    resourcePrefix = "lb_s_"
+}
+
+description = "Lunabee Studio synchronization lib"
+version = AndroidConfig.SYNCHRONIZATION_VERSION
+
+dependencies {
+    // AndroidX
+    implementation(libs.androidxAppcompat)
+    implementation(libs.androidxCore)
+    implementation(libs.androidxLifecycleProcess)
+    implementation(libs.androidxPreferenceKtx)
+    // Kotlin
+    implementation(libs.kotlinReflect)
+    implementation(libs.kotlinxCoroutinesAndroid)
+    implementation(libs.parseBoltsTasks)
+
+    // Lunabee
+    implementation(projects.coreAndroid)
+    implementation(projects.loggerKermit)
+}

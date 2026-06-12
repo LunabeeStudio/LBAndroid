@@ -48,6 +48,19 @@ LbcImage 1.9.1
 Load `LbcImageSpec.ImageDrawable` through Coil so the drawable is downsampled to the layout size instead of decoding
 the full bitmap into memory, fixing high memory usage on heavy drawables.
 
+## 2026-06-12
+
+```
+Synchronization 2.0.0
+```
+
+Move the `synchronization` module from the `Libraries_Android` repository into `LBAndroid`. The package is renamed from
+`com.lunabee.lbsynchronization` to `studio.lunabee.synchronization`, and subpackages are aligned to the repository
+convention (`lbConnectivityManager` → `connectivity`, `lbSyncManager` → `syncmanager`, `lbLifeCycle` → `lifecycle`).
+
+The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` are removed; use
+`studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
+
 ## 2026-0610
 
 ```

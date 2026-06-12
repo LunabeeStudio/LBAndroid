@@ -130,5 +130,6 @@ addCommonModule(
     "monitoring/monitoring-okhttp",
     "monitoring/monitoring-room",
     "monitoring/monitoring-ui",
+    "synchronization/synchronization",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")
