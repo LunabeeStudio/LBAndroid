@@ -33,6 +33,11 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            // kotlin.time.Instant / Clock are used across the engine; mirror :synchronization-parse-room.
+            languageSettings.optIn("kotlin.time.ExperimentalTime")
+        }
+
         commonMain.dependencies {
             // api: SyncTimestampStore exposes DataStore<Preferences> in its public constructor signature.
             api(libs.androidxDatastorePreferencesCore)

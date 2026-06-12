@@ -24,7 +24,7 @@ import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import java.util.Date
+import kotlin.time.Instant
 
 /**
  * Use this to group sync managers together.
@@ -57,14 +57,15 @@ class LBSyncGroup(
     }
 
     /**
-     * The lastSuccessfulSync of the oldest successfully synchronized sync manager or Date(0) if one of the sync manager was not
-     * synchronized successfully.
+     * The lastSuccessfulSync of the oldest successfully synchronized sync manager or
+     * [Instant.fromEpochMilliseconds] of 0 if one of the sync manager was not synchronized successfully.
      */
-    internal val lastSuccessfulSync: Date
+    internal val lastSuccessfulSync: Instant
         get() {
             return syncManagers.minOfOrNull {
-                (it.currentSyncStatus as? LBSyncProcessStatus.SyncSuccessfully)?.lastSuccessfulSync ?: Date(0)
-            } ?: Date(0)
+                (it.currentSyncStatus as? LBSyncProcessStatus.SyncSuccessfully)?.lastSuccessfulSync
+                    ?: Instant.fromEpochMilliseconds(0)
+            } ?: Instant.fromEpochMilliseconds(0)
         }
 
     /**
@@ -101,14 +102,15 @@ class LBSyncGroup(
      */
     fun syncManagerTask(): Task<Void> {
         val task = getTasksIfClosureIsEnabled {
-            Task.whenAll(syncManagers.map(LBGenericSyncManager::synchronize))
+            // TODO(#04): remove Bolts bridge
+            Task.whenAll(syncManagers.map(LBGenericSyncManager::synchronizeBoltsBridge))
         }
 
         if (task.isCompleted && task.result == null) {
             syncManagers
                 .filter { it.currentSyncStatus != LBSyncProcessStatus.Disabled }
                 .forEach {
-                    it.currentSyncStatus = LBSyncProcessStatus.Disabled
+                    it.setStatusInternal(LBSyncProcessStatus.Disabled)
                 }
         }
 
@@ -121,9 +123,10 @@ class LBSyncGroup(
     fun startServerNotificationListeners(): Task<Void> {
         return if (syncManagers.any { it.supportChangeNotificationFromServer() }) {
             getTasksIfClosureIsEnabled {
+                // TODO(#04): remove Bolts bridge
                 Task.whenAll(
                     syncManagers.filter { it.supportChangeNotificationFromServer() }
-                        .map(LBGenericSyncManager::startServerNotificationListener),
+                        .map(LBGenericSyncManager::startServerNotificationListenerBoltsBridge),
                 )
             }
         } else {
@@ -143,7 +146,7 @@ class LBSyncGroup(
                         taskIsEnabledClosureAsync.setResult(isEnable)
                     } else {
                         syncManagers.forEach {
-                            it.currentSyncStatus = LBSyncProcessStatus.Disabled
+                            it.setStatusInternal(LBSyncProcessStatus.Disabled)
                         }
                         taskIsEnabledClosureAsync.setError(LBSyncClosureException())
                     }
@@ -165,8 +168,9 @@ class LBSyncGroup(
      * @return the Bolt Task to stop all the serverNotificationListener available of the group
      */
     fun stopServerNotificationListeners(): Task<Void> {
+        // TODO(#04): remove Bolts bridge
         val tasks = syncManagers.filter(LBGenericSyncManager::supportChangeNotificationFromServer).map(
-            LBGenericSyncManager::stopServerNotificationListener,
+            LBGenericSyncManager::stopServerNotificationListenerBoltsBridge,
         )
         return Task.whenAll(tasks)
     }
