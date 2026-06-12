@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-0612
+
+```
+Synchronization 2.0.0
+```
+
+Move the `synchronization` module from the `Libraries_Android` repository into `LBAndroid`. The package is renamed from
+`com.lunabee.lbsynchronization` to `studio.lunabee.synchronization`, and subpackages are aligned to the repository
+convention (`lbConnectivityManager` → `connectivity`, `lbSyncManager` → `syncmanager`, `lbLifeCycle` → `lifecycle`).
+
+The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` are removed; use
+`studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
+
 ## 2026-0610
 
 ```
