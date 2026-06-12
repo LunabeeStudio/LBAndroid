@@ -87,7 +87,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     private fun listenReconnection() {
         isReconnecting = true
         if (LBConnectivityManager.getNetworkState(context).isConnected) {
-            handler.postDelayed(reconnectCallback, SERVER_DOWN_DELAY_MS)
+            handler.postDelayed(reconnectCallback, ServerDownDelayMs)
         } else {
             connectivityManager?.startListening(context)
         }
@@ -196,7 +196,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
         /**
          * The delay before reconnect if server is down
          */
-        private const val SERVER_DOWN_DELAY_MS: Long = 15000
+        private const val ServerDownDelayMs: Long = 15000
 
         /**
          * Private instance for singleton

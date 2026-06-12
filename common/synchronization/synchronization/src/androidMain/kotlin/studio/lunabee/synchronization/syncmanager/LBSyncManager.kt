@@ -452,6 +452,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
          * Base name of the DataStore Preferences file backing the sync timestamps (matches the legacy
          * SharedPreferences file name so existing installs keep the same on-disk location).
          */
-        const val timestampPrefFile: String = "com.lunabee.lbsynchronization"
+        const val TimestampPrefFile: String = "com.lunabee.lbsynchronization"
     }
 }
