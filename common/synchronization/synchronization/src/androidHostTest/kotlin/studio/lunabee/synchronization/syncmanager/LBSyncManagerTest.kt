@@ -16,25 +16,15 @@
 
 package studio.lunabee.synchronization.syncmanager
 
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestCoroutineScheduler
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
-import okio.FileSystem
-import okio.Path
 import studio.lunabee.core.model.LBResult
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.testfixture.FakeSyncManager
+import studio.lunabee.synchronization.testfixture.LocalObj
+import studio.lunabee.synchronization.testfixture.ServerObj
+import studio.lunabee.synchronization.testfixture.runManagerTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -107,7 +97,7 @@ class LBSyncManagerTest {
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Nothing>(objects = listOf(ServerObj(maxDate)))),
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = maxDate)))),
             supportIncremental = true,
         )
 
@@ -125,7 +115,7 @@ class LBSyncManagerTest {
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Nothing>(objects = listOf(ServerObj(Instant.fromEpochMilliseconds(5_000L))))),
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(5_000L))))),
             supportIncremental = false,
         )
 
@@ -144,9 +134,9 @@ class LBSyncManagerTest {
     @Test
     fun download_loops_over_every_page_of_a_multi_page_fetch() = runManagerTest { store, scope ->
         val pages = listOf(
-            FetchPage<ServerObj, Nothing>(objects = List(size = 2) { ServerObj(Instant.fromEpochMilliseconds(it + 1L)) }),
-            FetchPage<ServerObj, Nothing>(objects = List(size = 2) { ServerObj(Instant.fromEpochMilliseconds(it + 10L)) }),
-            FetchPage<ServerObj, Nothing>(objects = listOf(ServerObj(Instant.fromEpochMilliseconds(100L)))),
+            FetchPage<ServerObj, Int>(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
+            FetchPage<ServerObj, Int>(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
+            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)))),
         )
         val manager = FakeSyncManager(
             store = store,
@@ -327,128 +317,4 @@ class LBSyncManagerTest {
     }
 
     // endregion
-
-    // region test infrastructure
-
-    private fun runManagerTest(body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit) = runTest {
-        // One scheduler-backed scope shared by the manager AND the DataStore, so the store's I/O is
-        // governed by virtual time too: advanceUntilIdle() then deterministically drains cursor reads
-        // that happen mid-pipeline (e.g. while another run is parked).
-        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
-        try {
-            body(freshStore(scope), scope)
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    /**
-     * Builds a [SyncTimestampStore] over a fresh DataStore living on a unique temp path so no state is
-     * shared between tests (copied from SyncTimestampStoreTest), backed by [scope] so its coroutines run
-     * on the test scheduler.
-     */
-    private fun freshStore(scope: CoroutineScope): SyncTimestampStore {
-        val fileName = "sync_timestamp_${counter++}_${nextRandom()}.preferences_pb"
-        val path: Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / fileName
-        val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.createWithPath(scope = scope) { path }
-        return SyncTimestampStore(dataStore = dataStore)
-    }
-
-    private companion object {
-        private var counter: Int = 0
-
-        private fun nextRandom(): Int = (0..Int.MAX_VALUE).random()
-    }
-}
-
-private data class ServerObj(val updatedAt: Instant?)
-
-private data class LocalObj(val id: String)
-
-/**
- * Fake SPI subclass exercising the observable engine surface only.
- */
-private class FakeSyncManager(
-    store: SyncTimestampStore,
-    scope: CoroutineScope,
-    private val pages: List<FetchPage<ServerObj, Nothing>> = listOf(FetchPage<ServerObj, Nothing>(objects = emptyList())),
-    private val uploadObjects: List<LocalObj> = emptyList(),
-    private val supportChangeNotification: Boolean = false,
-    private val supportIncremental: Boolean = false,
-    private val pageSize: Int? = null,
-    private val fetchError: Exception? = null,
-    private val pushError: Exception? = null,
-    private val fetchGate: CompletableDeferred<Unit>? = null,
-    private val gateOnlyFirstFetch: Boolean = false,
-    retryTempo: kotlin.time.Duration? = null,
-) : LBSyncManager<ServerObj, LocalObj, Nothing>(timestampStore = store, scope = scope) {
-
-    init {
-        this.retryTempo = retryTempo
-    }
-
-    var fetchCalls: Int = 0
-        private set
-    var pushCalls: Int = 0
-        private set
-    val callLog: MutableList<String> = mutableListOf()
-    val updatedPageSizes: MutableList<Int> = mutableListOf()
-
-    override val syncKey: String get() = SyncKey
-
-    override suspend fun clearData() = Unit
-
-    override suspend fun updateData(data: List<ServerObj>) {
-        callLog += "update"
-        updatedPageSizes += data.size
-    }
-
-    override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<ServerObj, Nothing> {
-        callLog += "fetch"
-        val isFirstFetch = fetchCalls == 0
-        fetchCalls += 1
-        if (fetchGate != null && (!gateOnlyFirstFetch || isFirstFetch)) {
-            fetchGate.await()
-        }
-        fetchError?.let { throw it }
-        return pages.getOrElse(page) { FetchPage(objects = emptyList()) }
-    }
-
-    override fun updatedAt(obj: ServerObj): Instant? = obj.updatedAt
-
-    override fun isInSync(obj: LocalObj): Boolean = true
-
-    override suspend fun objectToBeUploaded(): List<LocalObj> = uploadObjects
-
-    override suspend fun pushObjectsToServer(objects: List<LocalObj>) {
-        callLog += "push"
-        pushCalls += 1
-        pushError?.let { throw it }
-    }
-
-    override suspend fun hasSomethingToUpload(): Boolean = uploadObjects.isNotEmpty()
-
-    override fun queryPageSize(): Int? = pageSize
-
-    override fun supportIncrementalSync(): Boolean = supportIncremental
-
-    override fun supportChangeNotificationFromServer(): Boolean = supportChangeNotification
-
-    /**
-     * Eagerly collects [status] into a list of simple class names on an [UnconfinedTestDispatcher] (so
-     * the collector resumes synchronously on each emission and observes every transition the pipeline
-     * yields between, rather than only the latest conflated value) and returns a getter for the recorded
-     * sequence.
-     */
-    fun recordStatuses(scope: CoroutineScope, scheduler: TestCoroutineScheduler): () -> List<String> {
-        val recorded = mutableListOf<String>()
-        scope.launch(UnconfinedTestDispatcher(scheduler)) {
-            status.collect { recorded += it::class.simpleName.orEmpty() }
-        }
-        return { recorded.toList() }
-    }
-
-    companion object {
-        const val SyncKey: String = "FakeSyncManager"
-    }
 }
