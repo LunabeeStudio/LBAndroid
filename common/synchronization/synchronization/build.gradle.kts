@@ -15,7 +15,7 @@
  */
 
 plugins {
-    id("lunabee.kmp-android-library-conventions")
+    id("lunabee.kmp-android-library-no-ios-conventions")
     id("lunabee.library-publish-conventions")
 }
 
