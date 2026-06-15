@@ -21,7 +21,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -76,16 +75,19 @@ object LBConnectivityManager {
                 trySend(getNetworkState(context))
             }
 
+            override fun onUnavailable() {
+                trySend(getNetworkState(context))
+            }
+
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                trySend(networkCapabilities.toNetworkState())
+                trySend(getNetworkState(context))
             }
         }
 
         trySend(getNetworkState(context))
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-        connectivityManager.registerNetworkCallback(request, callback)
+        // Track the default network: registerDefaultNetworkCallback reliably fires onLost when the last
+        // network drops (e.g. airplane mode), which a NetworkRequest-scoped callback may miss.
+        connectivityManager.registerDefaultNetworkCallback(callback)
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }.distinctUntilChanged()
 
