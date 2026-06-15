@@ -36,7 +36,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/**
+/*
  * Shared test fixture for the `:synchronization` engine JVM host tests.
  *
  * Centralises the fakes and the scheduler-backed harness so every test file reuses one set of

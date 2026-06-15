@@ -17,57 +17,86 @@
 package studio.lunabee.synchronization.connectivity
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * Use this class to get notify when connection change and to get connection state/type
- * **WARNING** : You need to add ACCESS_NETWORK_STATE permission in your app manifest
+ * Observe device connectivity through the modern [ConnectivityManager.NetworkCallback] +
+ * [NetworkCapabilities] APIs (the legacy `CONNECTIVITY_ACTION` broadcast and `activeNetworkInfo` are
+ * deprecated). Exposes a cold [networkStates] [Flow] and a one-shot [getNetworkState] snapshot.
+ *
+ * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
  */
-@Suppress("DEPRECATION")
-class LBConnectivityManager {
+object LBConnectivityManager {
 
     /**
-     * The action you want to do when connection change is detected
+     * Snapshot of the current device network state.
+     *
+     * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
      */
-    var listener: BroadcastReceiver? = null
+    @SuppressLint("MissingPermission")
+    fun getNetworkState(context: Context): NetworkState {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+            ?: return NetworkState(isConnected = false, connectionType = null)
+        val network = connectivityManager.activeNetwork
+        val capabilities = network?.let(connectivityManager::getNetworkCapabilities)
+        return capabilities.toNetworkState()
+    }
 
     /**
-     * Start listening connection changes
+     * Cold [Flow] emitting the [NetworkState] on every connectivity change (and once on collection with
+     * the current state). Backed by a [ConnectivityManager.NetworkCallback] registered for the
+     * INTERNET-capable default network and unregistered on cancellation. Consecutive duplicates are
+     * dropped.
+     *
+     * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
      */
-    fun startListening(context: Context) {
-        listener?.let {
-            context.registerReceiver(
-                listener,
-                IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION),
-            )
+    @SuppressLint("MissingPermission")
+    fun networkStates(context: Context): Flow<NetworkState> = callbackFlow {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+        if (connectivityManager == null) {
+            trySend(NetworkState(isConnected = false, connectionType = null))
+            awaitClose { }
+            return@callbackFlow
         }
-    }
 
-    /**
-     * Stop listening connection changes
-     */
-    fun stopListening(context: Context) {
-        listener?.let(context::unregisterReceiver)
-        listener = null
-    }
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                trySend(getNetworkState(context))
+            }
 
-    companion object {
-        /**
-         * Get the object NetworkState for the current device network
-         * **WARNING** : You need to add ACCESS_NETWORK_STATE permission in your app manifest
-         */
-        @SuppressLint("MissingPermission")
-        fun getNetworkState(context: Context): NetworkState {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val activeNetwork = connectivityManager.activeNetworkInfo
-            return if (activeNetwork != null && activeNetwork.isConnectedOrConnecting) {
-                NetworkState(true, activeNetwork.type)
-            } else {
-                NetworkState(false, null)
+            override fun onLost(network: Network) {
+                trySend(getNetworkState(context))
+            }
+
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                trySend(networkCapabilities.toNetworkState())
             }
         }
+
+        trySend(getNetworkState(context))
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        connectivityManager.registerNetworkCallback(request, callback)
+        awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+    }.distinctUntilChanged()
+
+    /**
+     * Map [NetworkCapabilities] to a [NetworkState]: connected when the network has the INTERNET
+     * capability, with [NetworkState.connectionType] set to the primary [LBNetworkTransport].
+     */
+    private fun NetworkCapabilities?.toNetworkState(): NetworkState {
+        if (this == null || !hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            return NetworkState(isConnected = false, connectionType = null)
+        }
+        return NetworkState(isConnected = true, connectionType = LBNetworkTransport.from(this))
     }
 }

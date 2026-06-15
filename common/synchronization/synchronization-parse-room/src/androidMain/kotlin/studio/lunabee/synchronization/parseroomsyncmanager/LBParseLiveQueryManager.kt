@@ -17,9 +17,7 @@
 package studio.lunabee.synchronization.parseroomsyncmanager
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import co.touchlab.kermit.Logger
@@ -29,6 +27,12 @@ import com.parse.livequery.LiveQueryException
 import com.parse.livequery.ParseLiveQueryClient
 import com.parse.livequery.ParseLiveQueryClientCallbacks
 import com.parse.livequery.SubscriptionHandling
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import java.net.URI
@@ -67,9 +71,11 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     private var handler: Handler = Handler(Looper.getMainLooper())
 
     /**
-     * Used for the reconnection
+     * Scope + job used to await connectivity before reconnecting (replaces the legacy connectivity
+     * BroadcastReceiver).
      */
-    private var connectivityManager: LBConnectivityManager? = null
+    private val reconnectionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var reconnectionJob: Job? = null
 
     /**
      * Used for the reconnection
@@ -89,25 +95,19 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
         if (LBConnectivityManager.getNetworkState(context).isConnected) {
             handler.postDelayed(reconnectCallback, ServerDownDelayMs)
         } else {
-            connectivityManager?.startListening(context)
+            awaitConnectivityThenReconnect()
         }
     }
 
     /**
-     * Init the connectivityManager and the logic for the listener
+     * Suspend until connectivity is back (collecting [LBConnectivityManager.networkStates]) then
+     * reconnect the LiveQuery client. Replaces the legacy connectivity BroadcastReceiver.
      */
-    private fun initConnectivityManager() {
-        connectivityManager?.stopListening(context)
-        connectivityManager = LBConnectivityManager()
-        connectivityManager?.listener = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                context?.let {
-                    if (LBConnectivityManager.getNetworkState(context).isConnected) {
-                        parseLiveQueryClient?.reconnect()
-                        connectivityManager?.stopListening(context)
-                    }
-                }
-            }
+    private fun awaitConnectivityThenReconnect() {
+        reconnectionJob?.cancel()
+        reconnectionJob = reconnectionScope.launch {
+            LBConnectivityManager.networkStates(context).first { it.isConnected }
+            parseLiveQueryClient?.reconnect()
         }
     }
     /*=================
@@ -126,7 +126,6 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
             parseLiveQueryClient = ParseLiveQueryClient.Factory.getClient(URI(parseLiveQueryURL))
             parseLiveQueryClient?.registerListener(this)
             parseLiveQueryClient?.connectIfNeeded()
-            initConnectivityManager()
         } catch (e: URISyntaxException) {
             e.printStackTrace()
             logger.e(e.localizedMessage ?: "")
@@ -150,6 +149,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     fun unsubscribe(query: ParseQuery<ParseObject>) {
         logger.v("Unsubscribe LiveQuery for ${query.className}")
         isReconnecting = false
+        reconnectionJob?.cancel()
         handler.removeCallbacks(reconnectCallback)
         parseLiveQueryClient?.unsubscribe(query)
     }
