@@ -25,9 +25,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
+import kotlin.time.Duration
 
 /**
  * Holds the fake server, local DB and the [DemoItemSyncManager], and exposes the bits the screen needs.
@@ -48,6 +50,14 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
     val localItems: StateFlow<List<LocalItem>> = localDb.items
     val serverItems: StateFlow<List<ServerItem>> = server.items
     val status: StateFlow<LBSyncProcessStatus> = syncManager.status
+
+    /** The engine's automatic-retry delay for a failed run (null disables retry). */
+    val retryTempo: Duration? = syncManager.retryTempo
+
+    private val _retryCount: MutableStateFlow<Int> = MutableStateFlow(0)
+
+    /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
+    val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
 
     /** Live device connectivity, driven by the library's modern [LBConnectivityManager] flow. */
     val isOnline: StateFlow<Boolean> = LBConnectivityManager.networkStates(application)
@@ -82,6 +92,20 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
     init {
         // Seed the status from the persisted cursor (NeverSync until this completes).
         viewModelScope.launch { syncManager.load() }
+        // Count failed attempts: each (auto-retried) failure publishes a fresh *WithError.
+        viewModelScope.launch {
+            syncManager.status.collect { current ->
+                when (current) {
+                    is LBSyncProcessStatus.DownloadFinishWithError,
+                    is LBSyncProcessStatus.UploadFinishWithError,
+                    -> _retryCount.update { it + 1 }
+
+                    is LBSyncProcessStatus.SyncSuccessfully -> _retryCount.value = 0
+
+                    else -> Unit
+                }
+            }
+        }
     }
 
     fun addClientItem() {
