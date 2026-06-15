@@ -56,10 +56,12 @@ The old SharedPreferences default-prefs migration is gone, so an app upgrading f
 Three layers, top to bottom:
 
 - **`LBSyncOperator`** (object/singleton) — app-wide registry. Holds `groups: LinkedHashMap<String,
-  LBSyncGroup>`. `initNetworkListener` / `initAppLifecycleListener` register `BroadcastReceiver`s that
-  trigger refreshes on `InternetIsBack` / `AppForeground`, and start/stop server-notification
-  listeners (e.g. Parse LiveQuery) on foreground/background. `syncManager<T>()` finds a registered
-  manager by type.
+  LBSyncGroup>`. `initNetworkListener(context)` collects `LBConnectivityManager.networkStates` (modern
+  `NetworkCallback` flow) to trigger `InternetIsBack`; `initAppLifecycleListener()` (no `Context`)
+  observes `ProcessLifecycleOwner` via a `DefaultLifecycleObserver`-backed flow to trigger
+  `AppForeground` and start/stop server-notification listeners (e.g. Parse LiveQuery) on
+  foreground/background. There is no broadcast bridge anymore — `LBSyncApplication` was removed; apps
+  just call these two init methods at startup. `syncManager<T>()` finds a registered manager by type.
 - **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
   `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
   groups sequentially**. So model table dependencies by putting the dependency in an earlier group. A
@@ -81,9 +83,8 @@ as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentS
 read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combined
 `statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and `isSyncing(): Flow<Boolean>` (snapshot of
 the registry at collection time; KDoc spells out the snapshot + `syncKey`-collision caveats). Multiple
-failures aggregate into `LBSyncAggregateException`. `LBSyncApplication` (extends `LBLifecycleApplication`
-from `:core-android`) is the `Application` base class that broadcasts the foreground/background intents
-the operator listens for.
+failures aggregate into `LBSyncAggregateException`. App foreground/background is observed directly from
+`ProcessLifecycleOwner` by the operator (no custom `Application` needed).
 
 ### Sharp edges
 

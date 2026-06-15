@@ -18,7 +18,8 @@ package studio.lunabee.synchronization.connectivity
 
 /**
  * Represent network state
- * @param isConnected: true if the network is connected, else otherwise
- * @param connectionType: integer value representing the connection type from ConnectivityManager#getType()
+ * @param isConnected: true if the active network has the INTERNET capability
+ * @param connectionType: the primary [LBNetworkTransport] of the active network, or null when
+ * disconnected or carried by an unmapped transport
  */
-data class NetworkState(val isConnected: Boolean, val connectionType: Int?)
+data class NetworkState(val isConnected: Boolean, val connectionType: LBNetworkTransport?)

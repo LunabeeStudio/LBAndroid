@@ -16,14 +16,18 @@
 
 package studio.lunabee.synchronization
 
-import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
@@ -35,7 +39,6 @@ import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.connectivity.NetworkState
-import studio.lunabee.synchronization.lifecycle.LBSyncApplication
 import studio.lunabee.synchronization.store.syncTimestampStore
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
@@ -53,7 +56,14 @@ object LBSyncOperator {
 
     // Device network fields
     private lateinit var lastNetworkState: NetworkState
-    private var connectivityManager: LBConnectivityManager? = null
+    private var networkListenerJob: Job? = null
+    private var appLifecycleJob: Job? = null
+
+    // Lifecycle observation must touch ProcessLifecycleOwner on the main thread. Lazy so merely touching
+    // the operator (e.g. triggerRefresh in JVM host tests) never forces Dispatchers.Main to load.
+    private val mainScope: CoroutineScope by lazy {
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    }
 
     /**
      * Map of LBSyncGroup managed
@@ -61,95 +71,75 @@ object LBSyncOperator {
     val groups: LinkedHashMap<String, LBSyncGroup> = LinkedHashMap()
 
     /**
-     * Broadcast receiver for network changes
-     */
-    var connectivityBroadcastReceiver: BroadcastReceiver? = null
-
-    /**
-     * Broadcast receiver for lifecycle changes : AppForegroundAction
-     */
-    var appLifecycleForegroundBroadcastReceiver: BroadcastReceiver? = null
-
-    /**
-     * Broadcast receiver for lifecycle changes : AppBackgroundAction
-     */
-    var appLifecycleBackgroundBroadcastReceiver: BroadcastReceiver? = null
-
-    /**
-     * Call this to let the LBSyncOperator refresh the sync managers for network changes
-     * The refresh is perform if network change is detected : new state is connected AND old state was not
-     * **WARNING** : A sync manager can only be refreshed if it has LBSyncRefreshEvent.INTERNET_IS_BACK
+     * Call this to let the LBSyncOperator refresh the sync managers for network changes. The refresh is
+     * performed when a reconnection is detected (new state is connected AND the previous state was not),
+     * by collecting [LBConnectivityManager.networkStates] in the shared [defaultSyncScope].
+     *
+     * **WARNING** : A sync manager can only be refreshed if its group carries
+     * [LBSyncRefreshEvent.InternetIsBack].
      */
     fun initNetworkListener(context: Context) {
-        lastNetworkState = LBConnectivityManager.getNetworkState(context)
-        connectivityManager?.stopListening(context)
-        connectivityManager = LBConnectivityManager()
-        connectivityManager?.listener = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                context?.let {
-                    val networkState = LBConnectivityManager.getNetworkState(it)
-                    if (networkState.isConnected && networkState.connectionType != null) {
-                        networkLogger.v("Internet is available with type ${networkState.connectionType}")
-                        if (!lastNetworkState.isConnected) {
-                            triggerRefresh(LBSyncRefreshEvent.InternetIsBack::class)
-                        }
-                    } else {
-                        networkLogger.v("Internet is disable")
+        val appContext = context.applicationContext
+        lastNetworkState = LBConnectivityManager.getNetworkState(appContext)
+        networkListenerJob?.cancel()
+        networkListenerJob = defaultSyncScope.launch {
+            LBConnectivityManager.networkStates(appContext).collect { networkState ->
+                if (networkState.isConnected) {
+                    networkLogger.v("Internet is available with transport ${networkState.connectionType}")
+                    if (!lastNetworkState.isConnected) {
+                        triggerRefresh(LBSyncRefreshEvent.InternetIsBack::class)
                     }
-                    lastNetworkState = networkState
+                } else {
+                    networkLogger.v("Internet is disabled")
                 }
+                lastNetworkState = networkState
             }
         }
-        connectivityManager?.startListening(context)
     }
 
     /**
-     * Call this to let the LBSyncOperator refresh the sync managers when app enter in foreground
-     * **WARNING** : A sync manager can only be refreshed if it has [LBSyncRefreshEvent.AppForeground]
+     * Call this to let the LBSyncOperator refresh the sync managers when the app enters the foreground.
+     * Observes [ProcessLifecycleOwner]'s lifecycle as a [Flow] (no broadcasts): a foreground transition
+     * triggers the refresh and starts the server-notification listeners; a background transition stops
+     * them.
      *
-     * This function also start and stop serverNotificationListeners available
+     * **WARNING** : A sync manager can only be refreshed if its group carries
+     * [LBSyncRefreshEvent.AppForeground].
      */
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    fun initAppLifecycleListener(context: Context) {
-        // Foreground
-        appLifecycleForegroundBroadcastReceiver?.let(context::unregisterReceiver)
-        appLifecycleForegroundBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
-                defaultSyncScope.launch { startServerNotificationListeners() }
+    fun initAppLifecycleListener() {
+        appLifecycleJob?.cancel()
+        appLifecycleJob = mainScope.launch {
+            appForegroundFlow()
+                .distinctUntilChanged()
+                .collect { isForeground ->
+                    if (isForeground) {
+                        triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
+                        startServerNotificationListeners()
+                    } else {
+                        stopServerNotificationListeners()
+                    }
+                }
+        }
+    }
+
+    /**
+     * Cold [Flow] of the process foreground state, bridged from [ProcessLifecycleOwner] via a
+     * [DefaultLifecycleObserver]. Collected on the main thread (see [mainScope]); the observer is removed
+     * on cancellation.
+     */
+    private fun appForegroundFlow(): Flow<Boolean> = callbackFlow {
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        val observer = object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                trySend(true)
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                trySend(false)
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            context.registerReceiver(
-                appLifecycleForegroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.AppForegroundAction),
-                Context.RECEIVER_EXPORTED,
-            )
-        } else {
-            context.registerReceiver(
-                appLifecycleForegroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.AppForegroundAction),
-            )
-        }
-        // Background
-        appLifecycleBackgroundBroadcastReceiver?.let(context::unregisterReceiver)
-        appLifecycleBackgroundBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                defaultSyncScope.launch { stopServerNotificationListeners() }
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            context.registerReceiver(
-                appLifecycleBackgroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.AppBackgroundAction),
-                Context.RECEIVER_EXPORTED,
-            )
-        } else {
-            context.registerReceiver(
-                appLifecycleBackgroundBroadcastReceiver,
-                IntentFilter(LBSyncApplication.AppBackgroundAction),
-            )
-        }
+        lifecycle.addObserver(observer)
+        awaitClose { lifecycle.removeObserver(observer) }
     }
 
     /**
