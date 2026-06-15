@@ -83,6 +83,11 @@ fun MainScreen(
                 subtitle = LbcTextSpec.StringResource(R.string.navigation_description),
                 direction = directions.navigateToLbcNavigation,
             ),
+            MenuDescription(
+                title = LbcTextSpec.Raw("Synchronization"),
+                subtitle = LbcTextSpec.Raw("Sync a local DB with a fake remote server"),
+                direction = directions.navigateToSynchronization,
+            ),
         ),
     )
 }

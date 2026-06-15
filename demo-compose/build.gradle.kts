@@ -19,6 +19,7 @@ plugins {
     id(libs.plugins.composePlugin.get().pluginId)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.androidxRoom)
     alias(libs.plugins.kotlinxSerialization)
 }
 
@@ -94,6 +95,7 @@ dependencies {
     implementation(platform(libs.composeBom))
     implementation(platform(libs.koinBom))
 
+    ksp(libs.androidxRoomCompiler)
     ksp(libs.hiltAndroidCompiler)
     ksp(projects.compose.presenterKoinKsp)
 
@@ -102,6 +104,7 @@ dependencies {
     implementation(libs.androidxCore)
     implementation(libs.androidxHiltNavigationCompose)
     implementation(libs.androidxLifecycleRuntimeCompose)
+    implementation(libs.androidxRoomRuntime)
     implementation(libs.androidxUiToolingPreview)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.composeFoundation)
@@ -129,6 +132,7 @@ dependencies {
     implementation(projects.compose.uifieldCore)
     implementation(projects.compose.uifieldCountrypicker)
     implementation(projects.compose.uifieldPhonepicker)
+    implementation(projects.coreAndroid)
     implementation(projects.ktorCore)
     implementation(projects.ktorJson)
     implementation(projects.ktorKermit)
@@ -137,6 +141,7 @@ dependencies {
     implementation(projects.monitoringKtor)
     implementation(projects.monitoringRoom)
     implementation(projects.monitoringUi)
+    implementation(projects.synchronization)
 
     debugImplementation(libs.androidxUiTooling)
     debugImplementation(libs.composeUiTestManifest)
@@ -145,6 +150,10 @@ dependencies {
     androidTestImplementation(libs.junit4)
     androidTestImplementation(libs.kotlinTestJunit)
     androidTestImplementation(projects.compose.androidtest)
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 kotlin.compilerOptions.jvmTarget.set(AndroidConfig.JVM_TARGET)
