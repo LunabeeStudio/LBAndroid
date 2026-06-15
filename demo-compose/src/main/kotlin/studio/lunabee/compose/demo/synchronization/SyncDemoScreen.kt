@@ -44,8 +44,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,9 +57,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 import java.time.Instant as JavaInstant
 
@@ -74,6 +79,7 @@ fun SyncDemoScreen(
     val refreshOnForeground by viewModel.refreshOnForeground.collectAsState()
     val refreshOnInternetBack by viewModel.refreshOnInternetBack.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
+    val retryCount by viewModel.retryCount.collectAsState()
 
     val visibleLocalItems = if (showDeleted) localItems else localItems.filterNot { it.isDeleted }
     val visibleServerItems = if (showDeleted) serverItems else serverItems.filterNot { it.isDeleted }
@@ -90,6 +96,17 @@ fun SyncDemoScreen(
 
         if (conflicts.isNotEmpty()) {
             ConflictBanner(conflicts = conflicts)
+        }
+
+        val errorAt = (status as? LBSyncProcessStatus.DownloadFinishWithError)?.at
+            ?: (status as? LBSyncProcessStatus.UploadFinishWithError)?.at
+        val retryTempo = viewModel.retryTempo
+        if (errorAt != null && retryTempo != null) {
+            RetryBanner(
+                errorAt = errorAt,
+                retryTempo = retryTempo,
+                attempt = retryCount,
+            )
         }
 
         Row(
@@ -208,6 +225,45 @@ private fun StatusBanner(
         }
     }
 }
+
+@Composable
+private fun RetryBanner(
+    errorAt: Instant,
+    retryTempo: Duration,
+    attempt: Int,
+    modifier: Modifier = Modifier,
+) {
+    var remainingSeconds by remember(errorAt) {
+        mutableLongStateOf(retryRemainingSeconds(errorAt, retryTempo))
+    }
+    LaunchedEffect(errorAt) {
+        while (remainingSeconds > 0) {
+            delay(1_000)
+            remainingSeconds = retryRemainingSeconds(errorAt, retryTempo)
+        }
+    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Sync failed — attempt #$attempt",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = if (remainingSeconds > 0) "Auto-retry in ${remainingSeconds}s" else "Retrying…",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+private fun retryRemainingSeconds(errorAt: Instant, retryTempo: Duration): Long =
+    (errorAt + retryTempo - Clock.System.now()).inWholeSeconds.coerceAtLeast(0)
 
 @Composable
 private fun NetworkIndicator(
