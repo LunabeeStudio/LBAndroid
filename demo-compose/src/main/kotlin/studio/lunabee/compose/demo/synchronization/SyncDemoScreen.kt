@@ -109,49 +109,10 @@ fun SyncDemoScreen(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(
-                onClick = viewModel::addClientItem,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(text = "+ Client item")
-            }
-            OutlinedButton(
-                onClick = viewModel::addServerItem,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(text = "+ Server item")
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = viewModel::synchronize,
-                enabled = !status.isProcessing(),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(text = "Synchronize")
-            }
-            OutlinedButton(
-                onClick = viewModel::reset,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(text = "Reset")
-            }
-        }
-
-        OutlinedButton(
-            onClick = viewModel::clearLocalDb,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(text = "Clear client DB")
-        }
+        ActionButtons(
+            viewModel = viewModel,
+            isProcessing = status.isProcessing(),
+        )
 
         OptionsSection(
             failNextSync = failNextSync,
@@ -185,6 +146,62 @@ fun SyncDemoScreen(
                 onDelete = viewModel::deleteServerItem,
                 modifier = Modifier.weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun ActionButtons(
+    viewModel: SyncDemoViewModel,
+    isProcessing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = viewModel::addClientItem,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "+ Client item")
+            }
+            OutlinedButton(
+                onClick = viewModel::addServerItem,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "+ Server item")
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = viewModel::synchronize,
+                enabled = !isProcessing,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "Synchronize")
+            }
+            OutlinedButton(
+                onClick = viewModel::reset,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "Reset")
+            }
+        }
+
+        OutlinedButton(
+            onClick = viewModel::clearLocalDb,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = "Clear client DB")
         }
     }
 }
