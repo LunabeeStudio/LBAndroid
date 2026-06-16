@@ -33,7 +33,7 @@ abstract class LBDefaultRoomSyncManager<ServerData, RoomData : LBRoomSyncModel>(
     context: Context,
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    queryDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBRoomSyncManager<ServerData, RoomData, Nothing>(
     context,
@@ -51,7 +51,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
     context: Context,
     protected val dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    protected val queryDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    protected val queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     protected val writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBSyncManager<ServerData, RoomData, PageInfo>(context, logging) {
 
