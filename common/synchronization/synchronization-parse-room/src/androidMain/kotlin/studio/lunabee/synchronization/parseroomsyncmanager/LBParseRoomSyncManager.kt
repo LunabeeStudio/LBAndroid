@@ -58,7 +58,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     context: Context,
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    queryDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(context, dao, logging, queryDispatcher, writeDispatcher) {
 
