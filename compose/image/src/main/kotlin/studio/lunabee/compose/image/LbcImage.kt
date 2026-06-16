@@ -34,8 +34,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.core.content.res.ResourcesCompat
-import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.decode.SvgDecoder
@@ -252,30 +250,32 @@ private fun DrawableImage(
     onState: ((AsyncImagePainter.State) -> Unit)?,
     errorPainter: Painter?,
 ) {
-    if (imageSpec.uiMode == Configuration.UI_MODE_TYPE_UNDEFINED) {
-        Image(
-            painter = painterResource(id = imageSpec.drawableRes),
-            contentDescription = contentDescription?.string,
-            modifier = modifier,
-            contentScale = contentScale,
-            alignment = alignment,
-            colorFilter = colorFilter,
-        )
-    } else {
-        val configuration = Configuration().apply {
-            uiMode = imageSpec.uiMode
+    val context = LocalContext.current
+    // Resolve the drawable through a configuration context so Coil picks the right uiMode (day/night) variant.
+    val requestContext = remember(context, imageSpec.uiMode) {
+        if (imageSpec.uiMode == Configuration.UI_MODE_TYPE_UNDEFINED) {
+            context
+        } else {
+            val configuration = Configuration().apply {
+                uiMode = imageSpec.uiMode
+            }
+            context.createConfigurationContext(configuration)
         }
-        val resources = LocalContext.current.createConfigurationContext(configuration).resources
-        val bitmap = ResourcesCompat.getDrawable(resources, imageSpec.drawableRes, null)!!.toBitmap()
-        LbcImage(
-            imageSpec = LbcImageSpec.Bitmap(bitmap),
-            modifier = modifier,
-            contentDescription = contentDescription,
-            onState = onState,
-            contentScale = contentScale,
-            alignment = alignment,
-            colorFilter = colorFilter,
-            errorPainter = errorPainter,
-        )
     }
+    // Let Coil load the drawable: it downsamples to the layout size instead of decoding the full bitmap.
+    AsyncImage(
+        model = ImageRequest
+            .Builder(requestContext)
+            .data(imageSpec.drawableRes)
+            .build(),
+        contentDescription = contentDescription?.string,
+        modifier = modifier,
+        alignment = alignment,
+        contentScale = contentScale,
+        error = errorPainter,
+        onError = onState,
+        onLoading = onState,
+        onSuccess = onState,
+        colorFilter = colorFilter,
+    )
 }

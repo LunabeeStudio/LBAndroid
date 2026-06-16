@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-06-16
+
+```
+LbcImage 1.9.1
+```
+
+Load `LbcImageSpec.ImageDrawable` through Coil so the drawable is downsampled to the layout size instead of decoding
+the full bitmap into memory, fixing high memory usage on heavy drawables.
+
 ## 2026-0610
 
 ```
