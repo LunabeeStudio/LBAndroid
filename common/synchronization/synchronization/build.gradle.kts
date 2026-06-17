@@ -39,6 +39,10 @@ kotlin {
         }
 
         commonMain.dependencies {
+            // BOM supplies the version for the versionless kotlinx-coroutines-core entry; without it the
+            // published POM has no version for coroutines and Maven Central validation rejects it.
+            implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
+
             // api: SyncTimestampStore exposes DataStore<Preferences> in its public constructor signature.
             api(libs.androidxDatastorePreferencesCore)
             // SyncRunner uses Mutex / CoroutineScope / async / delay; pin the dependency explicitly rather
@@ -49,8 +53,6 @@ kotlin {
             api(projects.core)
         }
         commonTest.dependencies {
-            implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
-
             implementation(libs.kotlinTest)
             implementation(libs.kotlinxCoroutinesTest)
         }
