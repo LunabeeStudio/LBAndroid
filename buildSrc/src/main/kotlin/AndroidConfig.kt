@@ -59,7 +59,7 @@ object AndroidConfig {
     const val LBCUIFIELD_PHONEPICKER_VERSION: String = LBCUIFIELD_CORE_VERSION
     const val LBCUIFIELD_COUNTRYPICKER_VERSION: String = LBCUIFIELD_CORE_VERSION
     const val LBCUIFIELD_FORM_VERSION: String = "0.9.0"
-    const val LBCIMAGE_VERSION: String = "1.9.0"
+    const val LBCIMAGE_VERSION: String = "1.9.1"
     const val LBCGLANCE_VERSION: String = "1.6.0"
     const val LBCPRESENTER_VERSION: String = "2.0.0-rc01"
     const val LBCPRESENTER_ANNOTATIONS_VERSION: String = "2.0.0-rc01"
