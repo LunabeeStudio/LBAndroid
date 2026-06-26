@@ -26,6 +26,12 @@ inline fun <reified T : Enum<T>> enumValueOfOrNull(name: String?, logger: Logger
     null
 }
 
+inline fun <reified T : Enum<T>> enumValueOfOrElse(name: String?, fallback: T): T = try {
+    name?.let { enumValueOf<T>(it) }
+} catch (_: IllegalArgumentException) {
+    null
+} ?: fallback
+
 object EnumExt {
     val enumLogger: Logger = LBLogger.get("EnumExt")
 }
