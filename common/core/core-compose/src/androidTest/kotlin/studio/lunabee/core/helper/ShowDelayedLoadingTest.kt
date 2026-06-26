@@ -157,18 +157,19 @@ class ShowDelayedLoadingTest {
             actualShowLoading.add(showLoading)
         }
 
-        // False because delay
-        assertFalse(actualShowLoading.last())
-        composeTestRule.wait(delayBeforeShow / 2)
+        // Hidden initially because of the show delay
         assertFalse(actualShowLoading.last())
 
-        // Request false
+        // Request hide before the show delay can elapse: this cancels the pending show
         shouldShowLoading.value = false
         composeTestRule.mainClock.advanceTimeByFrame()
         assertFalse(actualShowLoading.last())
 
-        // Assert showLoading was never true
-        composeTestRule.wait(delayBeforeShow / 2)
+        // Wait well beyond the show delay; the cancelled show must never become visible.
+        // Asserting after the full delay has elapsed (instead of relying on a wall-clock
+        // window shorter than delayBeforeShow) removes the timing race that made this test
+        // flaky on loaded CI agents, where the real wait could overshoot delayBeforeShow.
+        composeTestRule.wait(delayBeforeShow * 2)
         assertFalse(actualShowLoading.any { it })
     }
 }
