@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-06-26
+
+```
+Lbextensions 4.11.0
+bom 4.14.0
+```
+
+- Add `enumValueOfOrElse` to the `extension` module: resolves an enum entry by name and returns a caller-provided
+  `fallback` instead of `null` when the name is missing or unknown.
+
 ## 2026-06-16
 
 ```
