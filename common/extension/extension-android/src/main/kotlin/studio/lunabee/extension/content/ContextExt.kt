@@ -286,11 +286,7 @@ fun Context.startTextIntent(text: String, intentSender: IntentSender? = null) {
         type = "text/plain"
     }
 
-    val shareIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-        Intent.createChooser(sendIntent, null, intentSender)
-    } else {
-        Intent.createChooser(sendIntent, null)
-    }
+    val shareIntent = Intent.createChooser(sendIntent, null, intentSender)
     startActivity(shareIntent)
 }
 

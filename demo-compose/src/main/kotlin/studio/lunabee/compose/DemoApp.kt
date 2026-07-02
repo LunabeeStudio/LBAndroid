@@ -24,11 +24,15 @@ import org.koin.dsl.module
 import studio.lunabee.compose.demo.navigation.presenter.TestPresenterPresenter
 import studio.lunabee.compose.demo.presenter.timer.TimerInjectedParam
 import studio.lunabee.compose.demo.presenter.timer.TimerKoinPresenter
+import studio.lunabee.compose.demo.synchronization.SyncDemoRegistry
 
 @HiltAndroidApp
 class DemoApp : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Wire the sync-demo graph and register the operator's foreground / connectivity listeners.
+        SyncDemoRegistry.init(context = this)
 
         startKoin {
             modules(

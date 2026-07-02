@@ -29,6 +29,7 @@ object Destinations {
     const val KtorRoute: String = "KtorRoute"
     const val CoreRoute: String = "CoreRoute"
     const val LbcNavigation: String = "LbcNavigation"
+    const val SynchronizationRoute: String = "SynchronizationRoute"
 
     val BackNavigationScreen: List<String> = listOf(
         FoundationRoute,
@@ -42,5 +43,6 @@ object Destinations {
         KtorRoute,
         CoreRoute,
         LbcNavigation,
+        SynchronizationRoute,
     )
 }

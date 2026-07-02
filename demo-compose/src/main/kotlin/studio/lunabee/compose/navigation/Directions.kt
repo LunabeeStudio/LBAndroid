@@ -76,4 +76,8 @@ class Directions(navController: NavHostController) {
     val navigateToLbcNavigation: ToDirection = {
         navController.navigate(route = Destinations.LbcNavigation)
     }
+
+    val navigateToSynchronization: ToDirection = {
+        navController.navigate(route = Destinations.SynchronizationRoute)
+    }
 }
