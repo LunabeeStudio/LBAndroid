@@ -9,6 +9,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ```
 Lbloading 4.10.1
+bom 4.14.1
 ```
 
 - Add a `modifier` parameter to `DefaultBlockingContent` so callers can customize the blocking view.
