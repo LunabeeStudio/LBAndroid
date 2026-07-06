@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-06
+
+```
+Synchronization 2.0.0-beta02
+Synchronization Parse-Room 2.0.0-beta02
+```
+
+- Fix `LBSyncManager`: on a successful download the server `updatedAt` cursor is now persisted on terminal
+  success for **every** manager, not only when `supportIncrementalSync()` is enabled. This restores the legacy
+  `lbsynchronization` behaviour, where `supportIncrementalSync()` gates only per-page checkpointing (so a
+  mid-paging failure can resume), not whether the following run filters by the cursor. Without the fix a
+  non-incremental manager re-downloaded its full data set on every sync instead of only the records changed
+  since the last run.
+
 ## 2026-06-26
 
 ```

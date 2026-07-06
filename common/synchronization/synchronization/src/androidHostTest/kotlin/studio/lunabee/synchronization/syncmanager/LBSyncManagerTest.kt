@@ -111,19 +111,66 @@ class LBSyncManagerTest {
     }
 
     @Test
-    fun incremental_cursor_is_not_saved_when_incremental_sync_is_unsupported() = runManagerTest { store, scope ->
+    fun terminal_success_persists_the_server_cursor_even_without_incremental_sync() = runManagerTest { store, scope ->
+        val maxDate = Instant.fromEpochMilliseconds(5_000L)
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(5_000L))))),
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = maxDate)))),
             supportIncremental = false,
         )
 
         manager.synchronize()
 
+        assertEquals(
+            expected = maxDate.toEpochMilliseconds(),
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "a successful download persists the server cursor for legacy parity, even without incremental sync",
+        )
+    }
+
+    @Test
+    fun incremental_sync_checkpoints_a_completed_page_cursor_when_a_later_page_fails() = runManagerTest { store, scope ->
+        // Page 0 is a full page (so paging continues), then page 1 throws mid-download.
+        val page0Max = Instant.fromEpochMilliseconds(100L)
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = page0Max)))),
+            pageSize = 1,
+            fetchErrorOnPage = 1,
+            supportIncremental = true,
+        )
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Failure, "a mid-paging fetch failure surfaces as Failure")
+        assertEquals(
+            expected = page0Max.toEpochMilliseconds(),
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "incremental sync checkpoints the completed page's cursor so the next run resumes from it",
+        )
+    }
+
+    @Test
+    fun non_incremental_sync_persists_no_cursor_when_a_later_page_fails() = runManagerTest { store, scope ->
+        // Same shape, but non-incremental: nothing is checkpointed per page and the failure aborts before
+        // the terminal save, so no cursor is persisted.
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))),
+            pageSize = 1,
+            fetchErrorOnPage = 1,
+            supportIncremental = false,
+        )
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Failure, "a mid-paging fetch failure surfaces as Failure")
         assertNull(
             store.lastServerSyncDate(syncKey = manager.syncKey),
-            "no server cursor is persisted without incremental sync",
+            "without per-page checkpointing a failed multi-page download persists no cursor",
         )
     }
 

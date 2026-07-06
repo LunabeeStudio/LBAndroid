@@ -69,7 +69,8 @@ internal data class FetchArgs(val page: Int, val cursor: String?, val sinceLastD
  * Fake SPI subclass exercising the observable engine surface only.
  *
  * Superset of every per-test knob the engine tests need:
- * - download shape: [pages], [pageSize], [hasNextPageOverride] ([pageInfo]-driven), [fetchError];
+ * - download shape: [pages], [pageSize], [hasNextPageOverride] ([pageInfo]-driven), [fetchError],
+ *   [fetchErrorOnPage] (throw only when fetching the Nth page);
  * - upload shape: [uploadObjects], [pushError], [pushErrorOnAttempt] (throw only on the Nth push);
  * - incremental/notification gates: [supportIncremental], [supportChangeNotification];
  * - concurrency probes: [fetchGate], [gateOnlyFirstFetch];
@@ -88,6 +89,7 @@ internal open class FakeSyncManager(
     private val supportIncremental: Boolean = false,
     private val pageSize: Int? = null,
     private val fetchError: Exception? = null,
+    private val fetchErrorOnPage: Int? = null,
     private val pushError: Exception? = null,
     private val pushErrorOnAttempt: Int? = null,
     private val fetchGate: CompletableDeferred<Unit>? = null,
@@ -127,6 +129,7 @@ internal open class FakeSyncManager(
             fetchGate.await()
         }
         fetchError?.let { throw it }
+        fetchErrorOnPage?.let { if (page == it) throw FetchPageException(page = it) }
         return pages.getOrElse(page) { FetchPage(objects = emptyList()) }
     }
 
@@ -176,6 +179,9 @@ internal open class FakeSyncManager(
 
 /** Thrown by [FakeSyncManager] when [FakeSyncManager.pushErrorOnAttempt] fires on a given push attempt. */
 internal class PushAttemptException(attempt: Int) : Exception("push failed on attempt $attempt")
+
+/** Thrown by [FakeSyncManager] when [FakeSyncManager.fetchErrorOnPage] fires on a given page fetch. */
+internal class FetchPageException(page: Int) : Exception("fetch failed on page $page")
 
 /** Thrown by [StatefulFakeSyncManager.failNextPush] to model a one-shot transient push failure. */
 internal class TransientPushException : Exception("transient push failure")

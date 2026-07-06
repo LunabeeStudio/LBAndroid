@@ -364,8 +364,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
     /**
      * Downloads every page from the server. Status transitions `DownloadStarted` →
      * `DownloadUpdated` (per page) → `DownloadFinishSuccessfully`; a fetch failure maps to
-     * `DownloadFinishWithError` and rethrows. The incremental cursor is saved per page only when
-     * [supportIncrementalSync]; the local sync date is always saved on terminal success (parity).
+     * `DownloadFinishWithError` and rethrows.
+     *
+     * Cursor persistence mirrors the legacy engine: the server cursor is checkpointed **per page**
+     * only when [supportIncrementalSync] (so a mid-paging failure can resume from the last saved
+     * page), and is **always** persisted together with the local sync date on terminal success —
+     * even for a non-incremental manager, whose next run then fetches only records newer than that
+     * cursor. [supportIncrementalSync] therefore governs mid-paging resumption, not whether the
+     * cursor filter applies on the following run.
      */
     private suspend fun download() {
         setStatusInternal(LBSyncProcessStatus.DownloadStarted(Clock.System.now()))
@@ -406,9 +412,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo>(
         }
 
         setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
-        // Terminal save always records the local sync date; the server cursor is only persisted for
-        // incremental sync (the next run resumes from it).
-        saveDownloadDate(if (supportIncrementalSync()) maxDate else null)
+        // Terminal success always records both the local sync date and the server cursor (legacy
+        // parity); the per-page checkpoint above is the only part gated on incremental sync.
+        saveDownloadDate(maxDate)
     }
 
     /**
