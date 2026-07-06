@@ -82,8 +82,8 @@ object AndroidConfig {
     const val MONITORING_OKHTTP_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_ROOM_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_UI_VERSION: String = MONITORING_CORE_VERSION
-    const val SYNCHRONIZATION_VERSION: String = "2.0.0-beta01"
-    const val SYNCHRONIZATION_PARSE_ROOM_VERSION: String = "2.0.0-beta01"
+    const val SYNCHRONIZATION_VERSION: String = "2.0.0-beta02"
+    const val SYNCHRONIZATION_PARSE_ROOM_VERSION: String = "2.0.0-beta02"
 
     val JDK_VERSION: JavaVersion = JavaVersion.VERSION_21
     val JVM_TARGET: JvmTarget = JvmTarget.JVM_21

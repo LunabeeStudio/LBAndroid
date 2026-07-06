@@ -30,7 +30,7 @@ import kotlin.time.Instant
 /**
  * Download-side engine behaviour: the ascending cursor, `sinceLastDate` seeding, paging cursor
  * threading, the `hasNextPage` decision (pageInfo override vs `queryPageSize` fallback), and terminal
- * local-date persistence. Asserts observable behaviour only (persisted cursor, captured fetch args,
+ * cursor + local-date persistence. Asserts observable behaviour only (persisted cursor, captured fetch args,
  * status sequence) — never private fields.
  */
 class DownloadTest {
@@ -250,14 +250,15 @@ class DownloadTest {
 
     // endregion
 
-    // region terminal local-date persistence
+    // region terminal cursor & local-date persistence
 
     @Test
-    fun local_sync_date_is_persisted_on_terminal_success_even_without_incremental() = runManagerTest { store, scope ->
+    fun terminal_success_persists_both_local_date_and_server_cursor_even_without_incremental() = runManagerTest { store, scope ->
+        val serverMax = Instant.fromEpochMilliseconds(9_000L)
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(9_000L))))),
+            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = serverMax)))),
             supportIncremental = false,
             supportChangeNotification = true,
         )
@@ -270,9 +271,10 @@ class DownloadTest {
             manager.lastSuccessfulSyncDate() != null,
             "the local sync date is always persisted on terminal download success",
         )
-        assertNull(
-            store.lastServerSyncDate(syncKey = manager.syncKey),
-            "the server cursor stays null when incremental sync is off",
+        assertEquals(
+            expected = serverMax.toEpochMilliseconds(),
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "the server cursor is also persisted on terminal success, even with incremental sync off (legacy parity)",
         )
     }
 

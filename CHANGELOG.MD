@@ -20,6 +20,20 @@ bom 4.15.0
   table (introspecting columns via `PRAGMA table_info` and skipping columns that are nullable or have a default).
 - Bump `bom` to 4.15.0: it now pins `test-core` and `test-room` in place of the removed `test` module.
 
+## 2026-07-06
+
+```
+Synchronization 2.0.0-beta02
+Synchronization Parse-Room 2.0.0-beta02
+```
+
+- Fix `LBSyncManager`: on a successful download the server `updatedAt` cursor is now persisted on terminal
+  success for **every** manager, not only when `supportIncrementalSync()` is enabled. This restores the legacy
+  `lbsynchronization` behaviour, where `supportIncrementalSync()` gates only per-page checkpointing (so a
+  mid-paging failure can resume), not whether the following run filters by the cursor. Without the fix a
+  non-incremental manager re-downloaded its full data set on every sync instead of only the records changed
+  since the last run.
+
 ## 2026-07-03
 
 ```
