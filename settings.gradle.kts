@@ -117,6 +117,7 @@ addCommonModule(
     "extension/extension",
     "extension/extension-android",
     "test/test-core",
+    "test/test-room",
     "ktor/ktor-core",
     "ktor/ktor-kermit",
     "ktor/ktor-json",
