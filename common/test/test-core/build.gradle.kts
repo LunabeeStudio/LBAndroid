@@ -20,7 +20,7 @@ plugins {
 }
 
 description = "Lunabee Studio Kotlin test library"
-version = AndroidConfig.TEST_VERSION
+version = AndroidConfig.TEST_CORE_VERSION
 
 kotlin {
     jvm()

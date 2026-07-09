@@ -42,7 +42,7 @@ dependencies {
         addModule(projects.loadingKoin)
         addJvmModule(projects.loggerKermit)
         addModule(projects.loggerKermitCrashlytics)
-        addModule(projects.test)
+        addModule(projects.testCore)
         addModule(projects.monitoringCore)
         addModule(projects.monitoringKtor)
         addModule(projects.monitoringOkhttp)
