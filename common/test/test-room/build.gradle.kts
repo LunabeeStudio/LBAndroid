@@ -15,29 +15,41 @@
  */
 
 plugins {
-    id("lunabee.kmp-android-library-conventions")
+    id("lunabee.android-library-conventions")
     id("lunabee.library-publish-conventions")
+    alias(libs.plugins.androidxRoom)
+    alias(libs.plugins.ksp)
+}
+
+android {
+    namespace = "studio.lunabee.test.room"
+
+    // Exported Room schemas must be readable by Robolectric as assets. Attaching them to the `debug`
+    // source set keeps them out of the published release artifact.
+    sourceSets {
+        getByName("debug").assets.directories.add("$projectDir/schemas")
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 description = "Lunabee Studio Kotlin test library for Room database"
 version = AndroidConfig.TEST_ROOM_VERSION
 
-kotlin {
-    android {
-        namespace = "studio.lunabee.test.room"
-    }
+room {
+    schemaDirectory("$projectDir/schemas")
+}
 
-    sourceSets {
-        androidMain.dependencies {
-            api(libs.androidxRoomTestingAndroid)
-            implementation(libs.androidxTestMonitor)
-        }
-        commonMain.dependencies {
-            api(libs.kotlinTest)
-        }
-        jvmTest.dependencies {
-        }
-        nativeMain {
-        }
-    }
+dependencies {
+    // Fixtures used to exercise GlobalRoomMigrationTestHelper against a real Room database on the JVM.
+    add("kspTest", libs.androidxRoomCompiler)
+    api(libs.androidxRoomTestingAndroid)
+    implementation(libs.androidxTestMonitor)
+
+    testImplementation(libs.androidxRoomRuntime)
+    testImplementation(libs.androidxTestCoreKtx)
+    testImplementation(libs.kotlinTestJunit)
+    testImplementation(libs.robolectric)
 }
