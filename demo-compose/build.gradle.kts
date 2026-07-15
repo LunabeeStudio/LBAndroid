@@ -141,7 +141,8 @@ dependencies {
     implementation(projects.monitoringKtor)
     implementation(projects.monitoringRoom)
     implementation(projects.monitoringUi)
-    implementation(projects.synchronization)
+    implementation(projects.synchronizationCore)
+    implementation(projects.synchronizationCoreDatastore)
 
     debugImplementation(libs.androidxUiTooling)
     debugImplementation(libs.composeUiTestManifest)

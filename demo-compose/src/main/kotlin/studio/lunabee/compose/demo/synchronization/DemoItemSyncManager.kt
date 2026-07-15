@@ -16,7 +16,7 @@
 
 package studio.lunabee.compose.demo.synchronization
 
-import android.content.Context
+import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import studio.lunabee.synchronization.syncmanager.LBDefaultSyncManager
 import kotlin.time.Instant
@@ -28,16 +28,16 @@ import kotlin.time.Instant
  *  - upload pushes the records that only exist locally,
  *  - the re-download then re-pulls the just-pushed records so they flip to synced locally.
  *
- * Uses the `Context` constructor so cursors persist in the shared process-wide DataStore.
+ * Cursors persist in the shared process-wide DataStore, resolved from the sync store installed once
+ * at startup via LBSyncStorage (see SyncDemoRegistry.init).
  */
 class DemoItemSyncManager(
-    context: Context,
     private val localDb: LocalItemDatabase,
     private val server: FakeRemoteServer,
-) : LBDefaultSyncManager<ServerItem, LocalItem>(context) {
+) : LBDefaultSyncManager<ServerItem, LocalItem>() {
 
     /** Pinned so the persisted cursor key survives a class rename. */
-    override val syncKey: String = "DemoItemSyncManager"
+    override val syncKey: SyncKey = SyncKey("DemoItemSyncManager")
 
     override suspend fun clearData() {
         localDb.clear()
