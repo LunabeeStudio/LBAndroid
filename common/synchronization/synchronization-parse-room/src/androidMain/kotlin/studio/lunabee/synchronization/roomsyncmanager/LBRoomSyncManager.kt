@@ -16,6 +16,7 @@
 
 package studio.lunabee.synchronization.roomsyncmanager
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -98,6 +99,8 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
             try {
                 push(obj)
                 syncedIds += obj.lbLocalId
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 if (firstError == null) {
                     firstError = e
