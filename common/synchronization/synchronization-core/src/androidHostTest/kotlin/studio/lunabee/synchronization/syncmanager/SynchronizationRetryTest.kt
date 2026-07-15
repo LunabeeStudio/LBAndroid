@@ -32,12 +32,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/**
- * Manager-level automatic-retry behaviour, driven by [SyncRunner] under virtual time: a failed run is
- * re-run after `retryTempo`, a `null` tempo disables it, a cancel pre-empts a pending retry, and an
- * intermittently-failing push eventually succeeds on the retry. Also covers cursor persistence across
- * two sequential `synchronize()` calls.
- */
 class SynchronizationRetryTest {
 
     // region retry after tempo
@@ -64,7 +58,6 @@ class SynchronizationRetryTest {
         assertEquals(expected = 1, actual = fetchesAfterFirstRun, "exactly one download on the first run")
         assertEquals(expected = 1, actual = pushesAfterFirstRun, "exactly one push on the first run")
 
-        // Just shy of the tempo: no re-run yet.
         advanceTimeBy(29.seconds)
         runCurrent()
         assertEquals(expected = fetchesAfterFirstRun, actual = manager.fetchCalls, "no re-run before the tempo elapses")
@@ -88,7 +81,7 @@ class SynchronizationRetryTest {
             store = store,
             scope = scope,
             uploadObjects = listOf(LocalObj("a")),
-            pushErrorOnAttempt = 1, // only the first push throws; the retry's push succeeds
+            pushErrorOnAttempt = 1,
             retryTempo = 30.seconds,
         )
 
@@ -128,7 +121,6 @@ class SynchronizationRetryTest {
         assertTrue(caller.await() is LBResult.Failure)
         val pushesAfterFailure = manager.pushCalls
 
-        // No matter how much virtual time passes, a null tempo never re-runs.
         advanceTimeBy(10.seconds)
         advanceUntilIdle()
         assertEquals(expected = pushesAfterFailure, actual = manager.pushCalls, "a null tempo never schedules a retry")
@@ -193,7 +185,6 @@ class SynchronizationRetryTest {
             supportChangeNotification = true, // single download per run keeps fetchArgs crisp
         )
 
-        // First run saves the cursor.
         manager.synchronize()
         assertEquals(
             expected = Instant.fromEpochMilliseconds(cursorMillis),
@@ -201,7 +192,6 @@ class SynchronizationRetryTest {
             "the first run persists the server cursor",
         )
 
-        // Second run's first fetch is seeded with the persisted cursor.
         manager.synchronize()
 
         assertEquals(

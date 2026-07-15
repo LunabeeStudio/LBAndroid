@@ -55,7 +55,6 @@ import kotlin.reflect.KClass
 @Suppress("unused")
 object LBSyncOperator {
 
-    // Device network fields
     private lateinit var lastNetworkState: NetworkState
     private var networkListenerJob: Job? = null
     private var appLifecycleJob: Job? = null
@@ -66,9 +65,6 @@ object LBSyncOperator {
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     }
 
-    /**
-     * Map of LBSyncGroup managed
-     */
     val groups: LinkedHashMap<String, LBSyncGroup> = LinkedHashMap()
 
     /**
@@ -123,11 +119,6 @@ object LBSyncOperator {
         }
     }
 
-    /**
-     * Cold [Flow] of the process foreground state, bridged from [ProcessLifecycleOwner] via a
-     * [DefaultLifecycleObserver]. Collected on the main thread (see [mainScope]); the observer is removed
-     * on cancellation.
-     */
     private fun appForegroundFlow(): Flow<Boolean> = callbackFlow {
         val lifecycle = ProcessLifecycleOwner.get().lifecycle
         val observer = object : DefaultLifecycleObserver {
@@ -143,14 +134,8 @@ object LBSyncOperator {
         awaitClose { lifecycle.removeObserver(observer) }
     }
 
-    /**
-     * @return all the sync managers managed
-     */
     fun syncManagers(): List<LBGenericSyncManager> = groups.values.flatMap { it.syncManagers }
 
-    /**
-     * @return sync manager of type T if available in sync managers managed
-     */
     inline fun <reified T> syncManager(): T? = syncManagers().firstOrNull { it is T }?.let { it as T }
 
     /**
@@ -169,14 +154,6 @@ object LBSyncOperator {
      */
     suspend fun syncAllManagers(): LBResult<Unit> = runGroupsSequentially(groups.values)
 
-    /**
-     * Synchronize the given [groups] sequentially in iteration order, awaiting each
-     * [LBSyncGroup.syncManagers]. Every group always attempts; failures are collected then combined per
-     * the [syncAllManagers] aggregation rule.
-     *
-     * @param groups the groups to synchronize, in the desired sequential order.
-     * @return the combined synchronization result.
-     */
     private suspend fun runGroupsSequentially(groups: Collection<LBSyncGroup>): LBResult<Unit> {
         val errors: MutableList<Throwable> = mutableListOf()
         for (group in groups) {
@@ -189,11 +166,6 @@ object LBSyncOperator {
         }
     }
 
-    /**
-     * @param eventType the refresh-event type that fired.
-     * @return the managed groups carrying a matching [LBSyncRefreshEvent] whose debounce delay has elapsed
-     * against the group's [LBSyncGroup.lastSuccessfulSync].
-     */
     internal fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
         groups.values.filter { group ->
             group.refreshEvents.any { event ->
@@ -201,12 +173,6 @@ object LBSyncOperator {
             }
         }
 
-    /**
-     * Mark the managers of every group matching [eventType] as [LBSyncProcessStatus.PendingSync] and
-     * launch their sequential synchronization detached in the shared library [defaultSyncScope].
-     *
-     * @param eventType the refresh-event type that fired.
-     */
     internal fun triggerRefresh(eventType: KClass<out LBSyncRefreshEvent>) {
         val availableGroups = groupsForEvent(eventType)
         availableGroups.flatMap { it.syncManagers }.forEach {
@@ -229,9 +195,6 @@ object LBSyncOperator {
         groups.values.forEach { it.stopServerNotificationListeners() }
     }
 
-    /**
-     * @return true if any sync manager has data to upload
-     */
     suspend fun hasSomethingToUpload(): Boolean =
         syncManagers().any { it.hasSomethingToUpload() }
 
@@ -253,9 +216,6 @@ object LBSyncOperator {
         syncManagers().forEach { it.load() }
     }
 
-    /**
-     * Reset the data of all sync managers currently added in [groups]
-     */
     suspend fun resetAllData() {
         syncManagers().forEach { manager ->
             manager.resetData()
@@ -269,9 +229,6 @@ object LBSyncOperator {
         syncManagers().forEach(LBGenericSyncManager::resetSyncStatus)
     }
 
-    /**
-     * Cancel all requests for all sync managers
-     */
     fun cancelAllRequests() {
         syncManagers().forEach(LBGenericSyncManager::cancelAllRequests)
     }

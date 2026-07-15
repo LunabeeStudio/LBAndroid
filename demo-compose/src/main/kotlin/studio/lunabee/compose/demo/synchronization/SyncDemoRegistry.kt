@@ -48,10 +48,6 @@ object SyncDemoRegistry {
 
     private val group: LBSyncGroup = LBSyncGroup()
 
-    /**
-     * Build the graph once and register the operator group + lifecycle/network listeners. Safe to call
-     * from both [DemoApp] and the ViewModel.
-     */
     fun init(context: Context) {
         if (initialized) return
         synchronized(this) {
@@ -72,7 +68,6 @@ object SyncDemoRegistry {
         }
     }
 
-    /** Rebuild the group's refresh-event list from the two toggles. */
     fun setRefreshEvents(onForeground: Boolean, onInternetBack: Boolean) {
         group.refreshEvents = buildList {
             if (onForeground) add(LBSyncRefreshEvent.AppForeground())

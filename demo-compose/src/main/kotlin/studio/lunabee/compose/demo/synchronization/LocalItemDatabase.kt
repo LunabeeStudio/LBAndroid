@@ -31,10 +31,8 @@ class LocalItemDatabase {
 
     private val _items: MutableStateFlow<List<LocalItem>> = MutableStateFlow(emptyList())
 
-    /** The local records, exposed so the demo screen can render the "client" column. */
     val items: StateFlow<List<LocalItem>> = _items.asStateFlow()
 
-    /** Insert a brand-new record created on the client; it starts out unsynced. */
     fun addLocal(label: String) {
         _items.update { current ->
             current + LocalItem(

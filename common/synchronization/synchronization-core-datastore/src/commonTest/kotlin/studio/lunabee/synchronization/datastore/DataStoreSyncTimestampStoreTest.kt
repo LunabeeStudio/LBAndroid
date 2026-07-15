@@ -31,10 +31,6 @@ import kotlin.time.Instant
 
 class DataStoreSyncTimestampStoreTest {
 
-    /**
-     * Builds a [SyncTimestampStore] over a fresh DataStore living on a unique temp path so no state is
-     * shared between tests.
-     */
     private fun freshStore(): SyncTimestampStore {
         val fileName = "sync_timestamp_${counter++}_${nextRandom()}.preferences_pb"
         val path: Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / fileName
@@ -66,15 +62,12 @@ class DataStoreSyncTimestampStoreTest {
         val store = freshStore()
         store.saveSyncDates(syncKey = SyncKey("ManagerA"), serverDate = ms(1L), localDate = ms(2L))
 
-        // B was never written, so both of its reads stay null.
         assertNull(store.lastServerSyncDate(syncKey = SyncKey("ManagerB")))
         assertNull(store.lastSuccessfulSyncDate(syncKey = SyncKey("ManagerB")))
 
-        // A is unaffected.
         assertEquals(expected = ms(1L), actual = store.lastServerSyncDate(syncKey = SyncKey("ManagerA")))
         assertEquals(expected = ms(2L), actual = store.lastSuccessfulSyncDate(syncKey = SyncKey("ManagerA")))
 
-        // Writing B leaves A intact.
         store.saveSyncDates(syncKey = SyncKey("ManagerB"), serverDate = ms(10L), localDate = ms(20L))
         assertEquals(expected = ms(10L), actual = store.lastServerSyncDate(syncKey = SyncKey("ManagerB")))
         assertEquals(expected = ms(20L), actual = store.lastSuccessfulSyncDate(syncKey = SyncKey("ManagerB")))
@@ -124,7 +117,6 @@ class DataStoreSyncTimestampStoreTest {
         val store = freshStore()
         store.saveSyncDates(syncKey = SyncKey("ManagerA"), serverDate = ms(42L), localDate = ms(99L))
 
-        // After a single saveSyncDates(a, x, y) both reads reflect x and y consistently.
         assertEquals(expected = ms(42L), actual = store.lastServerSyncDate(syncKey = SyncKey("ManagerA")))
         assertEquals(expected = ms(99L), actual = store.lastSuccessfulSyncDate(syncKey = SyncKey("ManagerA")))
     }

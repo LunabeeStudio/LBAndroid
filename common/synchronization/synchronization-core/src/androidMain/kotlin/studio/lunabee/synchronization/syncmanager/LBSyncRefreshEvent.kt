@@ -32,10 +32,6 @@ import kotlin.time.Instant
  */
 sealed class LBSyncRefreshEvent(private val minimumDelay: Duration) {
 
-    /**
-     * @param lastSuccessfulSync the instant of the last successful sync to debounce against.
-     * @return true if at least [minimumDelay] has elapsed since [lastSuccessfulSync].
-     */
     internal fun isDelayElapsed(lastSuccessfulSync: Instant): Boolean =
         lastSuccessfulSync + minimumDelay < Clock.System.now()
 

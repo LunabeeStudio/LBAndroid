@@ -64,21 +64,18 @@ class ConflictTest {
 
         assertTrue(result is LBResult.Success, "the conflict sync completes successfully")
 
-        // updateData (download upsert) ran before pushObjectsToServer (upload).
         val updateIndex = manager.callLog.indexOf("update")
         val pushIndex = manager.callLog.indexOf("push")
         assertTrue(updateIndex >= 0, "the server row was upserted via updateData")
         assertTrue(pushIndex >= 0, "the remaining pending row was pushed via pushObjectsToServer")
         assertTrue(updateIndex < pushIndex, "download (updateData) precedes upload (pushObjectsToServer)")
 
-        // Last-write-wins: r1 now holds the server's value; the local edit was discarded.
         assertEquals(
             expected = serverR1,
             actual = manager.dao["r1"],
             "the server's r1' overwrote the local edit (last-write-wins, no merge)",
         )
 
-        // The conflicting r1 was NOT pushed (the download marked it in-sync); only r2 was uploaded.
         assertEquals(
             expected = listOf(listOf(LocalObj("r2"))),
             actual = manager.pushedBatches,
@@ -101,23 +98,20 @@ class ConflictTest {
             gateOnlyFirstFetch = true,
         )
 
-        // The in-flight run parks inside its first fetch.
         val first: Deferred<LBResult<Unit>> = async { manager.synchronize() }
         advanceUntilIdle()
 
-        // Two callers arrive while the run is in flight: they collapse onto ONE shared follow-up.
         val a: Deferred<LBResult<Unit>> = async { manager.synchronize() }
         val b: Deferred<LBResult<Unit>> = async { manager.synchronize() }
         advanceUntilIdle()
 
-        firstFetch.complete(Unit) // release the in-flight run; the single follow-up then runs
+        firstFetch.complete(Unit)
         advanceUntilIdle()
 
         first.await()
         val resultA = a.await()
         val resultB = b.await()
 
-        // Both collapsed callers observe the SAME follow-up run's result (a distinct run from the first).
         assertTrue(resultA is LBResult.Success)
         assertTrue(resultB is LBResult.Success)
         assertEquals(expected = resultA, actual = resultB, "both collapsed callers receive the same follow-up result")
@@ -141,7 +135,6 @@ class ConflictTest {
             retryTempo = 30.seconds,
         )
         manager.seedLocalDirty(ServerObj(id = "p1", updatedAt = Instant.fromEpochMilliseconds(1_000L)))
-        // Fail the first push so the run fails and a retry is scheduled.
         manager.failNextPush()
 
         // runCurrent settles the first (failing) run at the current instant while the +30s retry stays

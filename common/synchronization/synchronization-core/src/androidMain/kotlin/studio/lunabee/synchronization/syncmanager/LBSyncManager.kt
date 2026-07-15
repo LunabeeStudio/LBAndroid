@@ -33,14 +33,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/**
- * Generic [LBSyncManager]
- */
 typealias LBGenericSyncManager = LBSyncManager<*, *, *>
 
-/**
- * Default [LBSyncManager]
- */
 typealias LBDefaultSyncManager<ServerData, LocalData> = LBSyncManager<ServerData, LocalData, Nothing>
 
 /**
@@ -92,20 +86,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      */
     open val syncKey: SyncKey get() = SyncKey(this::class.simpleName.orEmpty())
 
-    /**
-     * Used to log : You can manage log in constructor with the field logging
-     */
     protected var logger: Logger? = if (logging) LBLogger.get("LBSM ${this::class.simpleName} ${this.hashCode()}") else null
 
-    /**
-     * Drives this manager's single in-flight run: concurrent [synchronize] calls collapse into one
-     * follow-up whose real result every caller receives, and a failed run is retried after [retryTempo].
-     */
     private val syncRunner: SyncRunner = SyncRunner(scope = scope, retryDelay = { retryTempo })
-
-    /*===============
-     * Public Fields
-     ===============*/
 
     /**
      * The delay before an automatic retry of a failed sync, re-read each time a retry is scheduled.
@@ -151,10 +134,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         )
     }
 
-    /*=============================
-     * Abstract methods: local side
-     =============================*/
-
     /**
      * Clear the data managed by the sync manager
      * Called when reset the sync manager
@@ -167,9 +146,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param data: object list to be updated
      */
     protected abstract suspend fun updateData(data: List<ServerData>)
-    /*===============================
-     * Abstract methods: server side
-     ===============================*/
 
     /**
      * How to fetch one page of data from the server. Throw on error: the engine catches at the pipeline
@@ -190,23 +166,10 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         sinceLastDate: Instant?,
     ): FetchPage<ServerData, PageInfo>
 
-    /**
-     * How to get the updatedAt information from the record coming from the server
-     * @param obj: server object
-     * @return the nullable updatedAt instant
-     */
     protected abstract fun updatedAt(obj: ServerData): Instant?
 
-    /**
-     * How to know whether an object is in sync with the server
-     * @param obj: the app object
-     * @return true if the app object is in sync with the server
-     */
     protected abstract fun isInSync(obj: LocalData): Boolean
 
-    /**
-     * @return the list of objects you need to upload to the server
-     */
     protected abstract suspend fun objectToBeUploaded(): List<LocalData>
 
     /**
@@ -219,13 +182,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      */
     protected abstract suspend fun pushObjectsToServer(objects: List<LocalData>)
 
-    /**
-     * @return true if some objects need to be uploaded to the server
-     */
     abstract suspend fun hasSomethingToUpload(): Boolean
-    /*======================
-     * Overrideable methods
-     ======================*/
 
     /**
      * Override this if you want to support paging
@@ -260,9 +217,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @return true once the listener is stopped.
      */
     open suspend fun stopServerNotificationListener(): Boolean = true
-    /*================
-     * Public methods
-     ================*/
 
     /**
      * Cancel the in-flight sync run and any pending automatic retry. The terminal status surfaced is
@@ -315,18 +269,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     suspend fun lastSuccessfulSyncDate(): Instant? =
         timestampStore.lastSuccessfulSyncDate(syncKey)
 
-    /*=================
-     * Private methods
-     =================*/
-
-    /**
-     * Runs the full sync pipeline once, linearizing the legacy download → upload → conditional
-     * re-download flow. SPI throws are caught at this boundary, mapped to the matching `*WithError`
-     * status, and returned as [LBResult.Failure] so [SyncRunner] schedules a retry.
-     *
-     * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the SPI
-     * error.
-     */
     private suspend fun runPipeline(): LBResult<Unit> {
         return try {
             download()
@@ -343,13 +285,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         }
     }
 
-    /**
-     * Uploads the pending objects, if any. On a non-empty push the status transitions
-     * `UploadStarted` → `UploadFinishSuccessfully`; a push failure maps to `UploadFinishWithError` and
-     * rethrows.
-     *
-     * @return true if a push was attempted (so a re-download may follow), false if nothing was pending.
-     */
     private suspend fun upload(): Boolean {
         val objects = objectToBeUploaded()
         if (objects.isEmpty()) return false
@@ -436,10 +371,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         )
     }
 
-    /**
-     * Get the last download date (server version) from the timestamp store.
-     * @return the nullable last server download instant.
-     */
     private suspend fun lastServerUpdatedDate(): Instant? =
         timestampStore.lastServerSyncDate(syncKey)
 
@@ -454,7 +385,6 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         return if (pageInfo != null) {
             hasNextPage(pageInfo)
         } else {
-            // Fallback to objects size if pageInfo has not been specified, default behavior
             queryPageSize() == objectCount
         }
     }

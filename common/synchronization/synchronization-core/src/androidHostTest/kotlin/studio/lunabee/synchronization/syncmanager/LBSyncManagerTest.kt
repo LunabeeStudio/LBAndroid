@@ -47,7 +47,6 @@ class LBSyncManagerTest {
         val result = manager.synchronize()
 
         assertTrue(result is LBResult.Success, "a clean pipeline returns Success")
-        // Download (fetch + update) → upload → re-download (fetch + update).
         assertEquals(expected = 2, actual = manager.fetchCalls, "download then re-download = two fetches")
         assertEquals(expected = 1, actual = manager.pushCalls, "upload runs once between the two downloads")
         assertEquals(
@@ -355,12 +354,11 @@ class LBSyncManagerTest {
         advanceUntilIdle()
         assertEquals(expected = 1, actual = manager.fetchCalls, "only the in-flight run has started")
 
-        // Several callers arrive while the run is in flight: they collapse into ONE follow-up.
         val collapsed = List(size = 3) { async { manager.synchronize() } }
         advanceUntilIdle()
         assertEquals(expected = 1, actual = manager.fetchCalls, "collapsed callers do not start their own run")
 
-        firstFetch.complete(Unit) // let the in-flight run finish; the single follow-up runs
+        firstFetch.complete(Unit)
         advanceUntilIdle()
 
         assertTrue(first.await() is LBResult.Success)

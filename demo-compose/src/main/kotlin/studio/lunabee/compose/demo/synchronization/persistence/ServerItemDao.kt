@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ServerItemDao {
-    /** Every row, including tombstones, for the UI to render (filtered by the show-deleted toggle). */
     @Query("SELECT * FROM server_item ORDER BY updatedAt")
     fun observeAll(): Flow<List<ServerItemEntity>>
 

@@ -134,31 +134,19 @@ class LBSyncGroup(
         }
     }
 
-    /**
-     * @return true if any sync manager of the group has data to upload
-     */
     suspend fun hasSomethingToUpload(): Boolean =
         syncManagers.any { it.hasSomethingToUpload() }
 
-    /**
-     * Reset the timeStamp of all sync managers of the group
-     */
     suspend fun resetAllTimestamps() {
         syncManagers.forEach { it.resetTimeStamp() }
     }
 
-    /**
-     * Reset the data of all sync managers of the group
-     */
     suspend fun resetAllData() {
         syncManagers.forEach { manager ->
             manager.resetData()
         }
     }
 
-    /**
-     * Cancel all requests for all sync managers of the group
-     */
     fun cancelAllRequests() {
         syncManagers.forEach(LBGenericSyncManager::cancelAllRequests)
     }

@@ -54,7 +54,6 @@ class RefreshEventTest {
     @Test
     fun app_foreground_delay_not_elapsed_returns_false() {
         val event = LBSyncRefreshEvent.AppForeground(minimumDelay = 30.seconds)
-        // last sync only 1 ms ago: well within the 30 s debounce → not elapsed.
         val recent = Clock.System.now() - 1.milliseconds
 
         assertFalse(event.isDelayElapsed(recent), "a sync 1 ms ago is inside the 30 s debounce")
@@ -63,7 +62,6 @@ class RefreshEventTest {
     @Test
     fun app_foreground_delay_elapsed_returns_true() {
         val event = LBSyncRefreshEvent.AppForeground(minimumDelay = 30.seconds)
-        // last sync an hour ago: far past the 30 s debounce → elapsed.
         val old = Clock.System.now() - 1.hours
 
         assertTrue(event.isDelayElapsed(old), "a sync an hour ago is past the 30 s debounce")
@@ -72,7 +70,6 @@ class RefreshEventTest {
     @Test
     fun app_foreground_zero_delay_is_always_elapsed() {
         val event = LBSyncRefreshEvent.AppForeground(minimumDelay = Duration.ZERO)
-        // Even a sync 1 ms ago counts as elapsed with a zero debounce.
         val recent = Clock.System.now() - 1.milliseconds
 
         assertTrue(event.isDelayElapsed(recent), "a zero debounce is always elapsed for any past instant")
@@ -125,7 +122,6 @@ class RefreshEventTest {
         val manager = FakeSyncManager(store = store, scope = scope, retryTempo = null)
         LBSyncOperator.groups["g"] = LBSyncGroup(
             syncManagers = linkedSetOf(manager),
-            // Carries InternetIsBack only; we fire AppForeground → no match, no PendingSync.
             refreshEvents = listOf(LBSyncRefreshEvent.InternetIsBack(minimumDelay = Duration.ZERO)),
         )
 

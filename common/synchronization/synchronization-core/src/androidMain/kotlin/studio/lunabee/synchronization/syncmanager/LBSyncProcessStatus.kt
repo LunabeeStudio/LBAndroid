@@ -63,10 +63,6 @@ sealed class LBSyncProcessStatus {
 
     data class DownloadFinishWithError(val error: Exception, val at: Instant) : LBSyncProcessStatus()
 
-    /**
-     * @return the status description
-     * Helpful for debugging
-     */
     fun fullDescription(): String {
         return when (this) {
             is NeverSync -> "Never synchronized"

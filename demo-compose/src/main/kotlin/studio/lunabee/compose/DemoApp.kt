@@ -31,7 +31,6 @@ class DemoApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Wire the sync-demo graph and register the operator's foreground / connectivity listeners.
         SyncDemoRegistry.init(context = this)
 
         startKoin {

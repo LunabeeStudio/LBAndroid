@@ -91,10 +91,6 @@ object LBConnectivityManager {
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }.distinctUntilChanged()
 
-    /**
-     * Map [NetworkCapabilities] to a [NetworkState]: connected when the network has the INTERNET
-     * capability, with [NetworkState.connectionType] set to the primary [LBNetworkTransport].
-     */
     private fun NetworkCapabilities?.toNetworkState(): NetworkState {
         if (this == null || !hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
             return NetworkState(isConnected = false, connectionType = null)

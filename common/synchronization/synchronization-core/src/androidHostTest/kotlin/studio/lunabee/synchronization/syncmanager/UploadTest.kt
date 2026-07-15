@@ -28,12 +28,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Upload-side engine behaviour: the nothing-to-upload short-circuit, the
- * `UploadStarted` → `UploadFinishSuccessfully` transition (with the processed count and the pushed
- * batch), the push-error mapping, and the download → upload → re-download ordering. Observable
- * behaviour only (status sequence, returned result, captured pushed batch).
- */
 class UploadTest {
 
     // region nothing-to-upload short-circuit
@@ -103,7 +97,6 @@ class UploadTest {
             supportChangeNotification = true,
         )
 
-        // Collect the concrete UploadFinishSuccessfully instance to read its processedObjectCount.
         val recorded = mutableListOf<LBSyncProcessStatus>()
         val job = scope.launch(UnconfinedTestDispatcher(testScheduler)) {
             manager.status.collect { recorded += it }

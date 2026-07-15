@@ -66,7 +66,6 @@ class SyncRunner(
 
     private val mutex: Mutex = Mutex()
 
-    /** The currently executing run, or `null` when idle. */
     private var inFlight: RunHandle? = null
 
     /**
@@ -76,7 +75,6 @@ class SyncRunner(
      */
     private var pending: RunHandle? = null
 
-    /** The scheduled-but-not-yet-fired retry job, or `null` when no retry is pending. */
     private var retryJob: Job? = null
 
     /**

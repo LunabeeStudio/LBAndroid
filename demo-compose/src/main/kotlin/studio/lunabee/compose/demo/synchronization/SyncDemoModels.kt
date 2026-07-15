@@ -18,9 +18,6 @@ package studio.lunabee.compose.demo.synchronization
 
 import kotlin.time.Instant
 
-/**
- * A record as it lives on the fake remote server. This is the `ServerData` of the sync manager.
- */
 data class ServerItem(
     val id: String,
     val label: String,

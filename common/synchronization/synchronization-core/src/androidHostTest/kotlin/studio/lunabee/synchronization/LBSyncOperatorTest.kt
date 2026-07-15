@@ -116,7 +116,6 @@ class LBSyncOperatorTest {
     fun groups_for_event_excludes_a_group_whose_delay_has_not_elapsed_and_includes_one_whose_delay_has() =
         runOperatorTest { store, scope ->
             val fresh = FakeOperatorManager(store = store, scope = scope, syncKey = "fresh")
-            // A recent successful sync: the one-hour debounce has NOT elapsed → excluded.
             fresh.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
             val freshGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(fresh),
@@ -124,7 +123,6 @@ class LBSyncOperatorTest {
             )
 
             val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
-            // A long-past successful sync: the one-hour debounce HAS elapsed → included.
             stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
             val staleGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(stale),
@@ -143,7 +141,6 @@ class LBSyncOperatorTest {
     fun groups_for_event_ignores_groups_carrying_a_different_event_type() = runOperatorTest { store, scope ->
         val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
         stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
-        // Carries InternetIsBack with an elapsed delay, but we query for AppForeground.
         val internetGroup = LBSyncGroup(
             syncManagers = linkedSetOf(stale),
             refreshEvents = listOf(LBSyncRefreshEvent.InternetIsBack(minimumDelay = 1.hours)),

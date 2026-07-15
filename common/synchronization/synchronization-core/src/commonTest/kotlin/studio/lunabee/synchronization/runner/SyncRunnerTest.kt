@@ -66,22 +66,18 @@ class SyncRunnerTest {
             return LBResult.Success(Unit)
         }
 
-        // First caller starts the in-flight run; it parks on gate[0].
         val first = async { runner.run(::block) }
         advanceUntilIdle()
         assertEquals(expected = 1, actual = invocations, "only the in-flight run should have started")
 
-        // Five callers arrive while the first run is still in flight: they must collapse into ONE follow-up.
         val collapsed = List(size = 5) { async { runner.run(::block) } }
         advanceUntilIdle()
         assertEquals(expected = 1, actual = invocations, "collapsed callers must not start their own run")
 
-        // Let the in-flight run finish; the single follow-up is promoted and parks on gate[1].
         gates[0].complete(Unit)
         advanceUntilIdle()
         assertEquals(expected = 2, actual = invocations, "exactly one follow-up run should have started")
 
-        // Finish the follow-up; every collapsed caller receives its result.
         gates[1].complete(Unit)
         advanceUntilIdle()
 
@@ -110,7 +106,6 @@ class SyncRunnerTest {
         runCurrent()
         assertEquals(expected = 1, actual = invocations, "retry must not fire before the delay elapses")
 
-        // Once the delay has fully elapsed, the block is re-invoked exactly once.
         advanceTimeBy(1.seconds)
         runCurrent()
         assertEquals(expected = 2, actual = invocations, "the failed run is retried once the delay elapses")
@@ -126,7 +121,6 @@ class SyncRunnerTest {
         }
         assertEquals(expected = 1, actual = invocations)
 
-        // Let any (erroneously) scheduled retry fire.
         advanceTimeBy(10.minutes)
         advanceUntilIdle()
         assertEquals(expected = 1, actual = invocations, "a successful run never reruns")
@@ -154,7 +148,6 @@ class SyncRunnerTest {
             var failingInvocations = 0
             var successInvocations = 0
 
-            // First run fails, arming a retry.
             runDirect(runner) {
                 failingInvocations++
                 LBResult.Failure()
@@ -171,7 +164,6 @@ class SyncRunnerTest {
             }
             assertEquals(expected = 1, actual = successInvocations)
 
-            // Past the original retry instant: the cancelled retry must NOT fire (no extra failing run).
             advanceTimeBy(30.seconds)
             runCurrent()
             assertEquals(expected = 1, actual = failingInvocations, "the pending retry was cancelled by the new run")
@@ -184,7 +176,6 @@ class SyncRunnerTest {
             val gate = CompletableDeferred<Unit>()
             var invocations = 0
 
-            // Start an in-flight run and park it.
             val awaiter = async {
                 runner.run {
                     invocations++
@@ -195,19 +186,16 @@ class SyncRunnerTest {
             advanceUntilIdle()
             assertEquals(expected = 1, actual = invocations, "the in-flight run has started and is parked")
 
-            // Cancel: the in-flight run is killed and its awaiter resolves (does not hang).
             runner.cancel()
             advanceUntilIdle()
 
             val result = awaiter.await()
             assertTrue(result is LBResult.Failure, "a cancelled in-flight run resolves its awaiter (no deadlock)")
 
-            // A cancel must not leave a retry armed.
             advanceTimeBy(10.minutes)
             advanceUntilIdle()
             assertEquals(expected = 1, actual = invocations, "cancel must not trigger a retry of the cancelled run")
 
-            // The runner accepts a fresh run after a cancel.
             val afterCancel = runDirect(runner) { LBResult.Success(Unit) }
             assertTrue(afterCancel is LBResult.Success, "the runner is reusable after cancel()")
         }
@@ -245,7 +233,6 @@ class SyncRunnerTest {
             return LBResult.Failure()
         }
 
-        // First failure schedules a retry at the current (10s) tempo.
         runDirect(runner, ::block)
         assertEquals(expected = 1, actual = invocations)
 
@@ -257,7 +244,6 @@ class SyncRunnerTest {
         runCurrent()
         assertEquals(expected = 2, actual = invocations, "first retry fired at the original 10s tempo")
 
-        // The second failure reschedules using the freshly-read 5s tempo: not yet at 4s.
         advanceTimeBy(4.seconds)
         runCurrent()
         assertEquals(expected = 2, actual = invocations, "second retry honours the updated 5s tempo (not yet)")

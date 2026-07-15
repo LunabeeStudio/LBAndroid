@@ -92,16 +92,13 @@ class CombinedStatusFlowTest {
         val syncing = group.isSyncing().record(scope, testScheduler)
         advanceUntilIdle()
 
-        // A mid-pipeline step (isProcessing() == true) flips the aggregate to true.
         m1.setStatusInternal(LBSyncProcessStatus.UploadFinishSuccessfully(processedObjectCount = 1, at = now()))
         advanceUntilIdle()
         assertTrue(syncing().last(), "mid-pipeline UploadFinishSuccessfully counts as syncing")
 
-        // m2 also processing keeps it true (no duplicate consecutive true emission expected).
         m2.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
         advanceUntilIdle()
 
-        // Both reach terminal idle statuses → aggregate flips back to false.
         m1.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(now()))
         advanceUntilIdle()
         assertTrue(syncing().last(), "still syncing while m2 is mid-pipeline")
@@ -130,7 +127,6 @@ class CombinedStatusFlowTest {
         val maps = group.statusByKey().record(scope, testScheduler)
         advanceUntilIdle()
 
-        // Register a second manager AFTER collection started, then drive its status.
         val late = FakeStatusManager(store = store, scope = scope, key = "late")
         group.syncManagers.add(late)
         late.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
@@ -198,7 +194,6 @@ class CombinedStatusFlowTest {
         val maps = LBSyncOperator.statusByKey().record(scope, testScheduler)
         advanceUntilIdle()
 
-        // Register a whole new group AFTER collection started, then drive its manager.
         val late = FakeStatusManager(store = store, scope = scope, key = "late")
         LBSyncOperator.groups["g2"] = LBSyncGroup(syncManagers = linkedSetOf(late))
         late.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))

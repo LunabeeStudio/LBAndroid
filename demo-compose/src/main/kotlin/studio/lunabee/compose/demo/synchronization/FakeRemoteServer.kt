@@ -55,20 +55,16 @@ class FakeRemoteServer private constructor(
     private val itemsFlow: Flow<List<ServerItem>> = dao.observeAll()
         .map { entities -> entities.map { it.toServerItem() } }
 
-    /** The server-side records, exposed so the demo screen can render the "remote" column. */
     val items: StateFlow<List<ServerItem>> = itemsFlow.stateIn(
         scope = scope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
 
-    /** Artificial round-trip latency applied to every fetch and push. */
     var latency: Duration = 1_500.milliseconds
 
-    /** When `true`, the next fetch or push throws once, then resets. */
     var failNextSync: Boolean = false
 
-    /** Add a record directly on the server, as if another client had created it. */
     suspend fun addRemote(label: String) {
         dao.upsert(
             listOf(
@@ -81,7 +77,6 @@ class FakeRemoteServer private constructor(
         )
     }
 
-    /** Fetch a single record by id, or null if the server has none. */
     suspend fun get(id: String): ServerItem? = dao.getById(id)?.toServerItem()
 
     /** Fetch every server record, ordered by ascending `updatedAt` (as the engine expects). */
@@ -92,7 +87,6 @@ class FakeRemoteServer private constructor(
         return dao.getAll().map { it.toServerItem() }
     }
 
-    /** Upsert the pushed records by id. */
     suspend fun push(items: List<ServerItem>) {
         delay(latency)
         requireNetwork()
@@ -100,12 +94,10 @@ class FakeRemoteServer private constructor(
         dao.upsert(items.map(ServerItemEntity::fromServerItem))
     }
 
-    /** Bump a record's `updatedAt` to now, as if it had been edited on the server. */
     suspend fun touchRemote(id: String) {
         dao.touch(id = id, updatedAt = Clock.System.now().toEpochMilliseconds())
     }
 
-    /** Delete a record directly on the server. */
     suspend fun deleteRemote(id: String) {
         dao.delete(id)
     }
@@ -121,7 +113,6 @@ class FakeRemoteServer private constructor(
         }
     }
 
-    /** Mimic a real backend being unreachable while the device is offline. */
     private fun requireNetwork() {
         if (!isOnline()) {
             throw IOException("No network: server unreachable")

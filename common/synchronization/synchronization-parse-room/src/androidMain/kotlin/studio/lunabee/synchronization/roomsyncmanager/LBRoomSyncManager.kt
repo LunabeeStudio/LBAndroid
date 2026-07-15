@@ -67,7 +67,6 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
      * @param obj the entity to push.
      */
     protected open suspend fun push(obj: RoomData) {
-        // Default download-only no-op.
     }
 
     override suspend fun clearData() {

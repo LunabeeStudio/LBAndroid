@@ -31,9 +31,6 @@ import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import kotlin.time.Duration
 
-/**
- * Holds the fake server, local DB and the [DemoItemSyncManager], and exposes the bits the screen needs.
- */
 class SyncDemoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val server: FakeRemoteServer
@@ -59,7 +56,6 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
     /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
     val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
 
-    /** Live device connectivity, driven by the library's modern [LBConnectivityManager] flow. */
     val isOnline: StateFlow<Boolean> = LBConnectivityManager.networkStates(application)
         .map { it.isConnected }
         .stateIn(
@@ -124,7 +120,6 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
         localDb.delete(id)
     }
 
-    /** Resolve in favour of the server: overwrite the local record with the server's current version. */
     fun overrideClientItemWithServer(id: String) {
         viewModelScope.launch {
             val serverItem = server.get(id)

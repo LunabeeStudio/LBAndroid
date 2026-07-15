@@ -129,7 +129,6 @@ class LBSyncGroupTest {
         assertTrue(result.throwable is LBSyncClosureException, "a disabled group fails with LBSyncClosureException")
         assertEquals(expected = LBSyncProcessStatus.Disabled, actual = m1.currentSyncStatus)
         assertEquals(expected = LBSyncProcessStatus.Disabled, actual = m2.currentSyncStatus)
-        // The gate short-circuits before any manager runs.
         assertEquals(expected = 0, actual = m1.fetchCalls, "a disabled group does not run its managers")
         assertEquals(expected = 0, actual = m2.fetchCalls)
     }

@@ -32,49 +32,12 @@ import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/*
- * Shared test fixture for the `:synchronization` engine JVM host tests.
- *
- * Centralises the fakes and the scheduler-backed harness so every test file reuses one set of
- * `internal` symbols instead of redeclaring duplicate private ones. New test files import these.
- */
-
-/**
- * Minimal server object the fake managers download.
- *
- * @property id stable identity used by the conflict/state tests; defaults to empty for the count-only
- * pipeline tests that ignore identity.
- * @property updatedAt the ascending incremental-sync cursor source.
- */
 internal data class ServerObj(val id: String = "", val updatedAt: Instant?)
 
-/**
- * Minimal local object the fake managers upload.
- *
- * @property id stable identity used by the conflict/state tests.
- */
 internal data class LocalObj(val id: String)
 
-/**
- * The captured arguments of a single [LBSyncManager.fetchRequest] call, so paging/cursor/seeding
- * threading can be asserted on observable inputs.
- */
 internal data class FetchArgs(val page: Int, val cursor: String?, val sinceLastDate: Instant?)
 
-/**
- * Fake SPI subclass exercising the observable engine surface only.
- *
- * Superset of every per-test knob the engine tests need:
- * - download shape: [pages], [pageSize], [hasNextPageOverride] ([pageInfo]-driven), [fetchError],
- *   [fetchErrorOnPage] (throw only when fetching the Nth page);
- * - upload shape: [uploadObjects], [pushError], [pushErrorOnAttempt] (throw only on the Nth push);
- * - incremental/notification gates: [supportIncremental], [supportChangeNotification];
- * - concurrency probes: [fetchGate], [gateOnlyFirstFetch];
- * - retry: [retryTempo].
- *
- * Captured for assertions: [fetchArgs], [pushedBatches], [fetchCalls], [pushCalls], [callLog],
- * [updatedPageSizes].
- */
 @Suppress("LongParameterList")
 internal open class FakeSyncManager(
     store: SyncTimestampStore,
@@ -173,13 +136,10 @@ internal open class FakeSyncManager(
     }
 }
 
-/** Thrown by [FakeSyncManager] when [FakeSyncManager.pushErrorOnAttempt] fires on a given push attempt. */
 internal class PushAttemptException(attempt: Int) : Exception("push failed on attempt $attempt")
 
-/** Thrown by [FakeSyncManager] when [FakeSyncManager.fetchErrorOnPage] fires on a given page fetch. */
 internal class FetchPageException(page: Int) : Exception("fetch failed on page $page")
 
-/** Thrown by [StatefulFakeSyncManager.failNextPush] to model a one-shot transient push failure. */
 internal class TransientPushException : Exception("transient push failure")
 
 /**
@@ -204,10 +164,8 @@ internal class StatefulFakeSyncManager(
         this.retryTempo = retryTempo
     }
 
-    /** id → stored object. */
     val dao: MutableMap<String, ServerObj> = mutableMapOf()
 
-    /** id → in-sync flag (false means a pending local write awaiting upload). */
     val inSyncById: MutableMap<String, Boolean> = mutableMapOf()
 
     val callLog: MutableList<String> = mutableListOf()
@@ -218,18 +176,15 @@ internal class StatefulFakeSyncManager(
     var pushCalls: Int = 0
         private set
 
-    /** When true, the next [pushObjectsToServer] throws once (then clears) to model a transient failure. */
     private var failPushOnce: Boolean = false
 
     override val syncKey: SyncKey get() = SyncKey(SyncKeyValue)
 
-    /** Seed a locally-edited record marked not-in-sync (a pending upload) before running a sync. */
     fun seedLocalDirty(obj: ServerObj) {
         dao[obj.id] = obj
         inSyncById[obj.id] = false
     }
 
-    /** Arm a one-shot transient push failure: the next push throws, leaving the records pending. */
     fun failNextPush() {
         failPushOnce = true
     }
@@ -242,7 +197,6 @@ internal class StatefulFakeSyncManager(
     override suspend fun updateData(data: List<ServerObj>) {
         callLog += "update"
         data.forEach { obj ->
-            // Last-write-wins upsert: the downloaded server object overwrites the local one.
             dao[obj.id] = obj
             inSyncById[obj.id] = true
         }
@@ -266,7 +220,6 @@ internal class StatefulFakeSyncManager(
         pushCalls += 1
         pushedBatches += objects
         if (failPushOnce) {
-            // Leave the records pending so the retry still has them to push.
             failPushOnce = false
             throw TransientPushException()
         }
@@ -280,10 +233,6 @@ internal class StatefulFakeSyncManager(
     }
 }
 
-/**
- * Runs [body] inside [runTest] with a scheduler-backed scope for the manager, plus a fresh in-memory
- * [SyncTimestampStore] fake so cursor reads/writes are synchronous and isolated per test.
- */
 internal fun runManagerTest(
     body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit,
 ) = runTest {
@@ -295,10 +244,6 @@ internal fun runManagerTest(
     }
 }
 
-/**
- * A fresh in-memory [SyncTimestampStore] with no state shared between tests. The engine tests exercise
- * the interface, not any particular backend, so an in-memory map keeps them fast and framework-free.
- */
 internal fun freshStore(): SyncTimestampStore = FakeSyncTimestampStore()
 
 /**

@@ -45,29 +45,14 @@ import java.net.URISyntaxException
  */
 class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
 
-    /**
-     * Must be the Application context
-     */
     private lateinit var context: Context
 
-    /**
-     * The LiveQuery client used for all the app
-     */
     private var parseLiveQueryClient: ParseLiveQueryClient? = null
 
-    /**
-     * Is the LiveQuery client connected or not
-     */
     private var isConnected = false
 
-    /**
-     * Is the LiveQuery client already trying to reconnect
-     */
     private var isReconnecting = false
 
-    /**
-     * Used for the reconnection
-     */
     private var handler: Handler = Handler(Looper.getMainLooper())
 
     /**
@@ -77,13 +62,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     private val reconnectionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var reconnectionJob: Job? = null
 
-    /**
-     * Used for the reconnection
-     */
     private var reconnectCallback: Runnable = Runnable { parseLiveQueryClient?.reconnect() }
-    /*=================
-     * Private methods
-     =================*/
 
     /**
      * This block listen the network and reconnect the client if connection is available
@@ -110,9 +89,6 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
             parseLiveQueryClient?.reconnect()
         }
     }
-    /*=================
-     * Public methods
-    =================*/
 
     /**
      * Init the LBParseLiveQueryManager
@@ -153,22 +129,13 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
         handler.removeCallbacks(reconnectCallback)
         parseLiveQueryClient?.unsubscribe(query)
     }
-    /*===================
-     * Overridden methods
-     ===================*/
 
-    /**
-     * Called when LiveQuery client is connected
-     */
     override fun onLiveQueryClientConnected(client: ParseLiveQueryClient?) {
         logger.v("Connected")
         isConnected = true
         isReconnecting = false
     }
 
-    /**
-     * Called when LiveQuery client is disconnected
-     */
     override fun onLiveQueryClientDisconnected(
         client: ParseLiveQueryClient?,
         userInitiated: Boolean,
@@ -177,30 +144,18 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
         isConnected = false
     }
 
-    /**
-     * Called when LiveQuery get errors
-     */
     override fun onLiveQueryError(client: ParseLiveQueryClient?, reason: LiveQueryException?) {
         logger.e("Error ${reason?.localizedMessage}\n${reason?.cause?.localizedMessage}")
     }
 
-    /**
-     * Called when LiveQuery get socket error, @see {@code listenReconnection()}
-     */
     override fun onSocketError(client: ParseLiveQueryClient?, reason: Throwable?) {
         logger.e("Socket error: ${reason?.localizedMessage}\n${reason?.cause?.localizedMessage}")
         listenReconnection()
     }
 
     companion object {
-        /**
-         * The delay before reconnect if server is down
-         */
         private const val ServerDownDelayMs: Long = 15000
 
-        /**
-         * Private instance for singleton
-         */
         @SuppressLint("StaticFieldLeak")
         private val internInstance = LBParseLiveQueryManager()
 

@@ -33,11 +33,6 @@ import studio.lunabee.synchronization.syncmanager.FetchPage
 import java.util.Date
 import kotlin.time.Instant
 
-/**
- * Generic [LBParseRoomSyncManager].
- *
- * @see LBParseRoomSyncManager
- */
 typealias LBGenericParseRoomSyncManager = LBParseRoomSyncManager<*>
 
 /**
@@ -78,9 +73,6 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
             }
             return field
         }
-    /*==================
-     * Abstract methods
-    ==================*/
 
     /**
      * @return the parse table name you want to sync
@@ -97,9 +89,6 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * @param from the Room entity you want to update from
      */
     protected abstract fun update(parseObject: ParseObject, from: RoomData)
-    /*=====================
-     * Overrideable methods
-     =====================*/
 
     /**
      * Override this if you want to only select specific keys for the parse query.
@@ -136,9 +125,6 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     ) {
         liveQueryScope.launch { synchronize() }
     }
-    /*===================
-     * Overridden methods
-     ===================*/
 
     /**
      * You can activate this option to optimize a sync failure.
@@ -146,11 +132,6 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      */
     override fun supportIncrementalSync(): Boolean = true
 
-    /**
-     * How to get the updatedAt information from the record coming from the server.
-     * @param obj server object
-     * @return the nullable updatedAt instant
-     */
     override fun updatedAt(obj: ParseObject): Instant? =
         obj.updatedAt?.let { Instant.fromEpochMilliseconds(it.time) }
 

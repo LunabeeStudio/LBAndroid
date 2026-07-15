@@ -27,11 +27,5 @@ object DateTimeFormatter {
 
     fun format(date: Date): String = formatter.format(date)
 
-    /**
-     * Formats an [Instant] using the same locale-aware date/time format as [format].
-     *
-     * @param instant the instant to format.
-     * @return the formatted date/time string.
-     */
     fun format(instant: Instant): String = formatter.format(Date(instant.toEpochMilliseconds()))
 }

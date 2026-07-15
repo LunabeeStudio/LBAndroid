@@ -21,10 +21,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-/**
- * Room database standing in for the remote backend's storage. Persisting it on disk lets the server
- * state survive process death, which is what a later background-sync demo needs.
- */
 @Database(
     entities = [ServerItemEntity::class],
     version = 1,

@@ -28,12 +28,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/**
- * Download-side engine behaviour: the ascending cursor, `sinceLastDate` seeding, paging cursor
- * threading, the `hasNextPage` decision (pageInfo override vs `queryPageSize` fallback), and terminal
- * cursor + local-date persistence. Asserts observable behaviour only (persisted cursor, captured fetch args,
- * status sequence) — never private fields.
- */
 class DownloadTest {
 
     // region ascending cursor
@@ -132,7 +126,7 @@ class DownloadTest {
             scope = scope,
             pages = pages,
             pageSize = 2,
-            supportChangeNotification = true, // single download
+            supportChangeNotification = true,
         )
 
         manager.synchronize()
@@ -150,7 +144,6 @@ class DownloadTest {
 
     @Test
     fun hasNextPage_pageInfo_override_decides_paging() = runManagerTest { store, scope ->
-        // Two pages, each carrying a pageInfo. The override continues only while pageInfo > 0.
         val pages = listOf(
             FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 1),
             FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 0),
