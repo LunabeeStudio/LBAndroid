@@ -201,6 +201,44 @@ class SyncRunnerTest {
         }
 
     @Test
+    fun cancel_resolves_collapsed_follow_up_awaiters_and_keeps_the_runner_reusable() = runRunnerTest { runner ->
+        val gate = CompletableDeferred<Unit>()
+        var invocations = 0
+
+        val inFlight = async {
+            runner.run {
+                invocations++
+                gate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        advanceUntilIdle()
+        assertEquals(expected = 1, actual = invocations, "the in-flight run has started and is parked")
+
+        val collapsed = List(size = 3) {
+            async {
+                runner.run {
+                    invocations++
+                    LBResult.Success(Unit)
+                }
+            }
+        }
+        advanceUntilIdle()
+
+        runner.cancel()
+        advanceUntilIdle()
+
+        assertTrue(inFlight.await() is LBResult.Failure, "the cancelled in-flight run resolves its awaiter")
+        collapsed.forEach {
+            assertTrue(it.await() is LBResult.Failure, "a collapsed caller must not hang when its follow-up is cancelled")
+        }
+        assertEquals(expected = 1, actual = invocations, "the cancelled follow-up never ran")
+
+        val afterCancel = runDirect(runner) { LBResult.Success(Unit) }
+        assertTrue(afterCancel is LBResult.Success, "the runner is reusable after cancelling a queued follow-up")
+    }
+
+    @Test
     fun cancel_aborts_a_pending_retry_before_it_fires() = runRunnerTest(retryDelay = { 30.seconds }) { runner ->
         var invocations = 0
 

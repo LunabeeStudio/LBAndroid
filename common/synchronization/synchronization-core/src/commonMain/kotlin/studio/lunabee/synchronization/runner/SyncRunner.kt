@@ -35,8 +35,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * [SyncRunner] guarantees that at most one execution of the supplied work is in flight at any time and
  * that concurrent requests collapse into a single follow-up run instead of piling up. It also retries a
- * failed run automatically after a configurable delay. It is the pure-coroutines replacement for the
- * legacy Bolts `Task`/`Timer` machinery that previously drove a sync manager.
+ * failed run automatically after a configurable delay.
  *
  * Concurrency contract:
  * - **Idle run** — calling [run] while nothing is in flight executes the block immediately on [scope];
@@ -101,19 +100,32 @@ class SyncRunner(
     }
 
     /**
-     * Cancels the in-flight run (if any) and any pending retry. Callers currently awaiting a cancelled
-     * run observe its completion rather than hanging: a cancelled run still completes its result with the
-     * last value it produced (or a [LBResult.Failure] carrying the cancellation cause), so
-     * [SyncRunner] never deadlocks its awaiters.
+     * Cancels the in-flight run (if any), the queued follow-up run (if any) and any pending retry.
+     * Callers currently awaiting a cancelled run — including collapsed callers whose follow-up never
+     * started — observe a completed [LBResult.Failure] carrying the cancellation cause rather than
+     * hanging, and the runner stays reusable for later [run] calls.
      */
     fun cancel() {
         scope.launch {
             mutex.withLock {
                 cancelPendingRetryLocked()
-                inFlight?.job?.cancel()
-                pending?.job?.cancel()
+                inFlight?.let(::abortLocked)
+                pending?.let(::abortLocked)
+                inFlight = null
+                pending = null
             }
         }
+    }
+
+    /**
+     * Cancels [handle]'s job and resolves its awaiters. Completing the result here (not only in the
+     * run coroutine) covers runs whose body never got to execute — a gated follow-up parked before its
+     * gate, or a job cancelled before its first dispatch — which would otherwise strand their awaiters.
+     * Must be called while holding [mutex].
+     */
+    private fun abortLocked(handle: RunHandle) {
+        handle.job.cancel()
+        handle.result.complete(LBResult.Failure(throwable = CancellationException("Sync run cancelled")))
     }
 
     /**
@@ -130,8 +142,9 @@ class SyncRunner(
         val gate = if (gated) CompletableDeferred<Unit>() else null
         lateinit var handle: RunHandle
         val job = scope.launch {
-            gate?.await()
             val outcome: LBResult<Unit> = try {
+                // Inside the try so a follow-up cancelled while parked still resolves its awaiters.
+                gate?.await()
                 block()
             } catch (cancellation: CancellationException) {
                 // Resolve awaiters consistently on cancellation instead of letting them hang, then settle
