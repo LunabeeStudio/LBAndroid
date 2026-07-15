@@ -80,7 +80,7 @@ sealed class LBSyncProcessStatus {
                     DateTimeFormatter.format(
                         this.at,
                     )
-                })"
+                }"
 
             is UploadFinishWithError -> "Upload failed ${DateTimeFormatter.format(this.at)}"
 
