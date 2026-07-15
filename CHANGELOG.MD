@@ -20,6 +20,15 @@ bom 4.15.0
   table (introspecting columns via `PRAGMA table_info` and skipping columns that are nullable or have a default).
 - Bump `bom` to 4.15.0: it now pins `test-core` and `test-room` in place of the removed `test` module.
 
+## 2026-07-03
+
+```
+Lbloading 4.10.1
+bom 4.14.1
+```
+
+- Add a `modifier` parameter to `DefaultBlockingContent` so callers can customize the blocking view.
+
 ## 2026-06-26
 
 ```
