@@ -25,6 +25,7 @@ version = AndroidConfig.SYNCHRONIZATION_CORE_VERSION
 kotlin {
     android {
         namespace = "studio.lunabee.synchronization"
+        minSdk = AndroidConfig.SynchronizationMinSdk
 
         withHostTest {
         }

@@ -31,7 +31,8 @@ android {
     compileSdk = AndroidConfig.CompileSdk
 
     defaultConfig {
-        minSdk = AndroidConfig.MinSdk
+        // The demo ships the synchronization demo, whose modules require API 24.
+        minSdk = AndroidConfig.SynchronizationMinSdk
         targetSdk = AndroidConfig.TargetSdk
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

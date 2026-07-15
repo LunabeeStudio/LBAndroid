@@ -14,6 +14,8 @@ Synchronization Core-Room 2.0.0-beta03
 Synchronization Parse-Room 2.0.0-beta03
 ```
 
+- The synchronization modules now declare `minSdk 24` (the connectivity engine relies on API 24
+  `registerDefaultNetworkCallback`); the rest of the repository stays at `minSdk 23`.
 - Renamed module `synchronization` to `synchronization-core`.
 - Made cursor storage framework-agnostic: `SyncTimestampStore` is now an interface in `synchronization-core`;
   install a backend once at startup via `LBSyncStorage.install(...)`.

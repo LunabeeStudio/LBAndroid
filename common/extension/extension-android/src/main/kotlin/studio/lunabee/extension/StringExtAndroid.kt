@@ -80,7 +80,14 @@ private val bbMap: Map<String, String> by lazyFast {
  *
  * <p>This uses TagSoup to handle real HTML, including all of the brokenness found in the wild.
  */
-fun String.fromHtml(): Spanned = Html.fromHtml(this, Html.FROM_HTML_MODE_LEGACY)
+@Suppress("DEPRECATION")
+fun String.fromHtml(): Spanned {
+    return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+        Html.fromHtml(this, Html.FROM_HTML_MODE_LEGACY)
+    } else {
+        Html.fromHtml(this)
+    }
+}
 
 /**
  * Convert a string with BBCode markups into a spanned String

@@ -25,6 +25,7 @@ version = AndroidConfig.SYNCHRONIZATION_PARSE_ROOM_VERSION
 kotlin {
     android {
         namespace = "studio.lunabee.synchronization.parseroom"
+        minSdk = AndroidConfig.SynchronizationMinSdk
     }
 
     sourceSets {

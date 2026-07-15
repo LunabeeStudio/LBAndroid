@@ -47,6 +47,9 @@ object AndroidConfig {
     const val TargetSdk: Int = CompileSdk
     const val MinSdk: Int = BuildConfigs.MinSdk
 
+    /** The synchronization modules rely on API 24 network callbacks (`registerDefaultNetworkCallback`). */
+    const val SynchronizationMinSdk: Int = 24
+
     // ⚠️ Match module name in UPPER_CASE ('-' -> '_')
     const val LBCCORE_VERSION: String = "1.14.0"
     const val LBCFOUNDATION_VERSION: String = "1.12.0"

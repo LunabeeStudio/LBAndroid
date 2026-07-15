@@ -49,10 +49,18 @@ annotation class Flags
 @SuppressLint("UnspecifiedImmutableFlag")
 object PendingIntentCompat {
     fun getActivityImmutable(context: Context, requestCode: Int, intent: Intent, @Flags flags: Int = 0): PendingIntent =
-        PendingIntent.getActivity(context, requestCode, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getActivity(context, requestCode, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+        } else {
+            PendingIntent.getActivity(context, requestCode, intent, flags)
+        }
 
     fun getBroadcastImmutable(context: Context, requestCode: Int, intent: Intent, @Flags flags: Int): PendingIntent =
-        PendingIntent.getBroadcast(context, requestCode, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getBroadcast(context, requestCode, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+        } else {
+            PendingIntent.getBroadcast(context, requestCode, intent, flags)
+        }
 
     fun getBroadcastMutable(context: Context, requestCode: Int, intent: Intent, @Flags flags: Int): PendingIntent =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
