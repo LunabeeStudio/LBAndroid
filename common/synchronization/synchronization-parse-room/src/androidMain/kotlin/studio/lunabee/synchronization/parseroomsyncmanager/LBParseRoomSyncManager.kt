@@ -59,7 +59,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * Scope used to fire-and-forget a [synchronize] from the LiveQuery callback, detached from any
      * caller.
      */
-    private val liveQueryScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val liveQueryScope: CoroutineScope = CoroutineScope(queryDispatcher)
 
     /**
      * The parse query to use for the synchronization and LiveQuery if needed.
