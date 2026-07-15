@@ -16,7 +16,6 @@
 
 package studio.lunabee.synchronization.roomsyncmanager
 
-import android.content.Context
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,13 +29,11 @@ typealias LBGenericRoomSyncManager = LBRoomSyncManager<*, *, *>
  */
 @Suppress("UnnecessaryAbstractClass")
 abstract class LBDefaultRoomSyncManager<ServerData, RoomData : LBRoomSyncModel>(
-    context: Context,
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
     queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBRoomSyncManager<ServerData, RoomData, Nothing>(
-    context,
     dao,
     logging,
     queryDispatcher,
@@ -48,12 +45,11 @@ abstract class LBDefaultRoomSyncManager<ServerData, RoomData : LBRoomSyncModel>(
  * with a fake DAO.
  */
 abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInfo>(
-    context: Context,
     protected val dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
     protected val queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     protected val writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : LBSyncManager<ServerData, RoomData, PageInfo>(context, logging) {
+) : LBSyncManager<ServerData, RoomData, PageInfo>(logging) {
 
     /**
      * Pulled rows are in sync, so the returned entity **must** carry `lbInSync = true` — there is no

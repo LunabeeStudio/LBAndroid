@@ -53,7 +53,7 @@ kotlin {
             implementation(projects.loggerKermit)
             // api: the manager base classes leak Parse/coroutine/synchronization types in their
             // public signatures and are subclassed by consumers, so those need them on the compile classpath.
-            api(projects.synchronization)
+            api(projects.synchronizationCore)
         }
     }
 }

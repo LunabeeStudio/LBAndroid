@@ -16,7 +16,6 @@
 
 package studio.lunabee.synchronization.parseroomsyncmanager
 
-import android.content.Context
 import com.parse.ParseException
 import com.parse.ParseObject
 import com.parse.ParseQuery
@@ -55,12 +54,11 @@ typealias LBGenericParseRoomSyncManager = LBParseRoomSyncManager<*>
  * @param writeDispatcher Coroutine dispatcher used for write accesses to the local data
  */
 abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
-    context: Context,
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
     queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
     writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(context, dao, logging, queryDispatcher, writeDispatcher) {
+) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(dao, logging, queryDispatcher, writeDispatcher) {
 
     /**
      * Scope used to fire-and-forget a [synchronize] from the LiveQuery callback, detached from any
