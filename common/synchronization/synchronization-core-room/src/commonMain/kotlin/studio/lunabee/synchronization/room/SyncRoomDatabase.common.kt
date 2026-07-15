@@ -56,11 +56,11 @@ internal const val DatabaseName: String = "studio.lunabee.synchronization.db"
 internal fun getRoomDb(
     builder: RoomPlatformBuilder,
     driver: SQLiteDriver,
-    dispatcher: CoroutineDispatcher,
+    dispatcher: CoroutineDispatcher?,
 ): SyncRoomDatabase {
     return builder
         .builder()
         .setDriver(driver)
-        .setQueryCoroutineContext(dispatcher)
+        .apply { dispatcher?.let { setQueryCoroutineContext(it) } }
         .build()
 }

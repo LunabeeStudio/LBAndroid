@@ -28,15 +28,24 @@ import platform.Foundation.NSUserDomainMask
 import studio.lunabee.synchronization.store.SyncTimestampStore
 
 /**
- * Returns a [SyncTimestampStore] backed by a DataStore file in the app's documents directory.
+ * The single process-wide store: AndroidX DataStore throws if two instances are active on the same
+ * file, so repeated [dataStoreSyncTimestampStore] calls must share one instance.
+ */
+private val sharedStore: SyncTimestampStore by lazy { createDataStoreSyncTimestampStore() }
+
+/**
+ * Returns the process-wide [SyncTimestampStore] backed by a DataStore file in the app's documents
+ * directory. Safe to call repeatedly: every call returns the same instance.
  *
  * Install it once at startup:
  * ```kotlin
  * LBSyncStorage.install(dataStoreSyncTimestampStore())
  * ```
  */
+fun dataStoreSyncTimestampStore(): SyncTimestampStore = sharedStore
+
 @OptIn(ExperimentalForeignApi::class)
-fun dataStoreSyncTimestampStore(): SyncTimestampStore {
+private fun createDataStoreSyncTimestampStore(): SyncTimestampStore {
     val documentDirectory: NSURL? = NSFileManager.defaultManager.URLForDirectory(
         directory = NSDocumentDirectory,
         inDomain = NSUserDomainMask,

@@ -20,11 +20,17 @@ import android.content.Context
 import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import studio.lunabee.synchronization.store.SyncTimestampStore
+import kotlin.concurrent.Volatile
+
+@Volatile
+private var sharedStore: SyncTimestampStore? = null
+private val sharedStoreLock: Any = Any()
 
 /**
- * Returns a [SyncTimestampStore] backed by a Room database stored in the app's database directory.
+ * Returns the process-wide [SyncTimestampStore] backed by a Room database stored in the app's database
+ * directory. The database is created on the first call; subsequent calls return the same instance and
+ * ignore the parameters (one database file must not be opened twice).
  *
  * Install it once at startup:
  * ```kotlin
@@ -33,16 +39,21 @@ import studio.lunabee.synchronization.store.SyncTimestampStore
  *
  * @param driver the SQLite driver Room runs on. Defaults to [BundledSQLiteDriver] (ships its own SQLite,
  * consistent across OS versions); pass e.g. `AndroidSQLiteDriver()` to use the platform's SQLite instead.
- * @param dispatcher the coroutine context Room runs its queries on.
+ * @param dispatcher the coroutine context Room runs its queries on, or `null` (default) to keep Room's
+ * own default query context.
  */
 fun Context.roomSyncTimestampStore(
     driver: SQLiteDriver = BundledSQLiteDriver(),
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    dispatcher: CoroutineDispatcher? = null,
 ): SyncTimestampStore {
-    val database = getRoomDb(
-        builder = RoomPlatformBuilder(context = applicationContext),
-        driver = driver,
-        dispatcher = dispatcher,
-    )
-    return RoomSyncTimestampStore(database = database)
+    return sharedStore ?: synchronized(sharedStoreLock) {
+        sharedStore ?: run {
+            val database = getRoomDb(
+                builder = RoomPlatformBuilder(context = applicationContext),
+                driver = driver,
+                dispatcher = dispatcher,
+            )
+            RoomSyncTimestampStore(database = database).also { sharedStore = it }
+        }
+    }
 }
