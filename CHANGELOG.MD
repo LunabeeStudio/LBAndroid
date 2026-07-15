@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-15
+
+```
+Synchronization Core 2.0.0-beta03
+Synchronization Core-Datastore 2.0.0-beta03
+Synchronization Core-Room 2.0.0-beta03
+Synchronization Parse-Room 2.0.0-beta03
+```
+
+- Renamed module `synchronization` to `synchronization-core`.
+- Made cursor storage framework-agnostic: `SyncTimestampStore` is now an interface in `synchronization-core`;
+  install a backend once at startup via `LBSyncStorage.install(...)`.
+- Strongly-typed store API: cursor keys use the `SyncKey` value class (`LBSyncManager.syncKey: SyncKey`,
+  `statusByKey()` keyed by `SyncKey`) and dates use `kotlin.time.Instant` instead of epoch-millis `Long`.
+- Extracted the DataStore implementation into the new `synchronization-core-datastore` module
+  (`Context.dataStoreSyncTimestampStore()`).
+- Added a Room implementation in the new `synchronization-core-room` module (`Context.roomSyncTimestampStore()`).
+- Breaking: removed the `Context` constructor from `LBSyncManager` (use the no-arg constructor after installing a
+  backend); `LBSyncOperator.resetAllTimestamps()` no longer takes a `Context`.
+- `synchronization-parse-room`: retargeted onto `synchronization-core`; its `LBRoomSyncManager` /
+  `LBParseRoomSyncManager` constructors no longer take a `Context`.
+
 ## 2026-07-09
 
 ```

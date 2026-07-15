@@ -1,20 +1,26 @@
 # :synchronization-parse-room
 
-A generic Parse↔Room synchronization framework built on top of the `:synchronization` library. KMP
+A generic Parse↔Room synchronization framework built on top of the `:synchronization-core` library. KMP
 `androidLibrary`, android namespace `studio.lunabee.synchronization.parseroom`. Classes live under
 `studio.lunabee.synchronization.{roomsyncmanager,parseroomsyncmanager}`.
 
 ## Why this module exists
 
 It provides a Room-backed implementation of the Parse sync framework. The sync managers extend the
-`:synchronization` library (`LBSyncManager`, `LBConnectivityManager`), so Room managers are
+`:synchronization-core` library (`LBSyncManager`, `LBConnectivityManager`), so Room managers are
 orchestrated by the same `LBSyncOperator` groups/triggers.
+
+This module is **storage-agnostic for sync cursors**: its managers use the no-store
+`LBSyncManager(logging)` constructor (no `Context`), so the consumer picks the cursor backend by
+installing one at startup — `LBSyncStorage.install(context.dataStoreSyncTimestampStore())` (add
+`:synchronization-core-datastore`) or `…roomSyncTimestampStore()` (add `:synchronization-core-room`).
+This is unrelated to the module's own synced-entity Room `@Database`.
 
 ## Source-set split
 
 - **commonMain — the persistence contract** (plain Kotlin + multiplatform Room only). This lets a
   consumer keep its synced `@Entity` classes **and** the `@Database` in commonMain.
-- **androidMain — the Parse-backed sync managers** (`Context` / Parse / coroutines / `:synchronization`).
+- **androidMain — the Parse-backed sync managers** (`Context` / Parse / coroutines / `:synchronization-core`).
   Parse queries use the Parse community **coroutines** extension artifact
   (`com.github.parse-community.Parse-SDK-Android:coroutines`); there is no Bolts dependency here anymore
   (Bolts survives only transitively inside the Parse SDK).
@@ -50,12 +56,12 @@ orchestrated by the same `LBSyncOperator` groups/triggers.
 
 ## Boundaries
 
-- Parse / coroutine / `:synchronization` types leak into the public manager signatures (androidMain
+- Parse / coroutine / `:synchronization-core` types leak into the public manager signatures (androidMain
   `api`); Room-runtime leaks into the contract (commonMain `api`). The Parse coroutines extension
   artifact is `implementation` (its extensions are called internally and never appear in a
   subclass-visible signature).
 - **No KSP/Room compiler here**: only the abstract `@Upsert` base lives here (needs the Room
   annotations on the classpath). The concrete `@Dao` subclasses + `@Database` live in the consumer
   module and are processed by its own `kspAndroid`.
-- Distinct android namespace (`…synchronization.parseroom`) from the `:synchronization` artifact so
+- Distinct android namespace (`…synchronization.parseroom`) from the `:synchronization-core` artifact so
   generated `R`/`BuildConfig` don't collide.

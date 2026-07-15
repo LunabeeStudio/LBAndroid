@@ -1,29 +1,41 @@
 # common/synchronization/
 
-Two published artifacts under `studio.lunabee.synchronization`. Root `AGENTS.MD` rules (detekt,
-commits, changelog, KDoc, named-args, versioning) apply here — this file only adds what's specific to
-these modules.
+Published artifacts under `studio.lunabee.synchronization`. Root `AGENTS.MD` rules (detekt, commits,
+changelog, KDoc, named-args, versioning) apply here — this file only adds what's specific to these
+modules.
 
 | Module | Path | Type | Namespace | Version const | Has README |
 |---|---|---|---|---|---|
-| `:synchronization` | `synchronization/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization` | `SYNCHRONIZATION_VERSION` | no — documented below |
+| `:synchronization-core` | `synchronization-core/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization` | `SYNCHRONIZATION_CORE_VERSION` | no — documented below |
+| `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
+| `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
 
-`:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization`. Its
-`README.md` is the source of truth for that module (source-set split, the BaseDao `@Upsert` trick, why
-no KSP lives there, the `api`-vs-`implementation` leakage rules). Don't duplicate it here — read it
-before touching that module.
+The engine (`:synchronization-core`) is **storage-agnostic**: it persists sync cursors through the
+`SyncTimestampStore` interface and never constructs a backend. A backend module provides the concrete
+store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor storage" below).
+`:synchronization-core-datastore` is the DataStore backend (preserves the legacy on-disk cursor file);
+`:synchronization-core-room` is the Room backend (standalone DB, monitoring-room pattern). Type-safe
+accessors: `projects.synchronizationCore`, `projects.synchronizationCoreDatastore`,
+`projects.synchronizationCoreRoom`, `projects.synchronizationParseRoom`.
+
+`:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
+(storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
+picks the backend). Its `README.md` is the source of truth for that module (source-set split, the
+BaseDao `@Upsert` trick, why no KSP lives there, the `api`-vs-`implementation` leakage rules). Don't
+duplicate it here — read it before touching that module.
 
 Both modules were **moved from `LunabeeStudio/Libraries_Android`** (commits 17d6452, d165c26), so the
 code predates this repo's conventions and version lineage (the migration shim mentions "3.8.0" though
 the artifact is at 2.0.0 here).
 
-## The `:synchronization` engine
+## The `:synchronization-core` engine
 
 Generic sync framework. **Source-set split**: the whole engine (`LBSyncManager`, `LBSyncGroup`,
-`LBSyncOperator`, connectivity, lifecycle) lives in `androidMain`; the only `commonMain` code is the
-sync-cursor persistence — `store/SyncTimestampStore`, a DataStore-backed deep module that speaks epoch
-millis and owns the legacy key scheme (`"${syncKey}lastSyncDate"` / `…_localDate`).
+`LBSyncOperator`, connectivity, lifecycle) lives in `androidMain`; `commonMain` holds the pure
+`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampStore` **interface** (epoch-millis, owns
+the legacy key scheme `"${syncKey}lastSyncDate"` / `…_localDate`), and the `store/LBSyncStorage`
+registry. No backend (DataStore/Room) is referenced from core.
 
 Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
 callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
@@ -35,20 +47,45 @@ internal `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`)
 collapse-and-join + failure-retry machinery is extracted into the `SyncRunner` deep module in
 `commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time.
 
-### Timestamp persistence (DataStore)
+### Cursor storage (pluggable backend)
 
-Cursors are persisted in AndroidX DataStore Preferences (no more SharedPreferences). `androidMain`'s
-`store/SyncTimestampStoreProvider.kt` declares a **top-level `preferencesDataStore` delegate** with file
-base name `com.lunabee.lbsynchronization` — the delegate enforces **one `DataStore` instance per
-process** (constructing a second store for the same file throws), so both `LBSyncManager` and
-`LBSyncOperator` obtain the *same* `SyncTimestampStore` via the internal `Context.syncTimestampStore`
-getter (built from `applicationContext`). Never instantiate the delegate/store a second time.
+`SyncTimestampStore` (commonMain interface) is the whole storage contract: `suspend`
+`lastServerSyncDate` / `lastSuccessfulSyncDate` / `saveSyncDates` / `clear` / `clearAll`. Keys are the
+`SyncKey` value class (`LBSyncManager.syncKey: SyncKey`), dates are `kotlin.time.Instant`, non-null-write
+semantics (a `null` argument leaves that cursor unchanged). `statusByKey()` on group/operator is keyed by
+`SyncKey`. **Only cursors are persisted — status is derived**, not stored.
 
-Because the read is now I/O, the **timestamp read/reset API is `suspend`**: `lastSuccessfulSyncDate()`,
-`resetTimeStamp()`, `LBSyncOperator.resetAllTimestamps()`, `LBSyncGroup.resetAllTimestamps()`. Status is
-**no longer seeded in the constructor** — call `suspend LBSyncManager.load()` (or
-`LBSyncOperator.loadAllStatuses()` for every managed manager) once at startup; until then status is
-`NeverSync`.
+Wiring is a **one-line install** at startup — there is no automatic classpath wiring (the KMP Android
+library format merges no component manifest, and iOS has no classpath init, so App-Startup-style
+self-registration is impossible here):
+
+```kotlin
+// Android, DataStore backend (preserves the legacy cursor file com.lunabee.lbsynchronization)
+LBSyncStorage.install(context.dataStoreSyncTimestampStore())
+// Android, Room backend
+LBSyncStorage.install(context.roomSyncTimestampStore())
+// iOS: dataStoreSyncTimestampStore() / roomSyncTimestampStore() (no Context)
+```
+
+`LBSyncManager`'s no-store constructor (`LBSyncManager(logging)`) reads `LBSyncStorage.requireStore()`
+**lazily** (on first cursor access), so install only has to run before the first sync, not before
+managers are created. `requireStore()` throws with a "add a backend / call install" message if none was
+installed. The `internal` primary constructor `(providedTimestampStore, scope, logging)` injects a store
+directly for tests/DI. There is **no `Context` constructor anymore** (removed), and
+`LBSyncOperator.resetAllTimestamps()` takes **no `Context`** (uses the installed store).
+
+Backends: `:synchronization-core-datastore` (`DataStoreSyncTimestampStore` over a process-wide
+`preferencesDataStore` delegate, file base name `SYNC_DATA_STORE_NAME` = `com.lunabee.lbsynchronization`
+for legacy parity); `:synchronization-core-room` (standalone `@Database`/`@Entity`/`@Dao`, `saveSyncDates`
+= `INSERT OR IGNORE` + `UPDATE … COALESCE` so a null arg preserves the stored cursor). The Room backend
+starts with a fresh table, so switching a DataStore-based app to Room **re-syncs once**. Its factories
+default to `BundledSQLiteDriver` (own SQLite, version-stable) but accept any `SQLiteDriver` —
+`roomSyncTimestampStore(driver = AndroidSQLiteDriver())` to use the platform SQLite instead.
+
+Because the read is I/O, the **read/reset API is `suspend`**: `lastSuccessfulSyncDate()`,
+`resetTimeStamp()`, `LBSyncOperator.resetAllTimestamps()`. Status is **not seeded in the constructor** —
+call `suspend LBSyncManager.load()` (or `LBSyncOperator.loadAllStatuses()` for every managed manager)
+once at startup; until then status is `NeverSync`.
 
 The old SharedPreferences default-prefs migration is gone, so an app upgrading from the
 `Libraries_Android` `lb-synchronization` **re-syncs once** (the old cursor file is not read).
@@ -74,9 +111,10 @@ Three layers, top to bottom:
   and `start`/`stopServerNotificationListener(): Boolean`; errors are thrown and the engine maps them to
   the `*WithError` statuses at the pipeline boundary. Override the `open` hooks for paging
   (`queryPageSize`/`hasNextPage`), incremental sync (`supportIncrementalSync`), and server push
-  notifications. The primary constructor injects `SyncTimestampStore` + `CoroutineScope` (used by JVM
-  host tests with fakes + a `TestScope`); the secondary `Context` constructor preserves the legacy call
-  shape. Typealiases: `LBGenericSyncManager = <*,*,*>`, `LBDefaultSyncManager<S,L> = <S,L,Nothing>`.
+  notifications. The `internal` primary constructor injects a `SyncTimestampStore` + `CoroutineScope`
+  (used by JVM host tests with fakes + a `TestScope`); the public no-store `LBSyncManager(logging)`
+  constructor resolves the installed backend lazily via `LBSyncStorage` (there is no `Context`
+  constructor). Typealiases: `LBGenericSyncManager = <*,*,*>`, `LBDefaultSyncManager<S,L> = <S,L,Nothing>`.
 
 Status & observation: `LBSyncProcessStatus` (sealed, immutable, `kotlin.time.Instant`-based) is exposed
 as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentSyncStatus` is a
@@ -91,7 +129,8 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
 - **`isProcessing()` returns `true` for `UploadFinishSuccessfully` / `DownloadFinishSuccessfully`** —
   they're mid-pipeline steps, not terminal. Only `Sync*`/`NeverSync`/`Disabled`/`*WithError` are done.
 - **Per-manager cursor keys default to the class simple name** via `open val syncKey`
-  (`"${syncKey}lastSyncDate"`), persisted in the DataStore file `com.lunabee.lbsynchronization`.
+  (`"${syncKey}lastSyncDate"`), persisted by the installed backend (DataStore file
+  `com.lunabee.lbsynchronization`, or the Room `sync_timestamp` table).
   **Renaming a `SyncManager` subclass silently resets its incremental-sync cursor** unless you pin a
   stable `syncKey` — the escape hatch is to **override `syncKey`** so the persisted key survives the
   rename. Treat `syncKey` as a persisted key.
@@ -109,25 +148,30 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
 
 ## Changelog
 
-`synchronization/CHANGELOG.MD` is **frozen legacy** (header literally says "Deprecated, please update
-the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in the **root** `CHANGELOG.MD`;
-bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference modules with
-type-safe accessors: `projects.synchronization`, `projects.synchronizationParseRoom`.
+`synchronization-core/CHANGELOG.MD` is **frozen legacy** (header literally says "Deprecated, please
+update the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in the **root**
+`CHANGELOG.MD`; bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference
+modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationCoreDatastore`,
+`projects.synchronizationCoreRoom`, `projects.synchronizationParseRoom`.
 
 ## Build & verify
 
 Standard repo flow (see root `AGENTS.MD`). Quick reference:
 
 ```bash
-./gradlew :synchronization:assemble :synchronization-parse-room:assemble
-./gradlew :synchronization:testAndroidHostTest   # runs the commonTest + androidHostTest engine tests on the JVM host
+./gradlew :synchronization-core:assemble :synchronization-core-datastore:assemble \
+  :synchronization-core-room:assemble :synchronization-parse-room:assemble
+./gradlew :synchronization-core:testAndroidHostTest          # engine tests (commonTest + androidHostTest) on the JVM host
+./gradlew :synchronization-core-datastore:testAndroidHostTest # DataStore round-trip tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed
 ```
 
 Engine unit tests (`SyncRunner`, manager pipeline, group, operator, combined flows) live in
 `commonTest` (the pure `SyncRunner`) and `androidHostTest` (the `androidMain` engine), run via the
-`withHostTest {}` setup with `runTest` + virtual time and fakes — no device needed.
+`withHostTest {}` setup with `runTest` + virtual time and an in-memory `SyncTimestampStore` fake — no
+device needed. The DataStore backend has its own round-trip tests; the Room backend has none (no
+context-free host DB builder, matching `monitoring-room`) — it shares the `SyncTimestampStore` contract.
 
-`:synchronization-parse-room` opts into `kotlin.time.ExperimentalTime` in all source sets, and keeps a
-distinct android namespace (`…parseroom`) from `:synchronization` so generated `R`/`BuildConfig` don't
-collide.
+The backend + parse-room modules opt into `kotlin.time.ExperimentalTime` where needed and each keep a
+distinct android namespace (`…datastore`, `…room`, `…parseroom`) from `:synchronization-core` so
+generated `R`/`BuildConfig` don't collide.
