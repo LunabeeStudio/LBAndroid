@@ -21,11 +21,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.time.Instant
 
-object DateTimeFormatter {
+internal object DateTimeFormatter {
 
     private val formatter: DateFormat = SimpleDateFormat.getDateTimeInstance()
 
-    fun format(date: Date): String = formatter.format(date)
-
-    fun format(instant: Instant): String = formatter.format(Date(instant.toEpochMilliseconds()))
+    /** [DateFormat.format] is not thread-safe and statuses log from parallel sync coroutines. */
+    fun format(instant: Instant): String = synchronized(formatter) {
+        formatter.format(Date(instant.toEpochMilliseconds()))
+    }
 }
