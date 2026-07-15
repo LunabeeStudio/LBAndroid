@@ -33,6 +33,7 @@ androidxRecyclerview = "1.4.0"
 androidxRoom = "2.8.4"
 androidxSqlite = "2.7.0"
 androidxTestCore = "1.7.0"
+androidxTestMonitor = "1.8.0"
 androidxTestRunner = "1.7.0"
 coil = "2.7.0"
 composeBom = "2026.06.01"
@@ -102,8 +103,10 @@ androidxRecyclerview = { group = "androidx.recyclerview", name = "recyclerview",
 androidxRoomCompiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidxRoom" }
 androidxRoomPaging = { group = "androidx.room", name = "room-paging", version.ref = "androidxRoom" }
 androidxRoomRuntime = { group = "androidx.room", name = "room-runtime", version.ref = "androidxRoom" }
+androidxRoomTestingAndroid = { group = "androidx.room", name = "room-testing-android", version.ref = "androidxRoom" }
 androidxSqliteBundled = { group = "androidx.sqlite", name = "sqlite-bundled", version.ref = "androidxSqlite" }
 androidxTestCoreKtx = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
+androidxTestMonitor = { group = "androidx.test", name = "monitor", version.ref = "androidxTestMonitor" }
 androidxTestRunner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidxUiTest = { module = "androidx.compose.ui:ui-test" }
 androidxUiTestJunit4 = { module = "androidx.compose.ui:ui-test-junit4" }

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-09
+
+```
+test-core 4.9.0
+test-room 1.0.0
+bom 4.15.0
+```
+
+- **break:** Rename the `test` module to `test-core` (moved to `common/test/test-core`); the Maven coordinate changes from
+  `studio.lunabee.test:test` to `studio.lunabee.test:test-core`.
+- Add `test-room` module: `GlobalRoomMigrationTestHelper` to test Room database migrations. It runs the empty-DB
+  first-to-last-version migration and, for every start version, a filled-DB migration that auto-inserts a sample row into every
+  table (introspecting columns via `PRAGMA table_info` and skipping columns that are nullable or have a default).
+- Bump `bom` to 4.15.0: it now pins `test-core` and `test-room` in place of the removed `test` module.
+
 ## 2026-07-03
 
 ```

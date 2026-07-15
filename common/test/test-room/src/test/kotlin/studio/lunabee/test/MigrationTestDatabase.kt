@@ -14,24 +14,19 @@
  * limitations under the License.
  */
 
-plugins {
-    id("lunabee.kmp-library-conventions")
-    id("lunabee.library-publish-conventions")
-}
+package studio.lunabee.test
 
-description = "Lunabee Studio Kotlin test library"
-version = AndroidConfig.TEST_VERSION
+import androidx.room.Database
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import androidx.room.RoomDatabase
 
-kotlin {
-    jvm()
+@Entity(tableName = "Item")
+data class Item(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val description: String?,
+)
 
-    sourceSets {
-        commonMain.dependencies {
-            api(libs.kotlinTest)
-        }
-        jvmTest.dependencies {
-        }
-        nativeMain {
-        }
-    }
-}
+@Database(entities = [Item::class], version = 2, exportSchema = true)
+abstract class MigrationTestDatabase : RoomDatabase()
