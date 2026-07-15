@@ -28,10 +28,10 @@ import kotlin.time.Instant
 class RoomSyncTimestampStore internal constructor(private val database: SyncRoomDatabase) : SyncTimestampStore {
 
     override suspend fun lastServerSyncDate(syncKey: SyncKey): Instant? =
-        database.syncTimestampDao().serverDate(syncKey)
+        database.syncTimestampDao().getServerDate(syncKey)
 
     override suspend fun lastSuccessfulSyncDate(syncKey: SyncKey): Instant? =
-        database.syncTimestampDao().localDate(syncKey)
+        database.syncTimestampDao().getLocalDate(syncKey)
 
     override suspend fun saveSyncDates(syncKey: SyncKey, serverDate: Instant?, localDate: Instant?) {
         database.syncTimestampDao().saveSyncDates(syncKey = syncKey, serverDate = serverDate, localDate = localDate)

@@ -29,10 +29,10 @@ import kotlin.time.Instant
 internal interface SyncTimestampDao {
 
     @Query("SELECT serverDate FROM sync_timestamp WHERE syncKey = :syncKey")
-    suspend fun serverDate(syncKey: SyncKey): Instant?
+    suspend fun getServerDate(syncKey: SyncKey): Instant?
 
     @Query("SELECT localDate FROM sync_timestamp WHERE syncKey = :syncKey")
-    suspend fun localDate(syncKey: SyncKey): Instant?
+    suspend fun getLocalDate(syncKey: SyncKey): Instant?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(entity: SyncTimestampEntity)
