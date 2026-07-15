@@ -128,7 +128,8 @@ fun DefaultLoadingContent(
                     liveRegion = LiveRegionMode.Polite
                     this.contentDescription = loadingContentDescription
                 }
-            }.then(modifier)
+            }
+            .then(modifier)
             .drawBehind { drawRect(background) },
     ) {
         progressIndicator()
@@ -141,9 +142,11 @@ fun DefaultLoadingContent(
 @OptIn(ExperimentalComposeUiApi::class)
 @Suppress("UnusedReceiverParameter")
 @Composable
-fun BlockingViewScope.DefaultBlockingContent() {
+fun BlockingViewScope.DefaultBlockingContent(
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .clickable(onClick = {}, enabled = false)
             .semantics {

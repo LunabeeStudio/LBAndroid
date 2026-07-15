@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-03
+
+```
+Lbloading 4.10.1
+bom 4.14.1
+```
+
+- Add a `modifier` parameter to `DefaultBlockingContent` so callers can customize the blocking view.
+
 ## 2026-06-26
 
 ```
