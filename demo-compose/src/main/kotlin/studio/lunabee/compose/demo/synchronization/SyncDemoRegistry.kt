@@ -19,7 +19,7 @@ package studio.lunabee.compose.demo.synchronization
 import android.content.Context
 import studio.lunabee.synchronization.LBSyncGroup
 import studio.lunabee.synchronization.LBSyncOperator
-import studio.lunabee.synchronization.datastore.dataStoreSyncTimestampStore
+import studio.lunabee.synchronization.room.roomSyncTimestampStore
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 
@@ -54,7 +54,7 @@ object SyncDemoRegistry {
             if (initialized) return
             val appContext = context.applicationContext
             // Install the DataStore-backed cursor store once, before any manager resolves it lazily.
-            LBSyncStorage.install(appContext.dataStoreSyncTimestampStore())
+            LBSyncStorage.install(appContext.roomSyncTimestampStore())
             server = FakeRemoteServer.getInstance(appContext)
             localDb = LocalItemDatabase()
             syncManager = DemoItemSyncManager(localDb = localDb, server = server)

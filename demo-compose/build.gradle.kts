@@ -143,7 +143,7 @@ dependencies {
     implementation(projects.monitoringRoom)
     implementation(projects.monitoringUi)
     implementation(projects.synchronizationCore)
-    implementation(projects.synchronizationCoreDatastore)
+    implementation(projects.synchronizationCoreRoom)
 
     debugImplementation(libs.androidxUiTooling)
     debugImplementation(libs.composeUiTestManifest)
