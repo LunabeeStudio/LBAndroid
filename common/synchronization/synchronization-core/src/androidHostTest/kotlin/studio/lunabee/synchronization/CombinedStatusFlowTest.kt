@@ -33,6 +33,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.testfixture.freshStore
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,6 +43,9 @@ import kotlin.time.Instant
 
 class CombinedStatusFlowTest {
 
+    // Clear on both sides: BeforeTest guards against a previous test class leaking registered groups
+    // into the process-wide operator singleton, AfterTest keeps this class from leaking its own.
+    @BeforeTest
     @AfterTest
     fun clearOperator() {
         LBSyncOperator.groups.clear()
