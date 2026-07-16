@@ -281,5 +281,5 @@ object LBSyncOperator {
         .distinctUntilChanged()
 }
 
-private val logger: Logger = LBLogger.get("LBSM ${LBSyncOperator::class.simpleName}")
-private val networkLogger: Logger = LBLogger.get("LBSM Network")
+private val logger: Logger = LBLogger.get("$LogTag ${LBSyncOperator::class.simpleName}")
+private val networkLogger: Logger = LBLogger.get("$LogTag Network")

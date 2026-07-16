@@ -34,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.LogTag
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import java.net.URI
 import java.net.URISyntaxException
@@ -172,4 +173,4 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     }
 }
 
-private val logger: Logger = LBLogger.get("LBSM Live")
+private val logger: Logger = LBLogger.get("$LogTag Live")

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.LogTag
 import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
@@ -82,7 +83,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      */
     open val syncKey: SyncKey = SyncKey(this::class.simpleName.orEmpty())
 
-    protected var logger: Logger? = if (logging) LBLogger.get("LBSM ${this::class.simpleName} ${this.hashCode()}") else null
+    protected var logger: Logger? = if (logging) LBLogger.get("$LogTag ${this::class.simpleName} ${this.hashCode()}") else null
 
     private val syncRunner: SyncRunner = SyncRunner(scope = scope, retryDelay = { retryTempo })
 
