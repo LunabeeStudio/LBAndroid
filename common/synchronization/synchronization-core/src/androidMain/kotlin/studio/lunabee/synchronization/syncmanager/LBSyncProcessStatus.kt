@@ -16,7 +16,6 @@
 
 package studio.lunabee.synchronization.syncmanager
 
-import studio.lunabee.synchronization.utils.DateTimeFormatter
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -66,41 +65,16 @@ sealed class LBSyncProcessStatus {
     fun fullDescription(): String {
         return when (this) {
             is NeverSync -> "Never synchronized"
-
             is PendingSync -> "Waiting for synchronization"
-
-            is SyncSuccessfully -> "Updated ${DateTimeFormatter.format(this.lastSuccessfulSync)}"
-
+            is SyncSuccessfully -> "Updated ${this.lastSuccessfulSync}"
             is Disabled -> "Disabled due to isEnabled closures"
-
             is UploadStarted -> "Uploading..."
-
-            is UploadFinishSuccessfully ->
-                "${this.processedObjectCount} records uploaded successfully ${
-                    DateTimeFormatter.format(
-                        this.at,
-                    )
-                }"
-
-            is UploadFinishWithError -> "Upload failed ${DateTimeFormatter.format(this.at)}"
-
+            is UploadFinishSuccessfully -> "${this.processedObjectCount} records uploaded successfully ${this.at}"
+            is UploadFinishWithError -> "Upload failed ${this.at}"
             is DownloadStarted -> "Downloading..."
-
-            is DownloadUpdated ->
-                "${this.processedObjectCount} records have been downloaded successfully ${
-                    DateTimeFormatter.format(
-                        this.at,
-                    )
-                }"
-
-            is DownloadFinishSuccessfully ->
-                "Download finish successfully ${
-                    DateTimeFormatter.format(
-                        this.at,
-                    )
-                }"
-
-            is DownloadFinishWithError -> "Download failed ${DateTimeFormatter.format(this.at)}"
+            is DownloadUpdated -> "${this.processedObjectCount} records have been downloaded successfully ${this.at}"
+            is DownloadFinishSuccessfully -> "Download finish successfully ${this.at}"
+            is DownloadFinishWithError -> "Download failed ${this.at}"
         }
     }
 
