@@ -49,15 +49,11 @@ typealias LBDefaultSyncManager<ServerData, LocalData> = LBSyncManager<ServerData
  * @param ServerData The type of data returned by the server
  * @param LocalData The type of data to be mapped from [ServerData]
  * @param PageInfo The type of data returned by the server to handle pagination. Could be [Nothing] if non applicable.
- * @param timestampStore storage-agnostic persistence for this manager's sync cursors, shared
- * process-wide with every other manager and the operator.
  * @param scope the scope every sync run and automatic retry is launched in. The no-store secondary
  * constructor passes the shared library [defaultSyncScope].
  * @param logging Enable LBSM logs
  */
-@Suppress("unused", "TooManyFunctions")
 abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal constructor(
-    providedTimestampStore: SyncTimestampLocalDataSource?,
     internal val scope: CoroutineScope,
     private var logging: Boolean = true,
 ) {
@@ -70,21 +66,21 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      *
      * @param logging Enable LBSM logs.
      */
-    constructor(logging: Boolean = true) : this(providedTimestampStore = null, scope = defaultSyncScope, logging = logging)
+    constructor(logging: Boolean = true) : this(scope = defaultSyncScope, logging = logging)
 
     /**
      * Resolved lazily so a manager built with the no-store constructor decouples its creation from
      * [LBSyncStorage.install] ordering: the installed backend is read on first cursor access. Tests and
      * advanced DI inject an explicit store through the `internal` primary constructor.
      */
-    private val timestampStore: SyncTimestampLocalDataSource by lazy { providedTimestampStore ?: LBSyncStorage.requireStore() }
+    private val timestampLocalDataSource: SyncTimestampLocalDataSource by lazy { LBSyncStorage.requireStore() }
 
     /**
      * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name
      * (persisted as `"${simpleName}lastSyncDate"`); override it to pin a stable key so the
      * incremental-sync cursor survives a class rename.
      */
-    open val syncKey: SyncKey get() = SyncKey(this::class.simpleName.orEmpty())
+    open val syncKey: SyncKey = SyncKey(this::class.simpleName.orEmpty())
 
     protected var logger: Logger? = if (logging) LBLogger.get("LBSM ${this::class.simpleName} ${this.hashCode()}") else null
 
@@ -128,7 +124,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      */
     suspend fun load() {
         setStatusInternal(
-            timestampStore.lastSuccessfulSyncDate(syncKey)?.let {
+            timestampLocalDataSource.lastSuccessfulSyncDate(syncKey)?.let {
                 LBSyncProcessStatus.SyncSuccessfully(it)
             } ?: LBSyncProcessStatus.NeverSync,
         )
@@ -254,7 +250,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     suspend fun resetTimeStamp() {
         cancelAllRequests()
-        timestampStore.clear(syncKey)
+        timestampLocalDataSource.clear(syncKey)
         logger?.v("Reset last updated date")
     }
 
@@ -264,7 +260,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      */
     @Suppress("MemberVisibilityCanBePrivate")
     suspend fun lastSuccessfulSyncDate(): Instant? =
-        timestampStore.lastSuccessfulSyncDate(syncKey)
+        timestampLocalDataSource.lastSuccessfulSyncDate(syncKey)
 
     private suspend fun runPipeline(): LBResult<Unit> {
         return try {
@@ -360,7 +356,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param instant A server instant to save, or null to leave the server cursor untouched.
      */
     private suspend fun saveDownloadDate(instant: Instant?) {
-        timestampStore.saveSyncDates(
+        timestampLocalDataSource.saveSyncDates(
             syncKey = syncKey,
             serverDate = instant,
             localDate = Clock.System.now(),
@@ -368,7 +364,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     }
 
     private suspend fun lastServerUpdatedDate(): Instant? =
-        timestampStore.lastServerSyncDate(syncKey)
+        timestampLocalDataSource.lastServerSyncDate(syncKey)
 
     /**
      * Called to know if the sync manager should query the next page using a custom data.

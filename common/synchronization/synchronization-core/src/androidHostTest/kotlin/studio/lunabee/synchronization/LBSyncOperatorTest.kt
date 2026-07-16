@@ -200,7 +200,7 @@ private class FakeOperatorManager(
     private val runOrder: MutableList<String>? = null,
     private val runId: String? = null,
     private val fetchError: Exception? = null,
-) : LBSyncManager<OperatorServerObj, OperatorLocalObj, Nothing>(providedTimestampStore = store, scope = scope) {
+) : LBSyncManager<OperatorServerObj, OperatorLocalObj, Nothing>(scope = scope) {
 
     init {
         retryTempo = null

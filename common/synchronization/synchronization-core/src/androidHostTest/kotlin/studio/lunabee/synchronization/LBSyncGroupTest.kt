@@ -185,7 +185,7 @@ private class FakeGroupManager(
     scope: CoroutineScope,
     syncKey: String,
     private val fetchError: Exception? = null,
-) : LBSyncManager<GroupServerObj, GroupLocalObj, Nothing>(providedTimestampStore = store, scope = scope) {
+) : LBSyncManager<GroupServerObj, GroupLocalObj, Nothing>(scope = scope) {
 
     init {
         retryTempo = null

@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.syncmanager.FetchPage
@@ -55,7 +56,7 @@ internal open class FakeSyncManager(
     private val gateOnlyFirstFetch: Boolean = false,
     private val hasNextPageOverride: ((pageInfo: Int) -> Boolean)? = null,
     retryTempo: Duration? = null,
-) : LBSyncManager<ServerObj, LocalObj, Int>(providedTimestampStore = store, scope = scope) {
+) : LBSyncManager<ServerObj, LocalObj, Int>(scope = scope) {
 
     init {
         this.retryTempo = retryTempo
@@ -158,7 +159,7 @@ internal class StatefulFakeSyncManager(
     scope: CoroutineScope,
     private val downloadPages: List<FetchPage<ServerObj, Int>> = listOf(FetchPage<ServerObj, Int>(objects = emptyList())),
     retryTempo: Duration? = null,
-) : LBSyncManager<ServerObj, LocalObj, Int>(providedTimestampStore = store, scope = scope) {
+) : LBSyncManager<ServerObj, LocalObj, Int>(scope = scope) {
 
     init {
         this.retryTempo = retryTempo
@@ -244,7 +245,13 @@ internal fun runManagerTest(
     }
 }
 
-internal fun freshStore(): SyncTimestampLocalDataSource = FakeSyncTimestampLocalDataSource()
+/**
+ * Creates a fresh in-memory store and installs it as the process-wide [LBSyncStorage] backend, since
+ * managers resolve their store exclusively through [LBSyncStorage]. Installing per test keeps tests
+ * isolated (last install wins).
+ */
+internal fun freshStore(): SyncTimestampLocalDataSource =
+    FakeSyncTimestampLocalDataSource().also(LBSyncStorage::install)
 
 /**
  * In-memory [SyncTimestampLocalDataSource] fake keyed by `syncKey`, mirroring the contract's non-null write

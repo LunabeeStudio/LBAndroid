@@ -255,7 +255,7 @@ private class FakeStatusManager(
     store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     key: String,
-) : LBSyncManager<CombinedServerObj, CombinedLocalObj, Nothing>(providedTimestampStore = store, scope = scope) {
+) : LBSyncManager<CombinedServerObj, CombinedLocalObj, Nothing>(scope = scope) {
 
     override val syncKey: SyncKey = SyncKey(key)
 
