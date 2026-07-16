@@ -166,6 +166,8 @@ class SyncDemoViewModel @Inject constructor(
     }
 
     fun reset() {
+        _syncRequestCount.value = 0
+        _syncRunCount.value = 0
         viewModelScope.launch {
             syncManager.resetData()
             server.clear()
