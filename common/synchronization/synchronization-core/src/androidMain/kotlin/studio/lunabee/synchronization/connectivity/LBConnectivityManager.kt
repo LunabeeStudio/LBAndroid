@@ -16,7 +16,6 @@
 
 package studio.lunabee.synchronization.connectivity
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -25,6 +24,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import studio.lunabee.synchronization.connectivity.LBConnectivityManager.getNetworkState
+import studio.lunabee.synchronization.connectivity.LBConnectivityManager.networkStates
 
 /**
  * Observe device connectivity through the [ConnectivityManager.NetworkCallback] +
@@ -39,7 +40,6 @@ object LBConnectivityManager {
     /**
      * Snapshot of the current device network state.
      */
-    @SuppressLint("MissingPermission")
     fun getNetworkState(context: Context): NetworkState {
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
             ?: return NetworkState(isConnected = false, connectionType = null)
@@ -54,7 +54,6 @@ object LBConnectivityManager {
      * INTERNET-capable default network and unregistered on cancellation. Consecutive duplicates are
      * dropped.
      */
-    @SuppressLint("MissingPermission")
     fun networkStates(context: Context): Flow<NetworkState> = callbackFlow {
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
         if (connectivityManager == null) {
