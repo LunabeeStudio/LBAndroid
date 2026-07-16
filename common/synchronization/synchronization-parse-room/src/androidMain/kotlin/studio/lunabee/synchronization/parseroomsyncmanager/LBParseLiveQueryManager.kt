@@ -172,4 +172,4 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     }
 }
 
-private val logger: Logger = LBLogger.get<LBParseLiveQueryManager>()
+private val logger: Logger = LBLogger.get("LBSM Live")
