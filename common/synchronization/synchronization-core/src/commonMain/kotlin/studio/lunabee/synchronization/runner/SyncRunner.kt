@@ -69,15 +69,16 @@ class SyncRunner(
 
     /**
      * The single shared follow-up run that callers arriving during [inFlight] collapse onto, or `null`
-     * if no follow-up has been requested for the current in-flight run. Sharing one handle across all
-     * collapsed callers is what enforces the "exactly one follow-up" guarantee.
+     * if no follow-up has been requested for the current in-flight run. Sharing one instance across all
+     * collapsed callers is what enforces the "exactly one follow-up" guarantee. The follow-up is not
+     * launched until [settle] promotes it, so cancelling it is just completing its [PendingRun.result].
      */
-    private var pending: RunHandle? = null
+    private var pending: PendingRun? = null
 
     private var retryJob: Job? = null
 
     /**
-     * Runs [block], honouring the collapse-and-join and retry contract documented on the class.
+     * Runs [block], honoring the collapse-and-join and retry contract documented on the class.
      *
      * @param block the suspending work to execute. The same reference is reused for the collapsed
      * follow-up run and for automatic retries.
@@ -85,18 +86,20 @@ class SyncRunner(
      * the single shared follow-up run when a run was already in flight.
      */
     suspend fun run(block: suspend () -> LBResult<Unit>): LBResult<Unit> {
-        val handle: RunHandle = mutex.withLock {
+        val result: CompletableDeferred<LBResult<Unit>> = mutex.withLock {
             // A new explicit request always pre-empts a pending retry.
             cancelPendingRetryLocked()
 
             if (inFlight == null) {
-                startRunLocked(block, gated = false).also { inFlight = it }
+                startRunLocked(block, result = CompletableDeferred()).also { inFlight = it }.result
             } else {
-                // Busy: collapse onto the single follow-up (creating it once, gated, if needed).
-                pending ?: startRunLocked(block, gated = true).also { pending = it }
+                // Busy: collapse onto the single follow-up (creating it once if needed).
+                val followUp = pending
+                    ?: PendingRun(block = block, result = CompletableDeferred()).also { pending = it }
+                followUp.result
             }
         }
-        return handle.result.await()
+        return result.await()
     }
 
     /**
@@ -109,42 +112,35 @@ class SyncRunner(
         scope.launch {
             mutex.withLock {
                 cancelPendingRetryLocked()
-                inFlight?.let(::abortLocked)
-                pending?.let(::abortLocked)
+                inFlight?.let { handle ->
+                    handle.job.cancel()
+                    handle.result.complete(cancelledFailure())
+                }
+                // The follow-up was never launched: resolving its awaiters is all there is to cancel.
+                pending?.result?.complete(cancelledFailure())
                 inFlight = null
                 pending = null
             }
         }
     }
 
-    /**
-     * Cancels [handle]'s job and resolves its awaiters. Completing the result here (not only in the
-     * run coroutine) covers runs whose body never got to execute — a gated follow-up parked before its
-     * gate, or a job cancelled before its first dispatch — which would otherwise strand their awaiters.
-     * Must be called while holding [mutex].
-     */
-    private fun abortLocked(handle: RunHandle) {
-        handle.job.cancel()
-        handle.result.complete(LBResult.Failure(throwable = CancellationException("Sync run cancelled")))
-    }
+    private fun cancelledFailure(): LBResult.Failure<Unit> =
+        LBResult.Failure(throwable = CancellationException("Sync run cancelled"))
 
     /**
-     * Launches the managing coroutine for a run of [block]. When [gated] is `true` the run is a collapsed
-     * follow-up that stays parked until the current in-flight run promotes it; otherwise it starts
-     * executing immediately. The coroutine runs the block, settles internal state (promotion or retry),
-     * then publishes the result to its awaiters — settling *before* completing the result deferred so any
-     * awaiter that resumes already sees consistent state. On cancellation it still completes the result
-     * (so awaiters never hang) and still settles, under [NonCancellable]. Must be called while holding
-     * [mutex].
+     * Launches the coroutine executing a run of [block] and returns its handle. The coroutine runs the
+     * block, settles internal state (promotion or retry), then publishes the outcome to [result] —
+     * settling *before* completing the result deferred so any awaiter that resumes already sees
+     * consistent state. On cancellation it still completes [result] (so awaiters never hang) and still
+     * settles, under [NonCancellable]. Must be called while holding [mutex].
      */
-    private fun startRunLocked(block: suspend () -> LBResult<Unit>, gated: Boolean): RunHandle {
-        val result = CompletableDeferred<LBResult<Unit>>()
-        val gate = if (gated) CompletableDeferred<Unit>() else null
+    private fun startRunLocked(
+        block: suspend () -> LBResult<Unit>,
+        result: CompletableDeferred<LBResult<Unit>>,
+    ): RunHandle {
         lateinit var handle: RunHandle
         val job = scope.launch {
             val outcome: LBResult<Unit> = try {
-                // Inside the try so a follow-up cancelled while parked still resolves its awaiters.
-                gate?.await()
                 block()
             } catch (cancellation: CancellationException) {
                 // Resolve awaiters consistently on cancellation instead of letting them hang, then settle
@@ -157,13 +153,13 @@ class SyncRunner(
             settle(handle, outcome, block, allowRetry = true)
             result.complete(outcome)
         }
-        handle = RunHandle(job = job, result = result, gate = gate)
+        handle = RunHandle(job = job, result = result)
         return handle
     }
 
     /**
-     * Settles internal state once the run owned by [handle] has produced [outcome]: promotes a queued
-     * follow-up to be the new in-flight run, or — when nothing is queued, [allowRetry] is `true` and the
+     * Settles internal state once the run owned by [handle] has produced [outcome]: launches a queued
+     * follow-up as the new in-flight run, or — when nothing is queued, [allowRetry] is `true` and the
      * run failed — schedules a retry of [block]. Re-reads state under [mutex] so it stays consistent with
      * concurrent [run]/[cancel] calls.
      *
@@ -181,10 +177,10 @@ class SyncRunner(
 
             val followUp = pending
             if (followUp != null) {
-                // Promote the collapsed follow-up: it becomes the in-flight run and starts now.
-                inFlight = followUp
+                // Promote the collapsed follow-up: launch it now as the in-flight run, completing the
+                // result deferred its collapsed callers are already awaiting.
                 pending = null
-                followUp.gate?.complete(Unit)
+                inFlight = startRunLocked(followUp.block, result = followUp.result)
             } else {
                 inFlight = null
                 if (allowRetry && outcome is LBResult.Failure) scheduleRetryLocked(block)
@@ -204,7 +200,7 @@ class SyncRunner(
                 retryJob = null
                 // A run started while we waited; let it run instead of duplicating work.
                 if (inFlight != null) return@withLock
-                startRunLocked(block, gated = false).also { inFlight = it }
+                inFlight = startRunLocked(block, result = CompletableDeferred())
             }
         }
     }
@@ -216,12 +212,25 @@ class SyncRunner(
     }
 
     /**
-     * Bundles a launched run's managing [job], the [result] its awaiters suspend on, and the [gate] that
-     * releases a collapsed follow-up (`null` for an immediate run).
+     * Bundles a launched run's state.
+     *
+     * @property job the coroutine [Job] managing the launched run.
+     * @property result the [CompletableDeferred] every awaiter suspends on for the run's [LBResult].
      */
     private class RunHandle(
         val job: Job,
         val result: CompletableDeferred<LBResult<Unit>>,
-        val gate: CompletableDeferred<Unit>?,
+    )
+
+    /**
+     * A collapsed follow-up run that has been requested but not launched yet.
+     *
+     * @property block the work to execute once promoted.
+     * @property result the [CompletableDeferred] every collapsed caller suspends on; completed by the
+     * promoted run, or directly with a failure when the runner is cancelled before promotion.
+     */
+    private class PendingRun(
+        val block: suspend () -> LBResult<Unit>,
+        val result: CompletableDeferred<LBResult<Unit>>,
     )
 }
