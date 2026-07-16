@@ -28,8 +28,8 @@ import kotlin.time.Instant
  *  - upload pushes the records that only exist locally,
  *  - the re-download then re-pulls the just-pushed records so they flip to synced locally.
  *
- * Cursors persist in the shared process-wide DataStore, resolved from the sync store installed once
- * at startup via LBSyncStorage (see SyncDemoRegistry.init).
+ * Cursors are resolved from the process-wide sync store installed via LBSyncStorage (see
+ * SyncDemoRegistry).
  */
 class DemoItemSyncManager(
     private val localDb: LocalItemDatabase,

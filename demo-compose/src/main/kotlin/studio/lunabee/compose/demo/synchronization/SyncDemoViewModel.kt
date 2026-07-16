@@ -16,9 +16,11 @@
 
 package studio.lunabee.compose.demo.synchronization
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.content.Context
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,20 +31,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
+import javax.inject.Inject
 import kotlin.time.Duration
 
-class SyncDemoViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class SyncDemoViewModel @Inject constructor(
+    @ApplicationContext context: Context,
+    private val registry: SyncDemoRegistry,
+) : ViewModel() {
 
-    private val server: FakeRemoteServer
-    private val localDb: LocalItemDatabase
-    private val syncManager: DemoItemSyncManager
-
-    init {
-        SyncDemoRegistry.init(application)
-        server = SyncDemoRegistry.server
-        localDb = SyncDemoRegistry.localDb
-        syncManager = SyncDemoRegistry.syncManager
-    }
+    private val server: FakeRemoteServer = registry.server
+    private val localDb: LocalItemDatabase = registry.localDb
+    private val syncManager: DemoItemSyncManager = registry.syncManager
 
     val localItems: StateFlow<List<LocalItem>> = localDb.items
     val serverItems: StateFlow<List<ServerItem>> = server.items
@@ -56,12 +56,12 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
     /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
     val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
 
-    val isOnline: StateFlow<Boolean> = LBConnectivityManager.networkStates(application)
+    val isOnline: StateFlow<Boolean> = LBConnectivityManager.networkStates(context)
         .map { it.isConnected }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000L),
-            initialValue = LBConnectivityManager.getNetworkState(application).isConnected,
+            initialValue = LBConnectivityManager.getNetworkState(context).isConnected,
         )
 
     /** Labels of items diverged on both sides; surfaced non-blocking, the sync itself still succeeds. */
@@ -174,7 +174,7 @@ class SyncDemoViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun applyRefreshEvents() {
-        SyncDemoRegistry.setRefreshEvents(
+        registry.setRefreshEvents(
             onForeground = _refreshOnForeground.value,
             onInternetBack = _refreshOnInternetBack.value,
         )

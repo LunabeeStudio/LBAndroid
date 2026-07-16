@@ -56,7 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import java.time.ZoneId
@@ -68,7 +68,7 @@ import java.time.Instant as JavaInstant
 
 @Composable
 fun SyncDemoScreen(
-    viewModel: SyncDemoViewModel = viewModel(),
+    viewModel: SyncDemoViewModel = hiltViewModel(),
 ) {
     val localItems by viewModel.localItems.collectAsState()
     val serverItems by viewModel.serverItems.collectAsState()

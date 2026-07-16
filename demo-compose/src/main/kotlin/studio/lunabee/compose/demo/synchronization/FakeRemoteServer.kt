@@ -16,7 +16,6 @@
 
 package studio.lunabee.compose.demo.synchronization
 
-import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,10 +25,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import studio.lunabee.compose.demo.synchronization.persistence.FakeRemoteServerDatabase
 import studio.lunabee.compose.demo.synchronization.persistence.ServerItemDao
 import studio.lunabee.compose.demo.synchronization.persistence.ServerItemEntity
-import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -38,14 +35,14 @@ import kotlin.uuid.Uuid
 
 /**
  * A stand-in for a remote backend, backed by a Room database so its state survives process death (the
- * groundwork for a later background-sync demo). It is an application-scoped singleton — obtain it via
- * [getInstance] — so a future background worker and the UI observe the same server.
+ * groundwork for a later background-sync demo). It is provided as an application-scoped Hilt
+ * `@Singleton` so a future background worker and the UI observe the same server.
  *
  * Every call adds a [latency] delay so the demo shows the sync statuses transitioning, and
  * [failNextSync] injects a one-shot error to demonstrate the `*WithError` statuses and the engine's
  * automatic retry.
  */
-class FakeRemoteServer private constructor(
+class FakeRemoteServer(
     private val dao: ServerItemDao,
     private val isOnline: () -> Boolean,
 ) {
@@ -116,19 +113,6 @@ class FakeRemoteServer private constructor(
     private fun requireNetwork() {
         if (!isOnline()) {
             throw IOException("No network: server unreachable")
-        }
-    }
-
-    companion object {
-        @Volatile
-        private var instance: FakeRemoteServer? = null
-
-        fun getInstance(context: Context): FakeRemoteServer = instance ?: synchronized(this) {
-            val appContext = context.applicationContext
-            instance ?: FakeRemoteServer(
-                dao = FakeRemoteServerDatabase.getInstance(appContext).serverItemDao(),
-                isOnline = { LBConnectivityManager.getNetworkState(appContext).isConnected },
-            ).also { instance = it }
         }
     }
 }

@@ -16,9 +16,7 @@
 
 package studio.lunabee.compose.demo.synchronization.persistence
 
-import android.content.Context
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
@@ -28,18 +26,7 @@ import androidx.room.RoomDatabase
 abstract class FakeRemoteServerDatabase : RoomDatabase() {
     abstract fun serverItemDao(): ServerItemDao
 
-    companion object {
-        private const val DatabaseName: String = "fake_remote_server.db"
-
-        @Volatile
-        private var instance: FakeRemoteServerDatabase? = null
-
-        fun getInstance(context: Context): FakeRemoteServerDatabase = instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(
-                context = context.applicationContext,
-                klass = FakeRemoteServerDatabase::class.java,
-                name = DatabaseName,
-            ).build().also { instance = it }
-        }
+    internal companion object {
+        const val DatabaseName: String = "fake_remote_server.db"
     }
 }
