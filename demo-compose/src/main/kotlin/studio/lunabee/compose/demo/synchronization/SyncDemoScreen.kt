@@ -109,9 +109,12 @@ fun SyncDemoScreen(
             )
         }
 
+        val syncRequestCount by viewModel.syncRequestCount.collectAsState()
+        val syncRunCount by viewModel.syncRunCount.collectAsState()
         ActionButtons(
             viewModel = viewModel,
-            isProcessing = status.isProcessing(),
+            syncRequestCount = syncRequestCount,
+            syncRunCount = syncRunCount,
         )
 
         OptionsSection(
@@ -153,7 +156,8 @@ fun SyncDemoScreen(
 @Composable
 private fun ActionButtons(
     viewModel: SyncDemoViewModel,
-    isProcessing: Boolean,
+    syncRequestCount: Int,
+    syncRunCount: Int,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -182,9 +186,10 @@ private fun ActionButtons(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // Deliberately never disabled: flooding the button exercises the SyncRunner
+            // collapse-and-join behavior (concurrent requests collapse into one follow-up run).
             Button(
                 onClick = viewModel::synchronize,
-                enabled = !isProcessing,
                 modifier = Modifier.weight(1f),
             ) {
                 Text(text = "Synchronize")
@@ -195,6 +200,14 @@ private fun ActionButtons(
             ) {
                 Text(text = "Reset")
             }
+        }
+
+        if (syncRequestCount > 0) {
+            Text(
+                text = "$syncRequestCount request(s) → $syncRunCount run(s) — " +
+                    "flood Synchronize to see concurrent requests collapse",
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
 
         OutlinedButton(

@@ -56,6 +56,16 @@ class SyncDemoViewModel @Inject constructor(
     /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
     val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
 
+    private val _syncRequestCount: MutableStateFlow<Int> = MutableStateFlow(0)
+
+    /** Number of Synchronize presses; flood the button to see requests collapse into fewer runs. */
+    val syncRequestCount: StateFlow<Int> = _syncRequestCount.asStateFlow()
+
+    private val _syncRunCount: MutableStateFlow<Int> = MutableStateFlow(0)
+
+    /** Number of pipeline runs actually started (including automatic retries). */
+    val syncRunCount: StateFlow<Int> = _syncRunCount.asStateFlow()
+
     val isOnline: StateFlow<Boolean> = LBConnectivityManager.observeNetworkStates(context)
         .map { it.isConnected }
         .stateIn(
@@ -90,6 +100,7 @@ class SyncDemoViewModel @Inject constructor(
         viewModelScope.launch { syncManager.load() }
         // Count failed attempts: each (auto-retried) failure publishes a fresh *WithError.
         viewModelScope.launch {
+            var previous: LBSyncProcessStatus? = null
             syncManager.status.collect { current ->
                 when (current) {
                     is LBSyncProcessStatus.DownloadFinishWithError,
@@ -98,8 +109,14 @@ class SyncDemoViewModel @Inject constructor(
 
                     is LBSyncProcessStatus.SyncSuccessfully -> _retryCount.value = 0
 
+                    // A run opens with DownloadStarted from an idle status; a DownloadStarted following a
+                    // processing status is the same run's re-download, not a new run.
+                    is LBSyncProcessStatus.DownloadStarted ->
+                        if (previous?.isProcessing() != true) _syncRunCount.update { it + 1 }
+
                     else -> Unit
                 }
+                previous = current
             }
         }
     }
@@ -140,6 +157,7 @@ class SyncDemoViewModel @Inject constructor(
     }
 
     fun synchronize() {
+        _syncRequestCount.update { it + 1 }
         viewModelScope.launch { syncManager.synchronize() }
     }
 
