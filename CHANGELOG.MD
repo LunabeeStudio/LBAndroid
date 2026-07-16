@@ -8,6 +8,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-07-17
 
 ```
+Synchronization Core 2.0.0-rc01
+Synchronization Core-Datastore 2.0.0-rc01
+Synchronization Core-Room 2.0.0-rc01
+Synchronization Parse-Room 2.0.0-rc01
+```
+
+First release candidate for the synchronization 2.0.0 line
+
+- Moved the sync modules out of `Libraries_Android` into `LBAndroid`, repackaged under
+  `studio.lunabee.synchronization` and aligned to the repository conventions.
+- Rewrote the async engine on Kotlin coroutines/Flow: one `suspend` entry point per level returning
+  `LBResult<Unit>`, status exposed as `StateFlow`, single-flight collapse-and-join + auto-retry extracted
+  into the `SyncRunner` deep module. The Facebook Bolts `Task`, `GlobalScope` and the callback/observer
+  surface are gone.
+- Made cursor storage framework-agnostic: `SyncTimestampLocalDataSource` interface installed once at startup
+  via `LBSyncStorage.install(...)`. Split the module into `synchronization-core` + pluggable backends
+  `synchronization-core-datastore` (legacy on-disk cursor) and `synchronization-core-room` (standalone Room DB).
+- Strongly-typed API: cursor keys use the `SyncKey` value class, dates use `kotlin.time.Instant` and the retry
+  tempo `kotlin.time.Duration?`, replacing epoch-millis `Long` / `java.util.Date`.
+- Added `synchronization-parse-room`: a generic Parse↔Room sync layer built on `synchronization-core`.
+- Raised the sync modules to `minSdk 24` and shipped `ACCESS_NETWORK_STATE` in the `synchronization-core` manifest.
+
+## 2026-07-17
+
+```
 Synchronization Core 2.0.0-beta04
 Synchronization Core-Datastore 2.0.0-beta04
 Synchronization Core-Room 2.0.0-beta04
