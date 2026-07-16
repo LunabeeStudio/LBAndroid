@@ -24,7 +24,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -51,20 +50,17 @@ class SyncDemoViewModel @Inject constructor(
     /** The engine's automatic-retry delay for a failed run (null disables retry). */
     val retryTempo: Duration? = syncManager.retryTempo
 
-    private val _retryCount: MutableStateFlow<Int> = MutableStateFlow(0)
-
     /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
-    val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
-
-    private val _syncRequestCount: MutableStateFlow<Int> = MutableStateFlow(0)
+    val retryCount: StateFlow<Int>
+        field = MutableStateFlow(0)
 
     /** Number of Synchronize presses; flood the button to see requests collapse into fewer runs. */
-    val syncRequestCount: StateFlow<Int> = _syncRequestCount.asStateFlow()
-
-    private val _syncRunCount: MutableStateFlow<Int> = MutableStateFlow(0)
+    val syncRequestCount: StateFlow<Int>
+        field = MutableStateFlow(0)
 
     /** Number of pipeline runs actually started (including automatic retries). */
-    val syncRunCount: StateFlow<Int> = _syncRunCount.asStateFlow()
+    val syncRunCount: StateFlow<Int>
+        field = MutableStateFlow(0)
 
     val isOnline: StateFlow<Boolean> = LBConnectivityManager.observeNetworkStates(context)
         .map { it.isConnected }
@@ -83,17 +79,17 @@ class SyncDemoViewModel @Inject constructor(
             initialValue = emptyList(),
         )
 
-    private val _failNextSync: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val failNextSync: StateFlow<Boolean> = _failNextSync.asStateFlow()
+    val failNextSync: StateFlow<Boolean>
+        field = MutableStateFlow(false)
 
-    private val _showDeleted: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val showDeleted: StateFlow<Boolean> = _showDeleted.asStateFlow()
+    val showDeleted: StateFlow<Boolean>
+        field = MutableStateFlow(false)
 
-    private val _refreshOnForeground: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val refreshOnForeground: StateFlow<Boolean> = _refreshOnForeground.asStateFlow()
+    val refreshOnForeground: StateFlow<Boolean>
+        field = MutableStateFlow(false)
 
-    private val _refreshOnInternetBack: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val refreshOnInternetBack: StateFlow<Boolean> = _refreshOnInternetBack.asStateFlow()
+    val refreshOnInternetBack: StateFlow<Boolean>
+        field = MutableStateFlow(false)
 
     init {
         // Seed the status from the persisted cursor (NeverSync until this completes).
@@ -105,14 +101,14 @@ class SyncDemoViewModel @Inject constructor(
                 when (current) {
                     is LBSyncProcessStatus.DownloadFinishWithError,
                     is LBSyncProcessStatus.UploadFinishWithError,
-                    -> _retryCount.update { it + 1 }
+                    -> retryCount.update { it + 1 }
 
-                    is LBSyncProcessStatus.SyncSuccessfully -> _retryCount.value = 0
+                    is LBSyncProcessStatus.SyncSuccessfully -> retryCount.value = 0
 
                     // A run opens with DownloadStarted from an idle status; a DownloadStarted following a
                     // processing status is the same run's re-download, not a new run.
                     is LBSyncProcessStatus.DownloadStarted ->
-                        if (previous?.isProcessing() != true) _syncRunCount.update { it + 1 }
+                        if (previous?.isProcessing() != true) syncRunCount.update { it + 1 }
 
                     else -> Unit
                 }
@@ -157,7 +153,7 @@ class SyncDemoViewModel @Inject constructor(
     }
 
     fun synchronize() {
-        _syncRequestCount.update { it + 1 }
+        syncRequestCount.update { it + 1 }
         viewModelScope.launch { syncManager.synchronize() }
     }
 
@@ -166,8 +162,8 @@ class SyncDemoViewModel @Inject constructor(
     }
 
     fun reset() {
-        _syncRequestCount.value = 0
-        _syncRunCount.value = 0
+        syncRequestCount.value = 0
+        syncRunCount.value = 0
         viewModelScope.launch {
             syncManager.resetData()
             server.clear()
@@ -175,28 +171,28 @@ class SyncDemoViewModel @Inject constructor(
     }
 
     fun setFailNextSync(fail: Boolean) {
-        _failNextSync.value = fail
+        failNextSync.value = fail
         server.failNextSync = fail
     }
 
     fun setShowDeleted(show: Boolean) {
-        _showDeleted.value = show
+        showDeleted.value = show
     }
 
     fun setRefreshOnForeground(enabled: Boolean) {
-        _refreshOnForeground.value = enabled
+        refreshOnForeground.value = enabled
         applyRefreshEvents()
     }
 
     fun setRefreshOnInternetBack(enabled: Boolean) {
-        _refreshOnInternetBack.value = enabled
+        refreshOnInternetBack.value = enabled
         applyRefreshEvents()
     }
 
     private fun applyRefreshEvents() {
         registry.setRefreshEvents(
-            onForeground = _refreshOnForeground.value,
-            onInternetBack = _refreshOnInternetBack.value,
+            onForeground = refreshOnForeground.value,
+            onInternetBack = refreshOnInternetBack.value,
         )
     }
 }
