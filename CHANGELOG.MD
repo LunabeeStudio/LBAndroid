@@ -16,6 +16,8 @@ Synchronization Parse-Room 2.0.0-beta03
 
 - The synchronization modules now declare `minSdk 24` (the connectivity engine relies on API 24
   `registerDefaultNetworkCallback`); the rest of the repository stays at `minSdk 23`.
+- `synchronization-core` now declares the `ACCESS_NETWORK_STATE` permission in its manifest, so consumer
+  apps no longer have to add it themselves.
 - Backend factories (`dataStoreSyncTimestampStore()`, `roomSyncTimestampStore()`) now return a
   process-wide single instance — safe to call repeatedly. The Room factories' `dispatcher` parameter
   defaults to Room's own query context instead of `Dispatchers.IO`.

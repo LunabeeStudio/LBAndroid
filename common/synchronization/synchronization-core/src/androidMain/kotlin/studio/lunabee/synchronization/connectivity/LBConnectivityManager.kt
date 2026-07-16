@@ -27,18 +27,17 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * Observe device connectivity through the modern [ConnectivityManager.NetworkCallback] +
- * [NetworkCapabilities] APIs (the legacy `CONNECTIVITY_ACTION` broadcast and `activeNetworkInfo` are
- * deprecated). Exposes a cold [networkStates] [Flow] and a one-shot [getNetworkState] snapshot.
+ * Observe device connectivity through the [ConnectivityManager.NetworkCallback] +
+ * [NetworkCapabilities] APIs. Exposes a cold [networkStates] [Flow] and a one-shot [getNetworkState]
+ * snapshot.
  *
- * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
+ * The `ACCESS_NETWORK_STATE` permission is declared in the library manifest and merges into the
+ * consumer app.
  */
 object LBConnectivityManager {
 
     /**
      * Snapshot of the current device network state.
-     *
-     * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
      */
     @SuppressLint("MissingPermission")
     fun getNetworkState(context: Context): NetworkState {
@@ -54,8 +53,6 @@ object LBConnectivityManager {
      * the current state). Backed by a [ConnectivityManager.NetworkCallback] registered for the
      * INTERNET-capable default network and unregistered on cancellation. Consecutive duplicates are
      * dropped.
-     *
-     * **WARNING**: you need the `ACCESS_NETWORK_STATE` permission in your app manifest.
      */
     @SuppressLint("MissingPermission")
     fun networkStates(context: Context): Flow<NetworkState> = callbackFlow {
