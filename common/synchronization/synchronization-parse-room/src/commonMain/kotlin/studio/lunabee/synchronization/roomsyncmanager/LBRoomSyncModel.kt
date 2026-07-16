@@ -22,7 +22,7 @@ import kotlin.time.Instant
  * Sync bookkeeping every Room entity synced by [LBRoomSyncManager] must expose.
  *
  * @property lbLocalId **must be the Room primary key**
- * @property lbServerId server (Parse) object id, null until the row has been pushed
+ * @property lbServerId server object id, null until the row has been pushed
  * @property lbUpdatedAt server `updatedAt`, used for incremental cursoring
  * @property lbInSync false ⇒ pending upload
  * @property lbDeleted soft-delete flag — deleted rows stay in the table (hidden by app read queries)

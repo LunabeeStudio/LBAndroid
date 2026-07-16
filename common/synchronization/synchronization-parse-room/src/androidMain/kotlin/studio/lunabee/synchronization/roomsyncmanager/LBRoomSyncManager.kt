@@ -62,8 +62,8 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
      * Pushes a single entity to the server. Throw on failure: [pushObjectsToServer] catches the first
      * error, marks the already-succeeded subset in sync, then rethrows it.
      *
-     * **WARNING**: must run on a background thread. Default no-op (download-only); the Parse layer
-     * overrides this.
+     * **WARNING**: must run on a background thread. Default no-op (download-only); a bidirectional
+     * subclass overrides this.
      *
      * @param obj the entity to push.
      */
@@ -121,6 +121,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
         return objectToUploadCount > 0
     }
 
-    /** The Parse layer overrides this to read `ParseObject.updatedAt` without building the entity. */
+    /** Default reads [LBRoomSyncModel.lbUpdatedAt] by building the entity; override to read the server
+     * object's updated-at directly and skip that. */
     override fun updatedAt(obj: ServerData): Instant? = createObjectFrom(obj).lbUpdatedAt
 }
