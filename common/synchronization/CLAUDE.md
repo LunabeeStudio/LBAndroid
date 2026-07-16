@@ -6,7 +6,7 @@ modules.
 
 | Module | Path | Type | Namespace | Version const | Has README |
 |---|---|---|---|---|---|
-| `:synchronization-core` | `synchronization-core/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization` | `SYNCHRONIZATION_CORE_VERSION` | no — documented below |
+| `:synchronization-core` | `synchronization-core/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization` | `SYNCHRONIZATION_CORE_VERSION` | yes — flow/sequence diagrams; sharp edges documented below |
 | `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
 | `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
