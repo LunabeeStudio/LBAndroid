@@ -56,7 +56,7 @@ class SyncDemoViewModel @Inject constructor(
     /** Number of consecutive failed sync attempts; reset to 0 on the next success. */
     val retryCount: StateFlow<Int> = _retryCount.asStateFlow()
 
-    val isOnline: StateFlow<Boolean> = LBConnectivityManager.networkStates(context)
+    val isOnline: StateFlow<Boolean> = LBConnectivityManager.observeNetworkStates(context)
         .map { it.isConnected }
         .stateIn(
             scope = viewModelScope,

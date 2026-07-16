@@ -24,12 +24,13 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager.getNetworkState
-import studio.lunabee.synchronization.connectivity.LBConnectivityManager.networkStates
+import studio.lunabee.synchronization.connectivity.LBConnectivityManager.observeNetworkStates
 
 /**
  * Observe device connectivity through the [ConnectivityManager.NetworkCallback] +
- * [NetworkCapabilities] APIs. Exposes a cold [networkStates] [Flow] and a one-shot [getNetworkState]
+ * [NetworkCapabilities] APIs. Exposes a cold [observeNetworkStates] [Flow] and a one-shot [getNetworkState]
  * snapshot.
  *
  * The `ACCESS_NETWORK_STATE` permission is declared in the library manifest and merges into the
@@ -54,38 +55,38 @@ object LBConnectivityManager {
      * INTERNET-capable default network and unregistered on cancellation. Consecutive duplicates are
      * dropped.
      */
-    fun networkStates(context: Context): Flow<NetworkState> = callbackFlow {
+    fun observeNetworkStates(context: Context): Flow<NetworkState> {
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
-        if (connectivityManager == null) {
-            trySend(NetworkState(isConnected = false, connectionType = null))
-            awaitClose { }
-            return@callbackFlow
+        return if (connectivityManager == null) {
+            flowOf(NetworkState(isConnected = false, connectionType = null))
+        } else {
+            callbackFlow {
+                val callback = object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        trySend(getNetworkState(context))
+                    }
+
+                    override fun onLost(network: Network) {
+                        trySend(getNetworkState(context))
+                    }
+
+                    override fun onUnavailable() {
+                        trySend(getNetworkState(context))
+                    }
+
+                    override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                        trySend(getNetworkState(context))
+                    }
+                }
+
+                trySend(getNetworkState(context))
+                // Track the default network: registerDefaultNetworkCallback reliably fires onLost when the last
+                // network drops (e.g. airplane mode), which a NetworkRequest-scoped callback may miss.
+                connectivityManager.registerDefaultNetworkCallback(callback)
+                awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+            }.distinctUntilChanged()
         }
-
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                trySend(getNetworkState(context))
-            }
-
-            override fun onLost(network: Network) {
-                trySend(getNetworkState(context))
-            }
-
-            override fun onUnavailable() {
-                trySend(getNetworkState(context))
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                trySend(getNetworkState(context))
-            }
-        }
-
-        trySend(getNetworkState(context))
-        // Track the default network: registerDefaultNetworkCallback reliably fires onLost when the last
-        // network drops (e.g. airplane mode), which a NetworkRequest-scoped callback may miss.
-        connectivityManager.registerDefaultNetworkCallback(callback)
-        awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
-    }.distinctUntilChanged()
+    }
 
     private fun NetworkCapabilities?.toNetworkState(): NetworkState {
         if (this == null || !hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {

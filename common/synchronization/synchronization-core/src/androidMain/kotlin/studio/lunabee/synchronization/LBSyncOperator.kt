@@ -70,7 +70,7 @@ object LBSyncOperator {
     /**
      * Call this to let the LBSyncOperator refresh the sync managers for network changes. The refresh is
      * performed when a reconnection is detected (new state is connected AND the previous state was not),
-     * by collecting [LBConnectivityManager.networkStates] in the shared [defaultSyncScope].
+     * by collecting [LBConnectivityManager.observeNetworkStates] in the shared [defaultSyncScope].
      *
      * **WARNING** : A sync manager can only be refreshed if its group carries
      * [LBSyncRefreshEvent.InternetIsBack].
@@ -80,7 +80,7 @@ object LBSyncOperator {
         lastNetworkState = LBConnectivityManager.getNetworkState(appContext)
         networkListenerJob?.cancel()
         networkListenerJob = defaultSyncScope.launch {
-            LBConnectivityManager.networkStates(appContext).collect { networkState ->
+            LBConnectivityManager.observeNetworkStates(appContext).collect { networkState ->
                 if (networkState.isConnected) {
                     networkLogger.v("Internet is available with transport ${networkState.connectionType}")
                     if (!lastNetworkState.isConnected) {

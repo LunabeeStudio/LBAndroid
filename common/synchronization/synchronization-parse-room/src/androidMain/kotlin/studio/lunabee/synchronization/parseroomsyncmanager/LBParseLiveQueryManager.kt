@@ -78,13 +78,13 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     }
 
     /**
-     * Suspend until connectivity is back (collecting [LBConnectivityManager.networkStates]) then
+     * Suspend until connectivity is back (collecting [LBConnectivityManager.observeNetworkStates]) then
      * reconnect the LiveQuery client.
      */
     private fun awaitConnectivityThenReconnect() {
         reconnectionJob?.cancel()
         reconnectionJob = reconnectionScope.launch {
-            LBConnectivityManager.networkStates(context).first { it.isConnected }
+            LBConnectivityManager.observeNetworkStates(context).first { it.isConnected }
             parseLiveQueryClient?.reconnect()
         }
     }
