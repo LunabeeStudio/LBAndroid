@@ -12,7 +12,7 @@ modules.
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
 
 The engine (`:synchronization-core`) is **storage-agnostic**: it persists sync cursors through the
-`SyncTimestampStore` interface and never constructs a backend. A backend module provides the concrete
+`SyncTimestampLocalDataSource` interface and never constructs a backend. A backend module provides the concrete
 store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor storage" below).
 `:synchronization-core-datastore` is the DataStore backend (preserves the legacy on-disk cursor file);
 `:synchronization-core-room` is the Room backend (standalone DB, monitoring-room pattern). Type-safe
@@ -33,7 +33,7 @@ the artifact is at 2.0.0 here).
 
 Generic sync framework. **Source-set split**: the whole engine (`LBSyncManager`, `LBSyncGroup`,
 `LBSyncOperator`, connectivity, lifecycle) lives in `androidMain`; `commonMain` holds the pure
-`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampStore` **interface** (`SyncKey` keys,
+`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampLocalDataSource` **interface** (`SyncKey` keys,
 `kotlin.time.Instant` dates; the DataStore backend persists epoch-millis under the key scheme
 `"${syncKey}lastSyncDate"` / `…_localDate`), and the `store/LBSyncStorage` registry. No backend
 (DataStore/Room) is referenced from core.
@@ -52,7 +52,7 @@ declare `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`) — the connectivity
 
 ### Cursor storage (pluggable backend)
 
-`SyncTimestampStore` (commonMain interface) is the whole storage contract: `suspend`
+`SyncTimestampLocalDataSource` (commonMain interface) is the whole storage contract: `suspend`
 `lastServerSyncDate` / `lastSuccessfulSyncDate` / `saveSyncDates` / `clear` / `clearAll`. Keys are the
 `SyncKey` value class (`LBSyncManager.syncKey: SyncKey`), dates are `kotlin.time.Instant`, non-null-write
 semantics (a `null` argument leaves that cursor unchanged). `statusByKey()` on group/operator is keyed by
@@ -64,10 +64,10 @@ self-registration is impossible here):
 
 ```kotlin
 // Android, DataStore backend (preserves the legacy cursor file com.lunabee.lbsynchronization)
-LBSyncStorage.install(context.dataStoreSyncTimestampStore())
+LBSyncStorage.install(context.dataStoreSyncTimestampLocalDataSource())
 // Android, Room backend
-LBSyncStorage.install(context.roomSyncTimestampStore())
-// iOS: dataStoreSyncTimestampStore() / roomSyncTimestampStore() (no Context)
+LBSyncStorage.install(context.roomSyncTimestampLocalDataSource())
+// iOS: dataStoreSyncTimestampLocalDataSource() / roomSyncTimestampLocalDataSource() (no Context)
 ```
 
 `LBSyncManager`'s no-store constructor (`LBSyncManager(logging)`) reads `LBSyncStorage.requireStore()`
@@ -77,7 +77,7 @@ installed. The `internal` primary constructor `(providedTimestampStore, scope, l
 directly for tests/DI. There is **no `Context` constructor anymore** (removed), and
 `LBSyncOperator.resetAllTimestamps()` takes **no `Context`** (uses the installed store).
 
-Backends: `:synchronization-core-datastore` (`DataStoreSyncTimestampStore` over a process-wide
+Backends: `:synchronization-core-datastore` (`DataStoreSyncTimestampLocalDataSource` over a process-wide
 `preferencesDataStore` delegate, file base name `SyncDataStoreName` = `com.lunabee.lbsynchronization`
 so existing installs keep their cursors); `:synchronization-core-room` (standalone
 `@Database`/`@Entity`/`@Dao`, `saveSyncDates` = `INSERT OR IGNORE` + `UPDATE … COALESCE` so a null arg
@@ -85,7 +85,7 @@ preserves the stored cursor). The Room backend starts with a fresh table, so swi
 DataStore-based app to Room **re-syncs once**. Every factory returns a process-wide single instance
 (safe to call repeatedly; later calls ignore the parameters). The Room factories default to
 `BundledSQLiteDriver` (own SQLite, version-stable) but accept any `SQLiteDriver` —
-`roomSyncTimestampStore(driver = AndroidSQLiteDriver())` to use the platform SQLite instead — and
+`roomSyncTimestampLocalDataSource(driver = AndroidSQLiteDriver())` to use the platform SQLite instead — and
 leave Room's default query context unless a `dispatcher` is passed.
 
 Because the read is I/O, the **read/reset API is `suspend`**: `lastSuccessfulSyncDate()`,
@@ -117,7 +117,7 @@ Three layers, top to bottom:
   and `start`/`stopServerNotificationListener(): Boolean`; errors are thrown and the engine maps them to
   the `*WithError` statuses at the pipeline boundary. Override the `open` hooks for paging
   (`queryPageSize`/`hasNextPage`), incremental sync (`supportIncrementalSync`), and server push
-  notifications. The `internal` primary constructor injects a `SyncTimestampStore` + `CoroutineScope`
+  notifications. The `internal` primary constructor injects a `SyncTimestampLocalDataSource` + `CoroutineScope`
   (used by JVM host tests with fakes + a `TestScope`); the public no-store `LBSyncManager(logging)`
   constructor resolves the installed backend lazily via `LBSyncStorage` (there is no `Context`
   constructor). Typealiases: `LBGenericSyncManager = <*,*,*>`, `LBDefaultSyncManager<S,L> = <S,L,Nothing>`.
@@ -174,9 +174,9 @@ Standard repo flow (see root `AGENTS.MD`). Quick reference:
 
 Engine unit tests (`SyncRunner`, manager pipeline, group, operator, combined flows) live in
 `commonTest` (the pure `SyncRunner`) and `androidHostTest` (the `androidMain` engine), run via the
-`withHostTest {}` setup with `runTest` + virtual time and an in-memory `SyncTimestampStore` fake — no
+`withHostTest {}` setup with `runTest` + virtual time and an in-memory `SyncTimestampLocalDataSource` fake — no
 device needed. The DataStore backend has its own round-trip tests; the Room backend has none (no
-context-free host DB builder, matching `monitoring-room`) — it shares the `SyncTimestampStore` contract.
+context-free host DB builder, matching `monitoring-room`) — it shares the `SyncTimestampLocalDataSource` contract.
 
 The backend + parse-room modules opt into `kotlin.time.ExperimentalTime` where needed and each keep a
 distinct android namespace (`…datastore`, `…room`, `…parseroom`) from `:synchronization-core` so

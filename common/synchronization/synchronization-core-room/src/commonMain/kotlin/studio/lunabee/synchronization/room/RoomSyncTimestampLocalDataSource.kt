@@ -17,15 +17,15 @@
 package studio.lunabee.synchronization.room
 
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import kotlin.time.Instant
 
 /**
- * [SyncTimestampStore] backed by a Room database. Obtain one through a platform factory
- * (`Context.roomSyncTimestampStore()` on Android, `roomSyncTimestampStore()` on iOS) rather than
+ * [SyncTimestampLocalDataSource] backed by a Room database. Obtain one through a platform factory
+ * (`Context.roomSyncTimestampLocalDataSource()` on Android, `roomSyncTimestampLocalDataSource()` on iOS) rather than
  * constructing it directly.
  */
-class RoomSyncTimestampStore internal constructor(private val database: SyncRoomDatabase) : SyncTimestampStore {
+class RoomSyncTimestampLocalDataSource internal constructor(private val database: SyncRoomDatabase) : SyncTimestampLocalDataSource {
 
     override suspend fun lastServerSyncDate(syncKey: SyncKey): Instant? =
         database.syncTimestampDao().getServerDate(syncKey)

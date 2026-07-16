@@ -27,7 +27,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
@@ -216,7 +216,7 @@ class CombinedStatusFlowTest {
 
     // region test infrastructure
 
-    private fun runFlowTest(body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit) = runTest {
+    private fun runFlowTest(body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit) = runTest {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
         try {
             body(freshStore(), scope)
@@ -252,7 +252,7 @@ private data class CombinedLocalObj(val id: String)
  * combined flows can be asserted without running the pipeline. The SPI members are inert.
  */
 private class FakeStatusManager(
-    store: SyncTimestampStore,
+    store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     key: String,
 ) : LBSyncManager<CombinedServerObj, CombinedLocalObj, Nothing>(providedTimestampStore = store, scope = scope) {

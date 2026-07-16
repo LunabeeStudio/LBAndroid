@@ -20,7 +20,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import studio.lunabee.synchronization.LBSyncGroup
 import studio.lunabee.synchronization.LBSyncOperator
-import studio.lunabee.synchronization.room.roomSyncTimestampStore
+import studio.lunabee.synchronization.room.roomSyncTimestampLocalDataSource
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 import javax.inject.Inject
@@ -47,7 +47,7 @@ class SyncDemoRegistry @Inject constructor(
 
     init {
         // Install the cursor store once, before any manager resolves it lazily on the first sync.
-        LBSyncStorage.install(context.roomSyncTimestampStore())
+        LBSyncStorage.install(context.roomSyncTimestampLocalDataSource())
         group.syncManagers = linkedSetOf(syncManager)
         LBSyncOperator.groups[GroupKey] = group
         // Built-in events: the operator observes ProcessLifecycleOwner (foreground) and connectivity;

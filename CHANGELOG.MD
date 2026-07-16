@@ -18,17 +18,17 @@ Synchronization Parse-Room 2.0.0-beta03
   `registerDefaultNetworkCallback`); the rest of the repository stays at `minSdk 23`.
 - `synchronization-core` now declares the `ACCESS_NETWORK_STATE` permission in its manifest, so consumer
   apps no longer have to add it themselves.
-- Backend factories (`dataStoreSyncTimestampStore()`, `roomSyncTimestampStore()`) now return a
+- Backend factories (`dataStoreSyncTimestampLocalDataSource()`, `roomSyncTimestampLocalDataSource()`) now return a
   process-wide single instance — safe to call repeatedly. The Room factories' `dispatcher` parameter
   defaults to Room's own query context instead of `Dispatchers.IO`.
 - Renamed module `synchronization` to `synchronization-core`.
-- Made cursor storage framework-agnostic: `SyncTimestampStore` is now an interface in `synchronization-core`;
+- Made cursor storage framework-agnostic: `SyncTimestampLocalDataSource` is now an interface in `synchronization-core`;
   install a backend once at startup via `LBSyncStorage.install(...)`.
 - Strongly-typed store API: cursor keys use the `SyncKey` value class (`LBSyncManager.syncKey: SyncKey`,
   `statusByKey()` keyed by `SyncKey`) and dates use `kotlin.time.Instant` instead of epoch-millis `Long`.
 - Extracted the DataStore implementation into the new `synchronization-core-datastore` module
-  (`Context.dataStoreSyncTimestampStore()`).
-- Added a Room implementation in the new `synchronization-core-room` module (`Context.roomSyncTimestampStore()`).
+  (`Context.dataStoreSyncTimestampLocalDataSource()`).
+- Added a Room implementation in the new `synchronization-core-room` module (`Context.roomSyncTimestampLocalDataSource()`).
 - Breaking: removed the `Context` constructor from `LBSyncManager` (use the no-arg constructor after installing a
   backend); `LBSyncOperator.resetAllTimestamps()` no longer takes a `Context`.
 - `synchronization-parse-room`: retargeted onto `synchronization-core`; its `LBRoomSyncManager` /
@@ -105,7 +105,7 @@ The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` ar
 `studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
 
 Sync-cursor persistence is now backed by AndroidX DataStore Preferences through a new multiplatform
-`commonMain` store, `SyncTimestampStore`, instead of SharedPreferences. The timestamp read/reset API is now
+`commonMain` store, `SyncTimestampLocalDataSource`, instead of SharedPreferences. The timestamp read/reset API is now
 `suspend`: `LBSyncManager.lastSuccessfulSyncDate()`, `LBSyncManager.resetTimeStamp()`,
 `LBSyncOperator.resetAllTimestamps()` and `LBSyncGroup.resetAllTimestamps()`. The status is no longer seeded in the
 manager constructor; seed it via the new `suspend LBSyncManager.load()` (or `LBSyncOperator.loadAllStatuses()` to seed

@@ -26,7 +26,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import kotlin.time.Duration
@@ -40,7 +40,7 @@ internal data class FetchArgs(val page: Int, val cursor: String?, val sinceLastD
 
 @Suppress("LongParameterList")
 internal open class FakeSyncManager(
-    store: SyncTimestampStore,
+    store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     private val pages: List<FetchPage<ServerObj, Int>> = listOf(FetchPage<ServerObj, Int>(objects = emptyList())),
     private val uploadObjects: List<LocalObj> = emptyList(),
@@ -154,7 +154,7 @@ internal class TransientPushException : Exception("transient push failure")
  * @param downloadPages the server pages returned by successive fetches (a download upserts them).
  */
 internal class StatefulFakeSyncManager(
-    store: SyncTimestampStore,
+    store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     private val downloadPages: List<FetchPage<ServerObj, Int>> = listOf(FetchPage<ServerObj, Int>(objects = emptyList())),
     retryTempo: Duration? = null,
@@ -234,7 +234,7 @@ internal class StatefulFakeSyncManager(
 }
 
 internal fun runManagerTest(
-    body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit,
+    body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit,
 ) = runTest {
     val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
     try {
@@ -244,13 +244,13 @@ internal fun runManagerTest(
     }
 }
 
-internal fun freshStore(): SyncTimestampStore = FakeSyncTimestampStore()
+internal fun freshStore(): SyncTimestampLocalDataSource = FakeSyncTimestampLocalDataSource()
 
 /**
- * In-memory [SyncTimestampStore] fake keyed by `syncKey`, mirroring the contract's non-null write
+ * In-memory [SyncTimestampLocalDataSource] fake keyed by `syncKey`, mirroring the contract's non-null write
  * semantics (a `null` argument leaves the corresponding stored value unchanged).
  */
-internal class FakeSyncTimestampStore : SyncTimestampStore {
+internal class FakeSyncTimestampLocalDataSource : SyncTimestampLocalDataSource {
 
     private val serverDates: MutableMap<SyncKey, Instant> = mutableMapOf()
     private val localDates: MutableMap<SyncKey, Instant> = mutableMapOf()

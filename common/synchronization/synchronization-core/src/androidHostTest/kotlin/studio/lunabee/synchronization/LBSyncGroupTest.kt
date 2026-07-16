@@ -23,7 +23,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
@@ -161,7 +161,7 @@ class LBSyncGroupTest {
 
     // region test infrastructure
 
-    private fun runGroupTest(body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit) = runTest {
+    private fun runGroupTest(body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit) = runTest {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
         try {
             body(freshStore(), scope)
@@ -181,7 +181,7 @@ private data class GroupLocalObj(val id: String)
  * outcomes only. Automatic retry is disabled so a failure resolves immediately under virtual time.
  */
 private class FakeGroupManager(
-    store: SyncTimestampStore,
+    store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     syncKey: String,
     private val fetchError: Exception? = null,

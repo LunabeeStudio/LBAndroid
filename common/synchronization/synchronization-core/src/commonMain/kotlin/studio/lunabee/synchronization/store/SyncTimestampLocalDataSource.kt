@@ -30,7 +30,7 @@ import kotlin.time.Instant
  *
  * @see LBSyncStorage
  */
-interface SyncTimestampStore {
+interface SyncTimestampLocalDataSource {
 
     /**
      * Reads the last server-side `updatedAt` cursor for [syncKey].

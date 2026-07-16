@@ -19,7 +19,7 @@ package studio.lunabee.synchronization.store
 import kotlin.jvm.JvmInline
 
 /**
- * Persisted identity of a sync manager's cursors in a [SyncTimestampStore]. Wraps the manager's
+ * Persisted identity of a sync manager's cursors in a [SyncTimestampLocalDataSource]. Wraps the manager's
  * `syncKey`; treat it as a stable persisted key (renaming it loses the saved cursor).
  */
 @JvmInline

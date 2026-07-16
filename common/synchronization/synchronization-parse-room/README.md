@@ -12,8 +12,8 @@ orchestrated by the same `LBSyncOperator` groups/triggers.
 
 This module is **storage-agnostic for sync cursors**: its managers use the no-store
 `LBSyncManager(logging)` constructor (no `Context`), so the consumer picks the cursor backend by
-installing one at startup — `LBSyncStorage.install(context.dataStoreSyncTimestampStore())` (add
-`:synchronization-core-datastore`) or `…roomSyncTimestampStore()` (add `:synchronization-core-room`).
+installing one at startup — `LBSyncStorage.install(context.dataStoreSyncTimestampLocalDataSource())` (add
+`:synchronization-core-datastore`) or `…roomSyncTimestampLocalDataSource()` (add `:synchronization-core-room`).
 This is unrelated to the module's own synced-entity Room `@Database`.
 
 ## Source-set split

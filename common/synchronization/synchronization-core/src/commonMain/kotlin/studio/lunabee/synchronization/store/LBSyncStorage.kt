@@ -19,7 +19,7 @@ package studio.lunabee.synchronization.store
 import kotlin.concurrent.Volatile
 
 /**
- * Process-wide registry for the single [SyncTimestampStore] backend the engine uses.
+ * Process-wide registry for the single [SyncTimestampLocalDataSource] backend the engine uses.
  *
  * The engine is storage-agnostic: it never constructs a store, it reads the installed one. A backend
  * module (`synchronization-core-datastore`, `synchronization-core-room`, …) exposes a one-line factory;
@@ -27,7 +27,7 @@ import kotlin.concurrent.Volatile
  *
  * ```kotlin
  * // Android, DataStore backend
- * LBSyncStorage.install(context.dataStoreSyncTimestampStore())
+ * LBSyncStorage.install(context.dataStoreSyncTimestampLocalDataSource())
  * ```
  *
  * There is no automatic classpath wiring: the Android multiplatform library format merges no component
@@ -38,20 +38,20 @@ import kotlin.concurrent.Volatile
 object LBSyncStorage {
 
     @Volatile
-    private var store: SyncTimestampStore? = null
+    private var store: SyncTimestampLocalDataSource? = null
 
     /**
      * Installs [store] as the process-wide backend, replacing any previously installed one. Call once at
      * startup. Installing a second time (e.g. both backend modules on the classpath) is last-wins.
      */
-    fun install(store: SyncTimestampStore) {
+    fun install(store: SyncTimestampLocalDataSource) {
         this.store = store
     }
 
     /**
      * The installed backend, or `null` when none has been installed yet.
      */
-    val installedStore: SyncTimestampStore?
+    val installedStore: SyncTimestampLocalDataSource?
         get() = store
 
     /**
@@ -60,8 +60,8 @@ object LBSyncStorage {
      * @throws IllegalStateException when no backend has been installed. Add a `synchronization-core-*`
      * backend module and call [install] at startup.
      */
-    fun requireStore(): SyncTimestampStore = store ?: error(
-        "No SyncTimestampStore installed. Add a synchronization-core-datastore or " +
+    fun requireStore(): SyncTimestampLocalDataSource = store ?: error(
+        "No SyncTimestampLocalDataSource installed. Add a synchronization-core-datastore or " +
             "synchronization-core-room dependency and call LBSyncStorage.install(...) at startup.",
     )
 }

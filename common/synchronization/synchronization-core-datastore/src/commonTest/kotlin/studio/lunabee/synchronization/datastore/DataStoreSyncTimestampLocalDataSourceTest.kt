@@ -23,19 +23,19 @@ import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import okio.Path
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Instant
 
-class DataStoreSyncTimestampStoreTest {
+class DataStoreSyncTimestampLocalDataSourceTest {
 
-    private fun freshStore(): SyncTimestampStore {
+    private fun freshStore(): SyncTimestampLocalDataSource {
         val fileName = "sync_timestamp_${counter++}_${nextRandom()}.preferences_pb"
         val path: Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / fileName
         val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.createWithPath { path }
-        return DataStoreSyncTimestampStore(dataStore = dataStore)
+        return DataStoreSyncTimestampLocalDataSource(dataStore = dataStore)
     }
 
     private fun ms(value: Long): Instant = Instant.fromEpochMilliseconds(value)

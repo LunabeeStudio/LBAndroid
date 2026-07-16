@@ -22,11 +22,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import kotlinx.coroutines.flow.first
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import kotlin.time.Instant
 
 /**
- * [SyncTimestampStore] backed by an AndroidX DataStore [Preferences] store.
+ * [SyncTimestampLocalDataSource] backed by an AndroidX DataStore [Preferences] store.
  *
  * Cursors are exposed as [Instant] but persisted as epoch-millis via [longPreferencesKey], converting at
  * the boundary. The key scheme is a persisted compatibility contract (existing installs keep their
@@ -36,7 +36,7 @@ import kotlin.time.Instant
  *
  * @param dataStore the preferences store all cursors are read from and written to.
  */
-class DataStoreSyncTimestampStore(private val dataStore: DataStore<Preferences>) : SyncTimestampStore {
+class DataStoreSyncTimestampLocalDataSource(private val dataStore: DataStore<Preferences>) : SyncTimestampLocalDataSource {
 
     override suspend fun lastServerSyncDate(syncKey: SyncKey): Instant? =
         dataStore.data.first()[serverDateKey(syncKey)]?.let { Instant.fromEpochMilliseconds(it) }

@@ -27,7 +27,7 @@ import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -57,7 +57,7 @@ typealias LBDefaultSyncManager<ServerData, LocalData> = LBSyncManager<ServerData
  */
 @Suppress("unused", "TooManyFunctions")
 abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal constructor(
-    providedTimestampStore: SyncTimestampStore?,
+    providedTimestampStore: SyncTimestampLocalDataSource?,
     internal val scope: CoroutineScope,
     private var logging: Boolean = true,
 ) {
@@ -77,7 +77,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * [LBSyncStorage.install] ordering: the installed backend is read on first cursor access. Tests and
      * advanced DI inject an explicit store through the `internal` primary constructor.
      */
-    private val timestampStore: SyncTimestampStore by lazy { providedTimestampStore ?: LBSyncStorage.requireStore() }
+    private val timestampStore: SyncTimestampLocalDataSource by lazy { providedTimestampStore ?: LBSyncStorage.requireStore() }
 
     /**
      * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name
@@ -356,7 +356,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     /**
      * Save the last download date in the timestamp store: always the device date, and the server
-     * [instant] when non-null (the [SyncTimestampStore] leaves a `null` server value unchanged).
+     * [instant] when non-null (the [SyncTimestampLocalDataSource] leaves a `null` server value unchanged).
      * @param instant A server instant to save, or null to leave the server cursor untouched.
      */
     private suspend fun saveDownloadDate(instant: Instant?) {

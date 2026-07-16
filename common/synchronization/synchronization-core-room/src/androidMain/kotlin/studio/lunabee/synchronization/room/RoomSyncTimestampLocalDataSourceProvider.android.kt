@@ -20,15 +20,15 @@ import android.content.Context
 import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.CoroutineDispatcher
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 
 /**
- * Returns a [SyncTimestampStore] backed by a Room database stored in the app's database directory. Call
+ * Returns a [SyncTimestampLocalDataSource] backed by a Room database stored in the app's database directory. Call
  * it once and install the result at startup; opening the same database file more than once is the
  * caller's responsibility to avoid.
  *
  * ```kotlin
- * LBSyncStorage.install(context.roomSyncTimestampStore())
+ * LBSyncStorage.install(context.roomSyncTimestampLocalDataSource())
  * ```
  *
  * @param driver the SQLite driver Room runs on. Defaults to [BundledSQLiteDriver] (ships its own SQLite,
@@ -36,14 +36,14 @@ import studio.lunabee.synchronization.store.SyncTimestampStore
  * @param dispatcher the coroutine context Room runs its queries on, or `null` (default) to keep Room's
  * own default query context.
  */
-fun Context.roomSyncTimestampStore(
+fun Context.roomSyncTimestampLocalDataSource(
     driver: SQLiteDriver = BundledSQLiteDriver(),
     dispatcher: CoroutineDispatcher? = null,
-): SyncTimestampStore {
+): SyncTimestampLocalDataSource {
     val database = getRoomDb(
         builder = RoomPlatformBuilder(context = applicationContext),
         driver = driver,
         dispatcher = dispatcher,
     )
-    return RoomSyncTimestampStore(database = database)
+    return RoomSyncTimestampLocalDataSource(database = database)
 }

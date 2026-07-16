@@ -25,27 +25,27 @@ import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 
 /**
  * The single process-wide store: AndroidX DataStore throws if two instances are active on the same
- * file, so repeated [dataStoreSyncTimestampStore] calls must share one instance.
+ * file, so repeated [dataStoreSyncTimestampLocalDataSource] calls must share one instance.
  */
-private val sharedStore: SyncTimestampStore by lazy { createDataStoreSyncTimestampStore() }
+private val sharedStore: SyncTimestampLocalDataSource by lazy { createDataStoreSyncTimestampLocalDataSource() }
 
 /**
- * Returns the process-wide [SyncTimestampStore] backed by a DataStore file in the app's documents
+ * Returns the process-wide [SyncTimestampLocalDataSource] backed by a DataStore file in the app's documents
  * directory. Safe to call repeatedly: every call returns the same instance.
  *
  * Install it once at startup:
  * ```kotlin
- * LBSyncStorage.install(dataStoreSyncTimestampStore())
+ * LBSyncStorage.install(dataStoreSyncTimestampLocalDataSource())
  * ```
  */
-fun dataStoreSyncTimestampStore(): SyncTimestampStore = sharedStore
+fun dataStoreSyncTimestampLocalDataSource(): SyncTimestampLocalDataSource = sharedStore
 
 @OptIn(ExperimentalForeignApi::class)
-private fun createDataStoreSyncTimestampStore(): SyncTimestampStore {
+private fun createDataStoreSyncTimestampLocalDataSource(): SyncTimestampLocalDataSource {
     val documentDirectory: NSURL? = NSFileManager.defaultManager.URLForDirectory(
         directory = NSDocumentDirectory,
         inDomain = NSUserDomainMask,
@@ -55,5 +55,5 @@ private fun createDataStoreSyncTimestampStore(): SyncTimestampStore {
     )
     val filePath = "${requireNotNull(documentDirectory?.path)}/$SyncDataStoreName.preferences_pb"
     val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.createWithPath(produceFile = { filePath.toPath() })
-    return DataStoreSyncTimestampStore(dataStore)
+    return DataStoreSyncTimestampLocalDataSource(dataStore)
 }

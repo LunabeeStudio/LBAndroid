@@ -23,7 +23,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.store.SyncKey
-import studio.lunabee.synchronization.store.SyncTimestampStore
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.syncmanager.FetchPage
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
@@ -161,7 +161,7 @@ class LBSyncOperatorTest {
     }
 
     private fun group(
-        store: SyncTimestampStore,
+        store: SyncTimestampLocalDataSource,
         scope: CoroutineScope,
         syncKey: String,
         order: MutableList<String>,
@@ -173,7 +173,7 @@ class LBSyncOperatorTest {
         ),
     )
 
-    private fun runOperatorTest(body: suspend TestScope.(store: SyncTimestampStore, scope: CoroutineScope) -> Unit) = runTest {
+    private fun runOperatorTest(body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit) = runTest {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
         try {
             body(freshStore(), scope)
@@ -194,7 +194,7 @@ private data class OperatorLocalObj(val id: String)
  * resolves immediately under virtual time.
  */
 private class FakeOperatorManager(
-    store: SyncTimestampStore,
+    store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     syncKey: String,
     private val runOrder: MutableList<String>? = null,
