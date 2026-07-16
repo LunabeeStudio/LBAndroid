@@ -20,17 +20,12 @@ import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.CoroutineDispatcher
 import studio.lunabee.synchronization.store.SyncTimestampStore
-import kotlin.concurrent.Volatile
-
-@Volatile
-private var sharedStore: SyncTimestampStore? = null
 
 /**
- * Returns the process-wide [SyncTimestampStore] backed by a Room database stored in the app's documents
- * directory. The database is created on the first call; subsequent calls return the same instance and
- * ignore the parameters (one database file must not be opened twice).
+ * Returns a [SyncTimestampStore] backed by a Room database stored in the app's documents directory. Call
+ * it once and install the result at startup; opening the same database file more than once is the
+ * caller's responsibility to avoid.
  *
- * Install it once at startup:
  * ```kotlin
  * LBSyncStorage.install(roomSyncTimestampStore())
  * ```
@@ -44,8 +39,6 @@ fun roomSyncTimestampStore(
     driver: SQLiteDriver = BundledSQLiteDriver(),
     dispatcher: CoroutineDispatcher? = null,
 ): SyncTimestampStore {
-    return sharedStore ?: run {
-        val database = getRoomDb(builder = RoomPlatformBuilder(), driver = driver, dispatcher = dispatcher)
-        RoomSyncTimestampStore(database = database).also { sharedStore = it }
-    }
+    val database = getRoomDb(builder = RoomPlatformBuilder(), driver = driver, dispatcher = dispatcher)
+    return RoomSyncTimestampStore(database = database)
 }
