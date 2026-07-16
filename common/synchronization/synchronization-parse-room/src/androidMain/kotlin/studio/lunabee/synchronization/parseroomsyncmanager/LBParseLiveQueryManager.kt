@@ -56,8 +56,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
     private var handler: Handler = Handler(Looper.getMainLooper())
 
     /**
-     * Scope + job used to await connectivity before reconnecting (replaces the legacy connectivity
-     * BroadcastReceiver).
+     * Scope + job used to await connectivity before reconnecting.
      */
     private val reconnectionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var reconnectionJob: Job? = null
@@ -80,7 +79,7 @@ class LBParseLiveQueryManager : ParseLiveQueryClientCallbacks {
 
     /**
      * Suspend until connectivity is back (collecting [LBConnectivityManager.networkStates]) then
-     * reconnect the LiveQuery client. Replaces the legacy connectivity BroadcastReceiver.
+     * reconnect the LiveQuery client.
      */
     private fun awaitConnectivityThenReconnect() {
         reconnectionJob?.cancel()

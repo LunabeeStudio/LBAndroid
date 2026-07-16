@@ -23,9 +23,8 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
- * There is the list of event than can triggered and sync manager refresh
- * [AppForeground] and [InternetIsBack] are managed in LBSyncOperator
- * You can use NOTIFICATION_FROM_SERVER in LiveQueries for example
+ * Events that can trigger a sync manager refresh. [AppForeground] and [InternetIsBack] are handled by
+ * `LBSyncOperator`.
  *
  * @param minimumDelay the minimum debounce duration that must elapse since the last successful sync
  * before this event triggers a refresh.

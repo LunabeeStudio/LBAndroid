@@ -33,19 +33,22 @@ the artifact is at 2.0.0 here).
 
 Generic sync framework. **Source-set split**: the whole engine (`LBSyncManager`, `LBSyncGroup`,
 `LBSyncOperator`, connectivity, lifecycle) lives in `androidMain`; `commonMain` holds the pure
-`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampStore` **interface** (epoch-millis, owns
-the legacy key scheme `"${syncKey}lastSyncDate"` / `…_localDate`), and the `store/LBSyncStorage`
-registry. No backend (DataStore/Room) is referenced from core.
+`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampStore` **interface** (`SyncKey` keys,
+`kotlin.time.Instant` dates; the DataStore backend persists epoch-millis under the key scheme
+`"${syncKey}lastSyncDate"` / `…_localDate`), and the `store/LBSyncStorage` registry. No backend
+(DataStore/Room) is referenced from core.
 
 Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
 callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
 inside the Parse SDK). Each level has ONE suspend entry point returning `LBResult<Unit>`:
 `LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()`.
-Detached-from-caller execution (receiver-triggered syncs, automatic retry) is preserved by an injected,
-library-owned `CoroutineScope` — the `Context`-based manager constructor defaults it to the shared
-internal `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
+Detached-from-caller execution (receiver-triggered syncs, automatic retry) runs in an injected,
+library-owned `CoroutineScope` — the no-store constructor defaults it to the shared internal
+`defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
 collapse-and-join + failure-retry machinery is extracted into the `SyncRunner` deep module in
-`commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time.
+`commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time. All four modules
+declare `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`) — the connectivity engine relies on
+`registerDefaultNetworkCallback` (API 24) — while the rest of the repo stays at `minSdk 23`.
 
 ### Cursor storage (pluggable backend)
 
@@ -75,12 +78,15 @@ directly for tests/DI. There is **no `Context` constructor anymore** (removed), 
 `LBSyncOperator.resetAllTimestamps()` takes **no `Context`** (uses the installed store).
 
 Backends: `:synchronization-core-datastore` (`DataStoreSyncTimestampStore` over a process-wide
-`preferencesDataStore` delegate, file base name `SYNC_DATA_STORE_NAME` = `com.lunabee.lbsynchronization`
-for legacy parity); `:synchronization-core-room` (standalone `@Database`/`@Entity`/`@Dao`, `saveSyncDates`
-= `INSERT OR IGNORE` + `UPDATE … COALESCE` so a null arg preserves the stored cursor). The Room backend
-starts with a fresh table, so switching a DataStore-based app to Room **re-syncs once**. Its factories
-default to `BundledSQLiteDriver` (own SQLite, version-stable) but accept any `SQLiteDriver` —
-`roomSyncTimestampStore(driver = AndroidSQLiteDriver())` to use the platform SQLite instead.
+`preferencesDataStore` delegate, file base name `SyncDataStoreName` = `com.lunabee.lbsynchronization`
+so existing installs keep their cursors); `:synchronization-core-room` (standalone
+`@Database`/`@Entity`/`@Dao`, `saveSyncDates` = `INSERT OR IGNORE` + `UPDATE … COALESCE` so a null arg
+preserves the stored cursor). The Room backend starts with a fresh table, so switching a
+DataStore-based app to Room **re-syncs once**. Every factory returns a process-wide single instance
+(safe to call repeatedly; later calls ignore the parameters). The Room factories default to
+`BundledSQLiteDriver` (own SQLite, version-stable) but accept any `SQLiteDriver` —
+`roomSyncTimestampStore(driver = AndroidSQLiteDriver())` to use the platform SQLite instead — and
+leave Room's default query context unless a `dispatcher` is passed.
 
 Because the read is I/O, the **read/reset API is `suspend`**: `lastSuccessfulSyncDate()`,
 `resetTimeStamp()`, `LBSyncOperator.resetAllTimestamps()`. Status is **not seeded in the constructor** —

@@ -29,8 +29,8 @@ import kotlin.time.Instant
  * [SyncTimestampStore] backed by an AndroidX DataStore [Preferences] store.
  *
  * Cursors are exposed as [Instant] but persisted as epoch-millis via [longPreferencesKey], converting at
- * the boundary. Preserves the legacy key scheme used by the previous SharedPreferences-based engine, so
- * renaming a manager (and therefore its [SyncKey]) still loses the saved cursor exactly as before:
+ * the boundary. The key scheme is a persisted compatibility contract (existing installs keep their
+ * cursors), so renaming a manager (and therefore its [SyncKey]) loses the saved cursor:
  * - server-date key = `"${syncKey.value}lastSyncDate"`
  * - local-date key  = `"${syncKey.value}lastSyncDate_localDate"`
  *

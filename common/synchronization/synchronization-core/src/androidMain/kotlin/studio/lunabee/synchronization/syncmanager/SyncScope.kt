@@ -21,11 +21,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /**
- * Shared, library-owned [CoroutineScope] every sync manager runs in when constructed via the
- * `Context`-based convenience constructor. It is the coroutine replacement for the old detached
- * `GlobalScope.launch`: receiver-triggered syncs and automatic retries keep firing independently of any
- * caller scope. A [SupervisorJob] keeps one failing sync from tearing the others down, and
- * [Dispatchers.IO] matches the previous I/O-bound execution context.
+ * Shared, library-owned [CoroutineScope] every sync manager built with the no-store constructor runs
+ * in: receiver-triggered syncs and automatic retries fire independently of any caller scope. A
+ * [SupervisorJob] keeps one failing sync from tearing the others down, and [Dispatchers.IO] fits the
+ * I/O-bound work.
  *
  * The operator reuses this same scope for receiver-triggered launches.
  */

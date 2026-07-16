@@ -147,9 +147,6 @@ object LBSyncOperator {
      * - exactly one failure → [LBResult.Failure] carrying that group's error;
      * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
      *
-     * This intentionally fixes the legacy chained-continuation behavior that dropped every group's error
-     * but the last.
-     *
      * @return the combined synchronization result across all groups.
      */
     suspend fun syncAllManagers(): LBResult<Unit> = runGroupsSequentially(groups.values)
@@ -209,8 +206,8 @@ object LBSyncOperator {
 
     /**
      * Seed the status of all sync managers currently added in [groups] from their persisted last
-     * successful sync date. Call this once (e.g. at startup) since the status is no longer seeded
-     * synchronously in each manager's constructor.
+     * successful sync date. Call this once (e.g. at startup); until then every status is
+     * [LBSyncProcessStatus.NeverSync].
      */
     suspend fun loadAllStatuses() {
         syncManagers().forEach { it.load() }

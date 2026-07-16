@@ -17,10 +17,9 @@
 package studio.lunabee.synchronization
 
 /**
- * Aggregates several underlying synchronization failures into one exception, mirroring the Bolts
- * `AggregateException` the engine previously relied on. Raised when more than one manager (or, at the
- * operator level, more than one group) fails during a single synchronization attempt so every error
- * can be logged or displayed instead of only the last one.
+ * Aggregates several underlying synchronization failures into one exception. Raised when more than one
+ * manager (or, at the operator level, more than one group) fails during a single synchronization
+ * attempt so every error can be logged or displayed instead of only the last one.
  *
  * The first underlying error is used as this exception's `cause`.
  *

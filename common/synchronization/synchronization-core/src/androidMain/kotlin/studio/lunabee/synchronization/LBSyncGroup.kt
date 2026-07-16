@@ -48,12 +48,9 @@ class LBSyncGroup(
 ) {
 
     /**
-     * Use this to gate the whole group's synchronization. Evaluated exactly once per [syncManagers]
-     * attempt; when it returns false every manager is marked [LBSyncProcessStatus.Disabled] and the
-     * attempt fails with [LBSyncClosureException].
-     *
-     * Being a suspend closure, it subsumes both the legacy synchronous and asynchronous enablement
-     * checks (e.g. gate the sync on a session call) without any callback bridging.
+     * Use this to gate the whole group's synchronization (e.g. gate the sync on a session call).
+     * Evaluated exactly once per [syncManagers] attempt; when it returns false every manager is marked
+     * [LBSyncProcessStatus.Disabled] and the attempt fails with [LBSyncClosureException].
      */
     var isEnabled: suspend () -> Boolean = { true }
 
@@ -78,8 +75,7 @@ class LBSyncGroup(
      *
      * Otherwise every manager runs to completion via `async`/`awaitAll` — because each
      * [LBGenericSyncManager.synchronize] returns its failure as a value, a failing sibling never
-     * cancels the others (parity with the legacy Bolts `whenAll`). The per-manager results are then
-     * combined:
+     * cancels the others. The per-manager results are then combined:
      * - no failure → [LBResult.Success];
      * - exactly one failure → [LBResult.Failure] carrying that manager's error;
      * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.

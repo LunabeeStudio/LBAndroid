@@ -40,7 +40,7 @@ sealed class LBSyncProcessStatus {
      * [lastSuccessfulSync] to read it: it is coerced to "now" so a clock-skewed future date never leaks.
      */
     data class SyncSuccessfully(private val rawLastSuccessfulSync: Instant) : LBSyncProcessStatus() {
-        /** The last successful sync instant, coerced to at most the current instant (legacy quirk). */
+        /** The last successful sync instant, coerced to at most the current instant. */
         val lastSuccessfulSync: Instant get() = minOf(rawLastSuccessfulSync, Clock.System.now())
     }
 

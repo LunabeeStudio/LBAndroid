@@ -43,7 +43,7 @@ typealias LBDefaultSyncManager<ServerData, LocalData> = LBSyncManager<ServerData
  *
  * Coroutine-native engine: [synchronize] is a suspend function returning [LBResult], status is exposed
  * as a [StateFlow], and run scheduling (collapse-and-join + automatic retry) is delegated to
- * [SyncRunner]. The detached-from-caller execution of the old `GlobalScope.launch` is preserved by the
+ * [SyncRunner]. Receiver-triggered syncs and automatic retries run detached from any caller, in the
  * injected [scope].
  *
  * @param ServerData The type of data returned by the server
@@ -63,10 +63,10 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 ) {
 
     /**
-     * Convenience constructor preserving the legacy call shape: the cursor store is resolved from the
-     * process-wide [LBSyncStorage] backend (install it once at startup) and runs are launched in the
-     * shared library [defaultSyncScope]. The store is read lazily, so [LBSyncStorage.install] only has to
-     * run before the first synchronization, not before this manager is created.
+     * Convenience constructor: the cursor store is resolved from the process-wide [LBSyncStorage]
+     * backend (install it once at startup) and runs are launched in the shared library
+     * [defaultSyncScope]. The store is read lazily, so [LBSyncStorage.install] only has to run before
+     * the first synchronization, not before this manager is created.
      *
      * @param logging Enable LBSM logs.
      */
@@ -80,9 +80,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     private val timestampStore: SyncTimestampStore by lazy { providedTimestampStore ?: LBSyncStorage.requireStore() }
 
     /**
-     * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name to
-     * preserve the legacy SharedPreferences key scheme (`"${simpleName}lastSyncDate"`); override it to
-     * make a subclass rename-safe so the incremental-sync cursor survives a class rename.
+     * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name
+     * (persisted as `"${simpleName}lastSyncDate"`); override it to pin a stable key so the
+     * incremental-sync cursor survives a class rename.
      */
     open val syncKey: SyncKey get() = SyncKey(this::class.simpleName.orEmpty())
 
@@ -123,8 +123,8 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     /**
      * Seed [status] from the persisted last successful sync date. Status stays
-     * [LBSyncProcessStatus.NeverSync] until this is called (the cursor read is suspending, so it can no
-     * longer run synchronously in `init`).
+     * [LBSyncProcessStatus.NeverSync] until this is called (the cursor read suspends, so it cannot run
+     * in the constructor).
      */
     suspend fun load() {
         setStatusInternal(
@@ -220,12 +220,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     /**
      * Cancel the in-flight sync run and any pending automatic retry. The terminal status surfaced is
-     * [LBSyncProcessStatus.DownloadFinishSuccessfully] (parity with the legacy soft-cancel path).
-     *
-     * An in-flight [synchronize] call returns an [LBResult.Failure] carrying the cancellation cause
-     * (this is how [SyncRunner] resolves cancelled awaiters so they never hang); the important parity is
-     * the terminal **status**, not the returned result. A [CancellationException] never escapes the
-     * engine.
+     * [LBSyncProcessStatus.DownloadFinishSuccessfully]; in-flight and collapsed [synchronize] callers
+     * receive an [LBResult.Failure] carrying the cancellation cause, and a [CancellationException]
+     * never escapes the engine.
      */
     fun cancelAllRequests() {
         setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
@@ -307,12 +304,11 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * `DownloadUpdated` (per page) → `DownloadFinishSuccessfully`; a fetch failure maps to
      * `DownloadFinishWithError` and rethrows.
      *
-     * Cursor persistence mirrors the legacy engine: the server cursor is checkpointed **per page**
-     * only when [supportIncrementalSync] (so a mid-paging failure can resume from the last saved
-     * page), and is **always** persisted together with the local sync date on terminal success —
-     * even for a non-incremental manager, whose next run then fetches only records newer than that
-     * cursor. [supportIncrementalSync] therefore governs mid-paging resumption, not whether the
-     * cursor filter applies on the following run.
+     * The server cursor is checkpointed **per page** only when [supportIncrementalSync] (so a
+     * mid-paging failure can resume from the last saved page), and is **always** persisted together
+     * with the local sync date on terminal success — even for a non-incremental manager, whose next
+     * run then fetches only records newer than that cursor. [supportIncrementalSync] therefore governs
+     * mid-paging resumption, not whether the cursor filter applies on the following run.
      */
     private suspend fun download() {
         setStatusInternal(LBSyncProcessStatus.DownloadStarted(Clock.System.now()))
@@ -353,8 +349,8 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         }
 
         setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
-        // Terminal success always records both the local sync date and the server cursor (legacy
-        // parity); the per-page checkpoint above is the only part gated on incremental sync.
+        // Terminal success always records both the local sync date and the server cursor; the per-page
+        // checkpoint above is the only part gated on incremental sync.
         saveDownloadDate(maxDate)
     }
 

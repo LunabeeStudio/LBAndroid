@@ -23,9 +23,8 @@ import kotlin.time.Instant
  * interface; a concrete backend (DataStore, Room, …) is provided by a separate module and installed via
  * [LBSyncStorage].
  *
- * Cursors are keyed by a manager's [SyncKey], preserving the legacy key scheme so renaming a manager
- * (and therefore its [SyncKey]) still loses the saved cursor exactly as before. Two cursors are tracked
- * per key:
+ * Cursors are keyed by a manager's [SyncKey]; the key is persisted, so renaming a manager (and
+ * therefore its [SyncKey]) loses the saved cursor. Two cursors are tracked per key:
  * - the last server-side `updatedAt` (incremental-sync cursor);
  * - the last successful local sync date.
  *
