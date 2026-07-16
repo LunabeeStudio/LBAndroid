@@ -17,9 +17,6 @@
 package studio.lunabee.synchronization.roomsyncmanager
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import kotlin.time.Instant
 
@@ -32,24 +29,19 @@ typealias LBGenericRoomSyncManager = LBRoomSyncManager<*, *, *>
 abstract class LBDefaultRoomSyncManager<ServerData, RoomData : LBRoomSyncModel>(
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBRoomSyncManager<ServerData, RoomData, Nothing>(
     dao,
     logging,
-    queryDispatcher,
-    writeDispatcher,
 )
 
 /**
  * [LBSyncManager] backed by Room. The DAO is constructor-injected so managers are unit-testable
- * with a fake DAO.
+ * with a fake DAO. Threading is Room's: every DAO method is `suspend`, so Room runs it on its own
+ * query/transaction context — no dispatcher wrapping here.
  */
 abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInfo>(
     protected val dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    protected val queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    protected val writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : LBSyncManager<ServerData, RoomData, PageInfo>(logging) {
 
     /**
@@ -71,26 +63,17 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
     }
 
     override suspend fun clearData() {
-        withContext(writeDispatcher) {
-            dao.deleteAll()
-        }
+        dao.deleteAll()
     }
 
     override suspend fun updateData(data: List<ServerData>) {
-        val rows = data.map { createObjectFrom(it) }
-        withContext(writeDispatcher) {
-            dao.upsert(rows)
-        }
+        dao.upsert(data.map { createObjectFrom(it) })
     }
 
     override fun isInSync(obj: RoomData): Boolean = obj.lbInSync
 
     /** Includes soft-deleted rows whose deletion still has to be pushed. */
-    override suspend fun objectToBeUploaded(): List<RoomData> {
-        return withContext(queryDispatcher) {
-            dao.notInSync()
-        }
-    }
+    override suspend fun objectToBeUploaded(): List<RoomData> = dao.notInSync()
 
     override suspend fun pushObjectsToServer(objects: List<RoomData>) {
         val syncedIds = mutableListOf<String>()
@@ -108,9 +91,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
             }
         }
         if (syncedIds.isNotEmpty()) {
-            withContext(writeDispatcher) {
-                dao.markInSync(syncedIds)
-            }
+            dao.markInSync(syncedIds)
         }
         firstError?.let { throw it }
     }

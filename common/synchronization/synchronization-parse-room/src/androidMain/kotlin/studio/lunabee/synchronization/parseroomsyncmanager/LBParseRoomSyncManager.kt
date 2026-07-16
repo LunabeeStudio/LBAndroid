@@ -23,7 +23,6 @@ import com.parse.coroutines.getById
 import com.parse.coroutines.suspendFind
 import com.parse.coroutines.suspendSave
 import com.parse.livequery.SubscriptionHandling
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,21 +44,17 @@ typealias LBGenericParseRoomSyncManager = LBParseRoomSyncManager<*>
  *
  * @param RoomData The Room entity type to be mapped from [ParseObject]
  * @param dao The persistence base for [RoomData]
- * @param queryDispatcher Coroutine dispatcher used for read accesses to the local data
- * @param writeDispatcher Coroutine dispatcher used for write accesses to the local data
  */
 abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     dao: LBRoomSyncDao<RoomData>,
     logging: Boolean = true,
-    queryDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(dao, logging, queryDispatcher, writeDispatcher) {
+) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(dao, logging) {
 
     /**
      * Scope used to fire-and-forget a [synchronize] from the LiveQuery callback, detached from any
      * caller.
      */
-    private val liveQueryScope: CoroutineScope = CoroutineScope(queryDispatcher)
+    private val liveQueryScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
     /**
      * The parse query to use for the synchronization and LiveQuery if needed.
