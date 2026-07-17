@@ -211,7 +211,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * Stop the listener for the server notifications.
      * eg: stop the Parse LiveQuery
      *
-     * @return true once the listener is stopped.
+     * @return true once the listener is stopped, false is nothing to stop
      */
     open suspend fun stopServerNotificationListener(): Boolean = true
 

@@ -54,19 +54,6 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
 ) : LBRoomSyncManager<ParseObject, RoomData, Nothing>(dao, logging) {
 
     /**
-     * The parse query to use for the synchronization and LiveQuery if needed.
-     * Must be a unique instance for LiveQuery.
-     * Please use this instead of {@code parseQuery()}.
-     */
-    private var parseQuery: ParseQuery<ParseObject>? = null
-        get() {
-            if (field == null) {
-                field = parseQuery()
-            }
-            return field
-        }
-
-    /**
      * @return the parse table name you want to sync
      * eg : "User"
      */
@@ -96,7 +83,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * Override this if you want to create a custom parse query.
      * **WARNING** If you just want to select or include keys, @see [keysToSelect] and [keysToInclude].
      */
-    protected open fun parseQuery(): ParseQuery<ParseObject> {
+    protected open suspend fun parseQuery(): ParseQuery<ParseObject> {
         val objectQuery: ParseQuery<ParseObject> = ParseQuery.getQuery(tableParseName())
         keysToInclude().forEach { keyToInclude ->
             objectQuery.include(keyToInclude)
@@ -193,13 +180,17 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
         objToSave.suspendSave()
     }
 
+    private var liveQuery: ParseQuery<ParseObject>? = null
+
     override suspend fun startServerNotificationListener(): Boolean {
-        LBParseLiveQueryManager.instance.unsubscribe(parseQuery!!)
-        val subscriptionHandling = LBParseLiveQueryManager.instance.subscribe(parseQuery!!)
+        stopServerNotificationListener()
+        val query = parseQuery()
+        val subscriptionHandling = LBParseLiveQueryManager.instance.subscribe(query)
+        liveQuery = query
         subscriptionHandling?.let {
-            it.handleEvents { _, event, `object` ->
+            it.handleEvents { _, event, parseObject ->
                 if (event == SubscriptionHandling.Event.CREATE || event == SubscriptionHandling.Event.UPDATE) {
-                    onLiveQueryCreateOrUpdate(event, `object`)
+                    onLiveQueryCreateOrUpdate(event, parseObject)
                 }
             }
         }
@@ -207,8 +198,10 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     }
 
     override suspend fun stopServerNotificationListener(): Boolean {
-        LBParseLiveQueryManager.instance.unsubscribe(parseQuery!!)
-        parseQuery = null
-        return true
+        return liveQuery?.let { query ->
+            LBParseLiveQueryManager.instance.unsubscribe(query)
+            liveQuery = null
+            true
+        } ?: false
     }
 }

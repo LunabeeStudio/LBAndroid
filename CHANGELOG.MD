@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-17
+
+```
+Synchronization Core 2.0.0-beta04
+Synchronization Core-Datastore 2.0.0-beta04
+Synchronization Core-Room 2.0.0-beta04
+Synchronization Parse-Room 2.0.0-beta04
+```
+
+- Make `parseQuery()` suspend so caller can compute the query using asynchronous data
+
 ## 2026-07-15
 
 ```
