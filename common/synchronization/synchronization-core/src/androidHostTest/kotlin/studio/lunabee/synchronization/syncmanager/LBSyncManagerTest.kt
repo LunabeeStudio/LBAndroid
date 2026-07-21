@@ -130,13 +130,14 @@ class LBSyncManagerTest {
     }
 
     @Test
-    fun incremental_sync_checkpoints_a_completed_page_cursor_when_a_later_page_fails() = runManagerTest { store, scope ->
-        // Page 0 is a full page (so paging continues), then page 1 throws mid-download.
-        val page0Max = Instant.fromEpochMilliseconds(100L)
+    fun incremental_sync_does_not_checkpoint_an_open_max_when_a_later_page_fails() = runManagerTest { store, scope ->
+        // Page 0 is a full page of a single timestamp (so paging continues), then page 1 throws. That
+        // timestamp is still open — page 1 could have carried more records sharing it — so under the strict
+        // `>` resume filter nothing is checkpointed, and the next run re-fetches from the prior cursor.
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = page0Max)))),
+            pages = listOf(FetchPage(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))),
             pageSize = 1,
             fetchErrorOnPage = 1,
             supportIncremental = true,
@@ -145,10 +146,9 @@ class LBSyncManagerTest {
         val result = manager.synchronize()
 
         assertTrue(result is LBResult.Failure, "a mid-paging fetch failure surfaces as Failure")
-        assertEquals(
-            expected = page0Max,
-            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
-            "incremental sync checkpoints the completed page's cursor so the next run resumes from it",
+        assertNull(
+            store.lastServerSyncDate(syncKey = manager.syncKey),
+            "an unclosed max (only one timestamp seen) is not persisted mid-paging",
         )
     }
 
@@ -159,7 +159,7 @@ class LBSyncManagerTest {
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))),
+            pages = listOf(FetchPage(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))),
             pageSize = 1,
             fetchErrorOnPage = 1,
             supportIncremental = false,
@@ -180,10 +180,10 @@ class LBSyncManagerTest {
 
     @Test
     fun download_loops_over_every_page_of_a_multi_page_fetch() = runManagerTest { store, scope ->
-        val pages = listOf(
-            FetchPage<ServerObj, Int>(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
-            FetchPage<ServerObj, Int>(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)))),
+        val pages = listOf<FetchPage<ServerObj, Int>>(
+            FetchPage(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
+            FetchPage(objects = List(size = 2) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
+            FetchPage(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)))),
         )
         val manager = FakeSyncManager(
             store = store,

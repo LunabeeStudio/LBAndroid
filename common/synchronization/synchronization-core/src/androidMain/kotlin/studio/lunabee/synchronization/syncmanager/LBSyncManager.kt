@@ -301,11 +301,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * `DownloadUpdated` (per page) → `DownloadFinishSuccessfully`; a fetch failure maps to
      * `DownloadFinishWithError` and rethrows.
      *
-     * The server cursor is checkpointed **per page** only when [supportIncrementalSync] (so a
-     * mid-paging failure can resume from the last saved page), and is **always** persisted together
-     * with the local sync date on terminal success — even for a non-incremental manager, whose next
-     * run then fetches only records newer than that cursor. [supportIncrementalSync] therefore governs
-     * mid-paging resumption, not whether the cursor filter applies on the following run.
+     * While [supportIncrementalSync] is on, each page (except the last) checkpoints only the *closed*
+     * part of the cursor — the highest `updatedAt` strictly below the running max — so a mid-paging
+     * failure resumes without skipping records that share the max timestamp but sit on a page not yet
+     * fetched (the resume filter is a strict `>`). The running max itself is persisted, together with
+     * the local sync date, **only** on terminal success (and always then, even for a non-incremental
+     * manager, whose next run then fetches only records newer than that cursor).
+     * [supportIncrementalSync] therefore governs mid-paging resumption, not whether the cursor filter
+     * applies on the following run.
      */
     private suspend fun download() {
         setStatusInternal(LBSyncProcessStatus.DownloadStarted(Clock.System.now()))
@@ -313,25 +316,23 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         val lastUpdatedDate: Instant? = lastServerUpdatedDate()
         var page = 0
         var cursor: String? = null
-        var maxDate: Instant? = lastUpdatedDate
+        var progress = CursorProgress(runMax = lastUpdatedDate, safeBelow = lastUpdatedDate)
 
         try {
             while (true) {
                 val fetchPage = fetchRequest(page = page, cursor = cursor, sinceLastDate = lastUpdatedDate)
                 val objects = fetchPage.objects
 
-                maxDate = listOfNotNull(
-                    objects.mapNotNull(::updatedAt).maxOrNull(),
-                    maxDate,
-                ).maxOrNull()
+                progress = progress.advance(objects.mapNotNull(::updatedAt))
 
                 updateData(objects)
-                if (supportIncrementalSync()) {
-                    saveDownloadDate(maxDate)
+                val hasNext = hasNextPage(objects.size, fetchPage.pageInfo)
+                if (supportIncrementalSync() && hasNext) {
+                    saveDownloadDate(progress.safeBelow)
                 }
                 setStatusInternal(LBSyncProcessStatus.DownloadUpdated(processedObjectCount = objects.size, at = Clock.System.now()))
 
-                if (hasNextPage(objects.size, fetchPage.pageInfo)) {
+                if (hasNext) {
                     page += 1
                     cursor = fetchPage.nextCursor
                 } else {
@@ -346,9 +347,9 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         }
 
         setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
-        // Terminal success always records both the local sync date and the server cursor; the per-page
-        // checkpoint above is the only part gated on incremental sync.
-        saveDownloadDate(maxDate)
+        // Paging is complete, so the running max is now fully consumed: persist it as the terminal
+        // cursor together with the local sync date (always, even for a non-incremental manager).
+        saveDownloadDate(progress.runMax)
     }
 
     /**
@@ -379,6 +380,35 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
             hasNextPage(pageInfo)
         } else {
             queryPageSize() == objectCount
+        }
+    }
+}
+
+/**
+ * Running cursor state while paging a download.
+ *
+ * @property runMax the highest `updatedAt` seen so far across every fetched page.
+ * @property safeBelow the highest `updatedAt` seen that is **strictly** below [runMax].
+ *
+ * Records are fetched contiguously from the start in ascending `updatedAt` order, so every value
+ * below [runMax] is fully paged, whereas [runMax]'s own timestamp may still have records on a page
+ * not yet fetched. With a strict `>` resume filter, only [safeBelow] is a loss-free mid-paging
+ * checkpoint; [runMax] is safe only once paging completes.
+ */
+private data class CursorProgress(val runMax: Instant?, val safeBelow: Instant?) {
+    /**
+     * Folds a page's [dates] into this running state, keeping only the two values that matter
+     * downstream: [runMax] and the highest value strictly below it ([safeBelow]). The page is
+     * merged with the carried state and sorted, so it need not arrive ordered; an empty page with a
+     * null seed leaves the state unchanged.
+     */
+    fun advance(dates: List<Instant>): CursorProgress {
+        val seen = (dates + listOfNotNull(runMax, safeBelow)).sorted()
+        val newMax = seen.lastOrNull()
+        return if (newMax == null) {
+            this
+        } else {
+            CursorProgress(runMax = newMax, safeBelow = seen.lastOrNull { it < newMax })
         }
     }
 }

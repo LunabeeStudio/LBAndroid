@@ -30,25 +30,27 @@ import kotlin.time.Instant
 
 class DownloadTest {
 
+    private fun obj(epochMillis: Long): ServerObj = ServerObj(updatedAt = Instant.fromEpochMilliseconds(epochMillis))
+
     // region ascending cursor
 
     @Test
     fun incremental_cursor_is_the_max_updatedAt_across_all_pages() = runManagerTest { store, scope ->
         // Mixed updatedAt within and across pages; the max (700) lives mid-list on the middle page.
-        val pages = listOf(
-            FetchPage<ServerObj, Int>(
+        val pages = listOf<FetchPage<ServerObj, Int>>(
+            FetchPage(
                 objects = listOf(
                     ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)),
                     ServerObj(updatedAt = Instant.fromEpochMilliseconds(300L)),
                 ),
             ),
-            FetchPage<ServerObj, Int>(
+            FetchPage(
                 objects = listOf(
                     ServerObj(updatedAt = Instant.fromEpochMilliseconds(700L)),
                     ServerObj(updatedAt = Instant.fromEpochMilliseconds(500L)),
                 ),
             ),
-            FetchPage<ServerObj, Int>(
+            FetchPage(
                 objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(200L))),
             ),
         )
@@ -67,6 +69,86 @@ class DownloadTest {
             expected = Instant.fromEpochMilliseconds(700L),
             actual = store.lastServerSyncDate(syncKey = manager.syncKey),
             "the persisted server cursor is the max updatedAt across every page, regardless of order",
+        )
+    }
+
+    @Test
+    fun terminal_cursor_is_the_running_max_when_a_timestamp_spans_uniform_pages() = runManagerTest { store, scope ->
+        // page0[0,1,1] page1[1,1,1] page2[] : the max (1) is only provably closed once paging ends,
+        // so the mid-paging checkpoints hold at 0 and the terminal cursor commits 1.
+        val pages = listOf(
+            FetchPage(objects = listOf(obj(0L), obj(1L), obj(1L)), pageInfo = 1),
+            FetchPage(objects = listOf(obj(1L), obj(1L), obj(1L)), pageInfo = 1),
+            FetchPage(objects = emptyList(), pageInfo = 0),
+        )
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = pages,
+            hasNextPageOverride = { pageInfo -> pageInfo > 0 },
+            supportIncremental = true,
+        )
+
+        manager.synchronize()
+
+        assertEquals(
+            expected = obj(1L).updatedAt,
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "a completed download commits the running max",
+        )
+    }
+
+    @Test
+    fun mid_paging_checkpoint_on_failure_is_the_closed_prefix_below_the_running_max() = runManagerTest { store, scope ->
+        // page0[0,1,1], page1[1,1,1] then page2 throws : 1 straddles the boundary (page2 could open with more 1s),
+        // so the checkpoint is 0 (the closed prefix), not 1 — the resume filter is a strict `>`.
+        val pages = listOf(
+            FetchPage(objects = listOf(obj(0L), obj(1L), obj(1L)), pageInfo = 1),
+            FetchPage(objects = listOf(obj(1L), obj(1L), obj(1L)), pageInfo = 1),
+        )
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = pages,
+            hasNextPageOverride = { pageInfo -> pageInfo > 0 },
+            fetchErrorOnPage = 2,
+            supportIncremental = true,
+        )
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Failure, "the mid-paging fetch failure surfaces as a failed sync")
+        assertEquals(
+            expected = obj(0L).updatedAt,
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "the checkpoint is the highest updatedAt strictly below the running max, not the max itself",
+        )
+    }
+
+    @Test
+    fun terminal_cursor_advances_when_a_later_page_introduces_a_higher_timestamp() = runManagerTest { store, scope ->
+        // page0[0,1,1] page1[1,1,1] page2[1,2] page3[] : 2 appears on page2 and paging completes,
+        // so the terminal cursor is 2.
+        val pages = listOf(
+            FetchPage(objects = listOf(obj(0L), obj(1L), obj(1L)), pageInfo = 1),
+            FetchPage(objects = listOf(obj(1L), obj(1L), obj(1L)), pageInfo = 1),
+            FetchPage(objects = listOf(obj(1L), obj(2L)), pageInfo = 1),
+            FetchPage(objects = emptyList(), pageInfo = 0),
+        )
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = pages,
+            hasNextPageOverride = { pageInfo -> pageInfo > 0 },
+            supportIncremental = true,
+        )
+
+        manager.synchronize()
+
+        assertEquals(
+            expected = obj(2L).updatedAt,
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "the terminal cursor is the running max once paging completes",
         )
     }
 
@@ -145,8 +227,8 @@ class DownloadTest {
     @Test
     fun hasNextPage_pageInfo_override_decides_paging() = runManagerTest { store, scope ->
         val pages = listOf(
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 1),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 0),
+            FetchPage(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 1),
+            FetchPage(objects = listOf(ServerObj(updatedAt = null)), pageInfo = 0),
         )
         val manager = FakeSyncManager(
             store = store,
@@ -171,8 +253,8 @@ class DownloadTest {
         // No pageInfo on any page: the engine compares objectCount to queryPageSize (2). A full page (2)
         // continues; a short page (1) stops.
         val pages = listOf(
-            FetchPage<ServerObj, Int>(objects = List(size = 2) { ServerObj(updatedAt = null) }),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null))),
+            FetchPage(objects = List(size = 2) { ServerObj(updatedAt = null) }),
+            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)))
         )
         val manager = FakeSyncManager(
             store = store,
@@ -200,7 +282,7 @@ class DownloadTest {
         val manager = FakeSyncManager(
             store = store,
             scope = scope,
-            pages = listOf(FetchPage<ServerObj, Int>(objects = emptyList())),
+            pages = listOf(FetchPage(objects = emptyList())),
             supportChangeNotification = true,
         )
         val statuses = manager.recordStatuses(scope, testScheduler)
@@ -223,9 +305,9 @@ class DownloadTest {
     @Test
     fun download_updated_processed_counts_match_each_page_size_in_order() = runManagerTest { store, scope ->
         val pages = listOf(
-            FetchPage<ServerObj, Int>(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
-            FetchPage<ServerObj, Int>(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)))),
+            FetchPage(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
+            FetchPage(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
+            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))
         )
         val manager = FakeSyncManager(
             store = store,
