@@ -29,6 +29,16 @@ First release candidate for the synchronization 2.0.0 line
   tempo `kotlin.time.Duration?`, replacing epoch-millis `Long` / `java.util.Date`.
 - Added `synchronization-parse-room`: a generic Parse↔Room sync layer built on `synchronization-core`.
 - Raised the sync modules to `minSdk 24` and shipped `ACCESS_NETWORK_STATE` in the `synchronization-core` manifest.
+- Incremental paging checkpoints only the *closed* cursor prefix mid-paging (the highest `updatedAt`
+  strictly below the running max) and persists the running max only on terminal success, so a mid-paging
+  failure cannot skip records sharing the max timestamp under the strict `>` resume filter.
+- The local "last successful sync" date is stamped only on terminal download success (not on per-page
+  checkpoints), so a partial or failed download is never reported as `SyncSuccessfully`.
+- Added the terminal status `LBSyncProcessStatus.Cancelled`, surfaced by `cancelAllRequests()` and by any
+  pipeline cancellation (including an external scope cancellation); `isProcessing()` / `isSyncing()` are
+  `false` after a cancel instead of staying stuck on a mid-pipeline step.
+- Failures raised while gathering the upload batch (`objectToBeUploaded()`) now map to
+  `UploadFinishWithError`, matching `pushObjectsToServer()` failures.
 
 ## 2026-07-17
 
