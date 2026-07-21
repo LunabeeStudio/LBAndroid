@@ -17,8 +17,12 @@
 package studio.lunabee.synchronization.syncmanager
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.store.SyncKey
@@ -306,6 +310,26 @@ class LBSyncManagerTest {
             "the Cancelled status is terminal, so isProcessing (and isSyncing) is false after a cancel",
         )
         assertTrue(caller.await() is LBResult.Failure, "a cancelled in-flight synchronize resolves as Failure")
+    }
+
+    @Test
+    fun external_scope_cancellation_surfaces_cancelled_status() = runManagerTest { store, _ ->
+        val runScope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        val gate = CompletableDeferred<Unit>()
+        val manager = FakeSyncManager(store = store, scope = runScope, fetchGate = gate, retryTempo = null)
+
+        runScope.launch { manager.synchronize() }
+        advanceUntilIdle() // park inside the first fetch (the gate is never completed)
+
+        // Cancel the scope directly — NOT via cancelAllRequests (which sets the status itself) — so only
+        // runPipeline's cancellation path can produce the terminal status.
+        runScope.cancel()
+        advanceUntilIdle()
+
+        assertTrue(
+            manager.currentSyncStatus is LBSyncProcessStatus.Cancelled,
+            "an external scope cancel still surfaces the Cancelled terminal status via runPipeline",
+        )
     }
 
     // endregion

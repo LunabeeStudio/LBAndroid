@@ -284,6 +284,11 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
             setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
             LBResult.Success(Unit)
         } catch (e: CancellationException) {
+            // Any cancellation of the pipeline — cancelAllRequests() or an external cancel of [scope] —
+            // surfaces a terminal Cancelled status here, the single boundary above download()/upload()
+            // (whose own CancellationException catches stay bare rethrows so cancellation is never
+            // mislabelled as a *WithError). setStatusInternal only mutates a StateFlow, safe while unwinding.
+            setStatusInternal(LBSyncProcessStatus.Cancelled(Clock.System.now()))
             throw e
         } catch (e: Exception) {
             LBResult.Failure(e)
