@@ -1,0 +1,41 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "b9ae77da35b9f47343ea67b7ec901fed",
+    "entities": [
+      {
+        "tableName": "sync_timestamp",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`syncKey` TEXT NOT NULL, `serverDate` INTEGER, `localDate` INTEGER, PRIMARY KEY(`syncKey`))",
+        "fields": [
+          {
+            "fieldPath": "syncKey",
+            "columnName": "syncKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverDate",
+            "columnName": "serverDate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "localDate",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "syncKey"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b9ae77da35b9f47343ea67b7ec901fed')"
+    ]
+  }
+}

@@ -39,6 +39,7 @@ import studio.lunabee.compose.demo.presenter.simple.SimpleExampleNavScope
 import studio.lunabee.compose.demo.presenter.timer.TimerHiltDestination
 import studio.lunabee.compose.demo.presenter.timer.TimerKoinDestination
 import studio.lunabee.compose.demo.presenter.timer.TimerNavScope
+import studio.lunabee.compose.demo.synchronization.SyncDemoScreen
 import studio.lunabee.compose.demo.theme.ThemeScreen
 import studio.lunabee.compose.demo.uifield.UiFieldsScreen
 
@@ -123,6 +124,12 @@ fun MainNavGraph(
             route = Destinations.LbcNavigation,
         ) {
             LbcNavigationDemoScreen()
+        }
+
+        composable(
+            route = Destinations.SynchronizationRoute,
+        ) {
+            SyncDemoScreen()
         }
 
         SimpleExampleDestination.composable(this, object : SimpleExampleNavScope {})

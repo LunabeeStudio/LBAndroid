@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-17
+
+```
+Synchronization Core 2.0.0-rc01
+Synchronization Core-Datastore 2.0.0-rc01
+Synchronization Core-Room 2.0.0-rc01
+Synchronization Parse-Room 2.0.0-rc01
+```
+
+First release candidate for the synchronization 2.0.0 line
+
+- Moved the sync modules out of `Libraries_Android` into `LBAndroid`, repackaged under
+  `studio.lunabee.synchronization` and aligned to the repository conventions.
+- Rewrote the async engine on Kotlin coroutines/Flow: one `suspend` entry point per level returning
+  `LBResult<Unit>`, status exposed as `StateFlow`, single-flight collapse-and-join + auto-retry extracted
+  into the `SyncRunner` deep module. The Facebook Bolts `Task`, `GlobalScope` and the callback/observer
+  surface are gone.
+- Made cursor storage framework-agnostic: `SyncTimestampLocalDataSource` interface installed once at startup
+  via `LBSyncStorage.install(...)`. Split the module into `synchronization-core` + pluggable backends
+  `synchronization-core-datastore` (legacy on-disk cursor) and `synchronization-core-room` (standalone Room DB).
+- Strongly-typed API: cursor keys use the `SyncKey` value class, dates use `kotlin.time.Instant` and the retry
+  tempo `kotlin.time.Duration?`, replacing epoch-millis `Long` / `java.util.Date`.
+- Added `synchronization-parse-room`: a generic Parse↔Room sync layer built on `synchronization-core`.
+- Raised the sync modules to `minSdk 24` and shipped `ACCESS_NETWORK_STATE` in the `synchronization-core` manifest.
+- Incremental paging checkpoints only the *closed* cursor prefix mid-paging (the highest `updatedAt`
+  strictly below the running max) and persists the running max only on terminal success, so a mid-paging
+  failure cannot skip records sharing the max timestamp under the strict `>` resume filter.
+- The local "last successful sync" date is stamped only on terminal download success (not on per-page
+  checkpoints), so a partial or failed download is never reported as `SyncSuccessfully`.
+- Added the terminal status `LBSyncProcessStatus.Cancelled`, surfaced by `cancelAllRequests()` and by any
+  pipeline cancellation (including an external scope cancellation); `isProcessing()` / `isSyncing()` are
+  `false` after a cancel instead of staying stuck on a mid-pipeline step.
+- Failures raised while gathering the upload batch (`objectToBeUploaded()`) now map to
+  `UploadFinishWithError`, matching `pushObjectsToServer()` failures.
+
+## 2026-07-17
+
+```
+Synchronization Core 2.0.0-beta04
+Synchronization Core-Datastore 2.0.0-beta04
+Synchronization Core-Room 2.0.0-beta04
+Synchronization Parse-Room 2.0.0-beta04
+```
+
+- Make `parseQuery()` suspend so caller can compute the query using asynchronous data
+
+## 2026-07-15
+
+```
+Synchronization Core 2.0.0-beta03
+Synchronization Core-Datastore 2.0.0-beta03
+Synchronization Core-Room 2.0.0-beta03
+Synchronization Parse-Room 2.0.0-beta03
+```
+
+- The synchronization modules now declare `minSdk 24` (the connectivity engine relies on API 24
+  `registerDefaultNetworkCallback`); the rest of the repository stays at `minSdk 23`.
+- `synchronization-core` now declares the `ACCESS_NETWORK_STATE` permission in its manifest, so consumer
+  apps no longer have to add it themselves.
+- Backend factories (`dataStoreSyncTimestampLocalDataSource()`, `roomSyncTimestampLocalDataSource()`) now return a
+  process-wide single instance — safe to call repeatedly. The Room factories' `dispatcher` parameter
+  defaults to Room's own query context instead of `Dispatchers.IO`.
+- Renamed module `synchronization` to `synchronization-core`.
+- Made cursor storage framework-agnostic: `SyncTimestampLocalDataSource` is now an interface in `synchronization-core`;
+  install a backend once at startup via `LBSyncStorage.install(...)`.
+- Strongly-typed store API: cursor keys use the `SyncKey` value class (`LBSyncManager.syncKey: SyncKey`,
+  `statusByKey()` keyed by `SyncKey`) and dates use `kotlin.time.Instant` instead of epoch-millis `Long`.
+- Extracted the DataStore implementation into the new `synchronization-core-datastore` module
+  (`Context.dataStoreSyncTimestampLocalDataSource()`).
+- Added a Room implementation in the new `synchronization-core-room` module (`Context.roomSyncTimestampLocalDataSource()`).
+- Breaking: removed the `Context` constructor from `LBSyncManager` (use the no-arg constructor after installing a
+  backend); `LBSyncOperator.resetAllTimestamps()` no longer takes a `Context`.
+- `synchronization-parse-room`: retargeted onto `synchronization-core`; its `LBRoomSyncManager` /
+  `LBParseRoomSyncManager` constructors no longer take a `Context`.
+
 ## 2026-07-09
 
 ```
@@ -19,6 +94,20 @@ bom 4.15.0
   first-to-last-version migration and, for every start version, a filled-DB migration that auto-inserts a sample row into every
   table (introspecting columns via `PRAGMA table_info` and skipping columns that are nullable or have a default).
 - Bump `bom` to 4.15.0: it now pins `test-core` and `test-room` in place of the removed `test` module.
+
+## 2026-07-06
+
+```
+Synchronization 2.0.0-beta02
+Synchronization Parse-Room 2.0.0-beta02
+```
+
+- Fix `LBSyncManager`: on a successful download the server `updatedAt` cursor is now persisted on terminal
+  success for **every** manager, not only when `supportIncrementalSync()` is enabled. This restores the legacy
+  `lbsynchronization` behaviour, where `supportIncrementalSync()` gates only per-page checkpointing (so a
+  mid-paging failure can resume), not whether the following run filters by the cursor. Without the fix a
+  non-incremental manager re-downloaded its full data set on every sync instead of only the records changed
+  since the last run.
 
 ## 2026-07-03
 
@@ -47,6 +136,67 @@ LbcImage 1.9.1
 
 Load `LbcImageSpec.ImageDrawable` through Coil so the drawable is downsampled to the layout size instead of decoding
 the full bitmap into memory, fixing high memory usage on heavy drawables.
+
+## 2026-06-12
+
+```
+Synchronization 2.0.0-beta01
+```
+
+Move the `synchronization` module from the `Libraries_Android` repository into `LBAndroid`. The package is renamed from
+`com.lunabee.lbsynchronization` to `studio.lunabee.synchronization`, and subpackages are aligned to the repository
+convention (`lbConnectivityManager` → `connectivity`, `lbSyncManager` → `syncmanager`, `lbLifeCycle` → `lifecycle`).
+
+The deprecated `LBApplication` and the local deprecated `LBLifecycleListener` are removed; use
+`studio.lunabee.core.lifecycle.LBLifecycleApplication` and `studio.lunabee.core.lifecycle.LBLifecycleListener` instead.
+
+Sync-cursor persistence is now backed by AndroidX DataStore Preferences through a new multiplatform
+`commonMain` store, `SyncTimestampLocalDataSource`, instead of SharedPreferences. The timestamp read/reset API is now
+`suspend`: `LBSyncManager.lastSuccessfulSyncDate()`, `LBSyncManager.resetTimeStamp()`,
+`LBSyncOperator.resetAllTimestamps()` and `LBSyncGroup.resetAllTimestamps()`. The status is no longer seeded in the
+manager constructor; seed it via the new `suspend LBSyncManager.load()` (or `LBSyncOperator.loadAllStatuses()` to seed
+every managed manager at once). A new per-manager `open val syncKey` replaces the class-name-derived preference keys —
+its default preserves the legacy scheme, and overriding it makes a manager rename-safe. SharedPreferences (and the old
+default-prefs migration) are removed, so an app upgrading from the `Libraries_Android` `lb-synchronization` will re-sync
+once.
+
+The async engine is rewritten on Kotlin coroutines/Flow — the Facebook Bolts `Task` dependency, `GlobalScope`, and the
+callback/observer surface are all gone (`LBSyncToken`, `LBSyncChangeStatusClosure`, the `Task<Boolean>`/callback
+`synchronize` overloads, `synchronizeWait`, and `LBSyncManagerFetchCompletion` are deleted):
+
+- One suspend entry point per level returning `LBResult<Unit>`: `LBSyncManager.synchronize()`,
+  `LBSyncGroup.syncManagers()` (now actually suspends instead of blocking a thread), `LBSyncOperator.syncAllManagers()`.
+- Status is exposed as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (`currentSyncStatus` stays as a read-only
+  alias); `LBSyncGroup` and `LBSyncOperator` add a combined `statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and
+  `isSyncing(): Flow<Boolean>`.
+- The subclass SPI becomes suspend and throw-based: `fetchRequest(...)` returns a `FetchPage`, `pushObjectsToServer(...)`,
+  `startServerNotificationListener()`/`stopServerNotificationListener()` return `Boolean`.
+- `java.util.Date` is replaced by `kotlin.time.Instant` across statuses, SPI parameters and refresh events; the retry
+  tempo becomes `kotlin.time.Duration?` (`retryTempo`, default 30 s) instead of `retryTempoInMs`.
+- Concurrent `synchronize()` calls now collapse into a single follow-up run whose real result every caller receives
+  (single-flight logic extracted into a new `SyncRunner` deep module in `commonMain`), and the group gate collapses into a
+  single `var isEnabled: suspend () -> Boolean`.
+- Failure aggregation is fixed: a multi-failure group/operator run surfaces every underlying error through the new
+  `LBSyncAggregateException` — `LBSyncOperator.syncAllManagers()` no longer silently drops all but the last group's error.
+- `kotlin-reflect` is dropped from the module (only stdlib `KClass`/`::class` are used).
+
+```
+SynchronizationParseRoom 2.0.0-beta01
+```
+
+Add the `synchronization-parse-room` module: a generic Parse↔Room synchronization framework built on
+top of `:synchronization`. KMP `androidLibrary` (`commonMain` persistence contract +
+`androidMain` Parse-backed managers), package `studio.lunabee.synchronization.{roomsyncmanager,parseroomsyncmanager}`,
+android namespace `studio.lunabee.synchronization.parseroom`. Parse SDK / ParseLiveQuery are resolved
+from JitPack (repository added to `settings.gradle.kts`).
+
+The Parse-backed managers are adapted to the coroutines rewrite of `:synchronization`: the subclass surface
+(`LBRoomSyncManager.push(obj)`, `LBParseRoomSyncManager.fetchRequest`/`push`/listeners) becomes suspend and throw-based,
+and `updatedAt` returns `kotlin.time.Instant?`. The Parse query call sites use the Parse community coroutines extension
+artifact (`com.github.parse-community.Parse-SDK-Android:coroutines`) instead of callback/blocking calls, and the explicit
+`com.parse.bolts:bolts-tasks` dependency is removed from the build script and the version catalog — Bolts now survives
+only transitively inside the Parse SDK. LiveQuery subscription, reconnect and the synchronize-on-create/update trigger are
+behaviorally unchanged.
 
 ## 2026-0610
 

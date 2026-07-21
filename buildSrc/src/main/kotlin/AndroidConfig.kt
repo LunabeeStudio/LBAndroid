@@ -47,6 +47,9 @@ object AndroidConfig {
     const val TargetSdk: Int = CompileSdk
     const val MinSdk: Int = BuildConfigs.MinSdk
 
+    /** The synchronization modules rely on API 24 network callbacks (`registerDefaultNetworkCallback`). */
+    const val SynchronizationMinSdk: Int = 24
+
     // ⚠️ Match module name in UPPER_CASE ('-' -> '_')
     const val LBCCORE_VERSION: String = "1.14.0"
     const val LBCFOUNDATION_VERSION: String = "1.12.0"
@@ -82,6 +85,10 @@ object AndroidConfig {
     const val MONITORING_OKHTTP_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_ROOM_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_UI_VERSION: String = MONITORING_CORE_VERSION
+    const val SYNCHRONIZATION_CORE_VERSION: String = "2.0.0-rc01"
+    const val SYNCHRONIZATION_CORE_DATASTORE_VERSION: String = "2.0.0-rc01"
+    const val SYNCHRONIZATION_CORE_ROOM_VERSION: String = "2.0.0-rc01"
+    const val SYNCHRONIZATION_PARSE_ROOM_VERSION: String = "2.0.0-rc01"
 
     val JDK_VERSION: JavaVersion = JavaVersion.VERSION_21
     val JVM_TARGET: JvmTarget = JvmTarget.JVM_21

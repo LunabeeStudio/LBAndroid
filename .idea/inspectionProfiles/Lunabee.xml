@@ -32,7 +32,6 @@
       <option name="DONT_REPORT_TRUE_ASSERT_STATEMENTS" value="false" />
     </inspection_tool>
     <inspection_tool class="ConstantValueMerged" />
-    <inspection_tool class="Destructure" enabled="true" level="INFORMATION" enabled_by_default="true" />
     <inspection_tool class="GlancePreviewDimensionRespectsLimit" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="composableFile" value="true" />
     </inspection_tool>
@@ -46,6 +45,12 @@
       <option name="composableFile" value="true" />
     </inspection_tool>
     <inspection_tool class="MoveVariableDeclarationIntoWhen" enabled="true" level="INFORMATION" enabled_by_default="true" />
+    <inspection_tool class="MultiplatformPreviewAnnotationInFunctionWithParameters" enabled="true" level="ERROR" enabled_by_default="true">
+      <option name="composableFile" value="true" />
+    </inspection_tool>
+    <inspection_tool class="MultiplatformPreviewMultipleParameterProviders" enabled="true" level="ERROR" enabled_by_default="true">
+      <option name="composableFile" value="true" />
+    </inspection_tool>
     <inspection_tool class="OptionalOfNullableMisuseMerged" />
     <inspection_tool class="PreviewAnnotationInFunctionWithParameters" enabled="true" level="ERROR" enabled_by_default="true">
       <option name="composableFile" value="true" />
