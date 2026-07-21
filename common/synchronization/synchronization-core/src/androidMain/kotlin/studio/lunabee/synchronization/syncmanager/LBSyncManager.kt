@@ -194,8 +194,18 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     protected open fun supportIncrementalSync(): Boolean = false
 
     /**
-     * Return true if the client is notified by the server when a record is uploaded on it
-     * eg: Parse LiveQuery
+     * Whether the server pushes change notifications to this client (e.g. Parse LiveQuery), so the
+     * engine can trust the server instead of polling.
+     *
+     * Returning `true` has two effects: the group/operator starts this manager's
+     * [startServerNotificationListener] on foreground (managers are **filtered on this flag**, so it must
+     * already be `true` for the listener to be started — the flag gates the very call that wires the
+     * listener), and [synchronize] skips the post-upload re-download (the server will notify of the
+     * merged result instead).
+     *
+     * Defaults to `false`. A subclass that wires a listener (e.g. one whose
+     * [startServerNotificationListener] subscribes a LiveQuery) must override this to `true` to actually
+     * activate it; otherwise the listener is never started and every sync re-downloads after upload.
      */
     open fun supportChangeNotificationFromServer(): Boolean = false
 

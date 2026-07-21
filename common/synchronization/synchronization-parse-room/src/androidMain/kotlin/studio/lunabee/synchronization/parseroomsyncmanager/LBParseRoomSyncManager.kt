@@ -42,6 +42,12 @@ typealias LBGenericParseRoomSyncManager = LBParseRoomSyncManager<*>
  * [objectToBeUploaded] returns full immutable entities, so [push] receives the entity directly and
  * never re-queries it by primary key.
  *
+ * LiveQuery is wired here — [startServerNotificationListener] subscribes the query and feeds
+ * [onLiveQueryCreateOrUpdate] — but it stays inert until the concrete subclass overrides
+ * [supportChangeNotificationFromServer] to return `true`. That flag gates both whether the group starts
+ * the listener and whether the post-upload re-download is skipped; without it the LiveQuery machinery is
+ * never started.
+ *
  * @param RoomData The Room entity type to be mapped from [ParseObject]
  * @param dao The persistence base for [RoomData]
  * @param liveQueryScope Scope used to fire-and-forget a [synchronize] from the LiveQuery callback,
