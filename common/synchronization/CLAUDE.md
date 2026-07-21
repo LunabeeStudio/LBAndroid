@@ -133,7 +133,8 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
 ### Sharp edges
 
 - **`isProcessing()` returns `true` for `UploadFinishSuccessfully` / `DownloadFinishSuccessfully`** —
-  they're mid-pipeline steps, not terminal. Only `Sync*`/`NeverSync`/`Disabled`/`*WithError` are done.
+  they're mid-pipeline steps, not terminal. Only `Sync*`/`NeverSync`/`Disabled`/`Cancelled`/`*WithError`
+  are done.
 - **Per-manager cursor keys default to the class simple name** via `open val syncKey`
   (`"${syncKey}lastSyncDate"`), persisted by the installed backend (DataStore file
   `com.lunabee.lbsynchronization`, or the Room `sync_timestamp` table).
@@ -146,7 +147,7 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   saves the max instant seen, so out-of-order results lose records.
 - A failed run is retried automatically by `SyncRunner` after `retryTempo` (a `Duration?`, default 30 s;
   `null` disables retry). `cancelAllRequests()` cancels the in-flight run **and** any pending retry, and
-  surfaces the legacy terminal status `DownloadFinishSuccessfully`.
+  surfaces the terminal status `Cancelled` (so `isProcessing()` / `isSyncing` drop to `false`).
 - Concurrent `synchronize()` calls **collapse into a single follow-up run** whose real `LBResult` every
   caller receives — the old immediate-success-while-dirty behavior is gone.
 - `StateFlow` is conflated (status is state, not an event stream) and observer threading is the

@@ -217,12 +217,13 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     /**
      * Cancel the in-flight sync run and any pending automatic retry. The terminal status surfaced is
-     * [LBSyncProcessStatus.DownloadFinishSuccessfully]; in-flight and collapsed [synchronize] callers
+     * [LBSyncProcessStatus.Cancelled] (so [LBSyncProcessStatus.isProcessing] — and therefore the
+     * group/operator `isSyncing` flow — drops to `false`); in-flight and collapsed [synchronize] callers
      * receive an [LBResult.Failure] carrying the cancellation cause, and a [CancellationException]
      * never escapes the engine.
      */
     fun cancelAllRequests() {
-        setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
+        setStatusInternal(LBSyncProcessStatus.Cancelled(Clock.System.now()))
         syncRunner.cancel()
     }
 

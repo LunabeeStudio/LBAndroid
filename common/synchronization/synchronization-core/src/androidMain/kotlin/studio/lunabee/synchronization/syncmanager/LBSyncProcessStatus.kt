@@ -45,6 +45,12 @@ sealed class LBSyncProcessStatus {
 
     data object Disabled : LBSyncProcessStatus()
 
+    /**
+     * Terminal status produced by [studio.lunabee.synchronization.syncmanager.LBSyncManager.cancelAllRequests]:
+     * the in-flight run was cancelled — neither a success nor an error.
+     */
+    data class Cancelled(val at: Instant) : LBSyncProcessStatus()
+
     data class UploadStarted(val at: Instant) : LBSyncProcessStatus()
 
     data class UploadFinishSuccessfully(
@@ -68,6 +74,7 @@ sealed class LBSyncProcessStatus {
             is PendingSync -> "Waiting for synchronization"
             is SyncSuccessfully -> "Updated ${this.lastSuccessfulSync}"
             is Disabled -> "Disabled due to isEnabled closures"
+            is Cancelled -> "Sync cancelled ${this.at}"
             is UploadStarted -> "Uploading..."
             is UploadFinishSuccessfully -> "${this.processedObjectCount} records uploaded successfully ${this.at}"
             is UploadFinishWithError -> "Upload failed ${this.at}"
@@ -89,6 +96,7 @@ sealed class LBSyncProcessStatus {
             is PendingSync -> false
             is SyncSuccessfully -> false
             is Disabled -> false
+            is Cancelled -> false
             is UploadStarted -> true
             is UploadFinishSuccessfully -> true
             is UploadFinishWithError -> false

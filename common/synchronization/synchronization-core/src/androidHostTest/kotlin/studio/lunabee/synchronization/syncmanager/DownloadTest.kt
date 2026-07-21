@@ -254,7 +254,7 @@ class DownloadTest {
         // continues; a short page (1) stops.
         val pages = listOf(
             FetchPage(objects = List(size = 2) { ServerObj(updatedAt = null) }),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null)))
+            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = null))),
         )
         val manager = FakeSyncManager(
             store = store,
@@ -307,7 +307,7 @@ class DownloadTest {
         val pages = listOf(
             FetchPage(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 1L)) }),
             FetchPage(objects = List(size = 3) { ServerObj(updatedAt = Instant.fromEpochMilliseconds(it + 10L)) }),
-            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L))))
+            FetchPage<ServerObj, Int>(objects = listOf(ServerObj(updatedAt = Instant.fromEpochMilliseconds(100L)))),
         )
         val manager = FakeSyncManager(
             store = store,

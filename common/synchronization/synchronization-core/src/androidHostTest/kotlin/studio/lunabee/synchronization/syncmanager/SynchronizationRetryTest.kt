@@ -161,8 +161,8 @@ class SynchronizationRetryTest {
             "cancelAllRequests pre-empts the pending retry: no re-run after the tempo",
         )
         assertTrue(
-            manager.currentSyncStatus is LBSyncProcessStatus.DownloadFinishSuccessfully,
-            "cancel surfaces the legacy DownloadFinishSuccessfully terminal status",
+            manager.currentSyncStatus is LBSyncProcessStatus.Cancelled,
+            "cancel surfaces the Cancelled terminal status",
         )
     }
 

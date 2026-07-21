@@ -285,7 +285,7 @@ class LBSyncManagerTest {
     }
 
     @Test
-    fun cancel_surfaces_download_finish_successfully_terminal_status() = runManagerTest { store, scope ->
+    fun cancel_surfaces_cancelled_terminal_status() = runManagerTest { store, scope ->
         val gate = CompletableDeferred<Unit>()
         val manager = FakeSyncManager(store = store, scope = scope, fetchGate = gate, retryTempo = null)
 
@@ -298,8 +298,12 @@ class LBSyncManagerTest {
         advanceUntilIdle()
 
         assertTrue(
-            manager.currentSyncStatus is LBSyncProcessStatus.DownloadFinishSuccessfully,
-            "cancel surfaces the legacy DownloadFinishSuccessfully terminal status",
+            manager.currentSyncStatus is LBSyncProcessStatus.Cancelled,
+            "cancel surfaces the Cancelled terminal status",
+        )
+        assertTrue(
+            !manager.currentSyncStatus.isProcessing(),
+            "the Cancelled status is terminal, so isProcessing (and isSyncing) is false after a cancel",
         )
         assertTrue(caller.await() is LBResult.Failure, "a cancelled in-flight synchronize resolves as Failure")
     }
