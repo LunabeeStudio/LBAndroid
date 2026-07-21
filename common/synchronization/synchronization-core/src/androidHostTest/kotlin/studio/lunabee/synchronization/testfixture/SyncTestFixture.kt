@@ -52,6 +52,7 @@ internal open class FakeSyncManager(
     private val fetchErrorOnPage: Int? = null,
     private val pushError: Exception? = null,
     private val pushErrorOnAttempt: Int? = null,
+    private val objectToBeUploadedError: Exception? = null,
     private val fetchGate: CompletableDeferred<Unit>? = null,
     private val gateOnlyFirstFetch: Boolean = false,
     private val hasNextPageOverride: ((pageInfo: Int) -> Boolean)? = null,
@@ -97,7 +98,10 @@ internal open class FakeSyncManager(
 
     override fun isInSync(obj: LocalObj): Boolean = true
 
-    override suspend fun objectToBeUploaded(): List<LocalObj> = uploadObjects
+    override suspend fun objectToBeUploaded(): List<LocalObj> {
+        objectToBeUploadedError?.let { throw it }
+        return uploadObjects
+    }
 
     override suspend fun pushObjectsToServer(objects: List<LocalObj>) {
         callLog += "push"

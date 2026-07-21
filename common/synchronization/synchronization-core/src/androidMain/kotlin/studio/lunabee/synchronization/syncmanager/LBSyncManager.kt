@@ -291,20 +291,29 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     }
 
     private suspend fun upload(): Boolean {
-        val objects = objectToBeUploaded()
-        if (objects.isEmpty()) return false
-
-        setStatusInternal(LBSyncProcessStatus.UploadStarted(Clock.System.now()))
-        try {
-            pushObjectsToServer(objects)
+        return try {
+            val objects = objectToBeUploaded()
+            if (objects.isEmpty()) {
+                false
+            } else {
+                setStatusInternal(LBSyncProcessStatus.UploadStarted(Clock.System.now()))
+                pushObjectsToServer(objects)
+                setStatusInternal(
+                    LBSyncProcessStatus.UploadFinishSuccessfully(
+                        processedObjectCount = objects.size,
+                        at = Clock.System.now(),
+                    ),
+                )
+                true
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Covers objectToBeUploaded() as well as pushObjectsToServer(): either failure surfaces as
+            // UploadFinishWithError rather than leaving the prior (mid-pipeline) status in place.
             setStatusInternal(LBSyncProcessStatus.UploadFinishWithError(error = e, at = Clock.System.now()))
             throw e
         }
-        setStatusInternal(LBSyncProcessStatus.UploadFinishSuccessfully(processedObjectCount = objects.size, at = Clock.System.now()))
-        return true
     }
 
     /**

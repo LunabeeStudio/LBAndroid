@@ -143,6 +143,30 @@ class UploadTest {
         assertTrue(manager.currentSyncStatus.currentError() === boom, "the error status exposes the thrown exception")
     }
 
+    @Test
+    fun objectToBeUploaded_throws_emits_upload_finish_with_error_and_returns_that_failure() = runManagerTest { store, scope ->
+        val boom = IllegalStateException("gather boom")
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            objectToBeUploadedError = boom,
+            retryTempo = null,
+        )
+        val statuses = manager.recordStatuses(scope, testScheduler)
+
+        val result = manager.synchronize()
+        advanceUntilIdle()
+
+        assertTrue(result is LBResult.Failure, "a failure gathering the upload batch surfaces as Failure")
+        assertEquals(expected = boom, actual = result.throwable, "the returned failure carries the thrown error")
+        assertEquals(expected = 0, actual = manager.pushCalls, "push is never reached")
+        assertEquals(
+            expected = "UploadFinishWithError",
+            actual = statuses().last(),
+            "a throw from objectToBeUploaded surfaces as UploadFinishWithError, not the prior mid-pipeline status",
+        )
+    }
+
     // endregion
 
     // region pipeline ordering with upload
