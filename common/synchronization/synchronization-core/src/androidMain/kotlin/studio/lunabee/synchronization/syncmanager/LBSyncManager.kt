@@ -329,7 +329,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
                 updateData(objects)
                 val hasNext = hasNextPage(objects.size, fetchPage.pageInfo)
                 if (supportIncrementalSync() && hasNext) {
-                    saveDownloadDate(progress.safeBelow)
+                    saveDownloadDate(serverInstant = progress.safeBelow, localDate = null)
                 }
                 setStatusInternal(LBSyncProcessStatus.DownloadUpdated(processedObjectCount = objects.size, at = Clock.System.now()))
 
@@ -348,21 +348,25 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
         }
 
         setStatusInternal(LBSyncProcessStatus.DownloadFinishSuccessfully(Clock.System.now()))
-        // Paging is complete, so the running max is now fully consumed: persist it as the terminal
-        // cursor together with the local sync date (always, even for a non-incremental manager).
-        saveDownloadDate(progress.runMax)
+        // Paging is complete: persist the running max as the terminal cursor, and only now stamp the
+        // local sync date (the "last successful sync" marker), always — even for a non-incremental manager.
+        saveDownloadDate(serverInstant = progress.runMax, localDate = Clock.System.now())
     }
 
     /**
-     * Save the last download date in the timestamp store: always the device date, and the server
-     * [instant] when non-null (the [SyncTimestampLocalDataSource] leaves a `null` server value unchanged).
-     * @param instant A server instant to save, or null to leave the server cursor untouched.
+     * Persist download cursors: the server [serverInstant] when non-null, and the local sync date only
+     * when [localDate] is non-null (the [SyncTimestampLocalDataSource] leaves a `null` argument
+     * unchanged). Mid-paging checkpoints omit [localDate] so the "last successful sync" marker is written
+     * only on terminal success, never for a partial download.
+     *
+     * @param serverInstant the server cursor to save, or null to leave the resume cursor untouched.
+     * @param localDate the local sync date to save, or null (default) to leave it untouched.
      */
-    private suspend fun saveDownloadDate(instant: Instant?) {
+    private suspend fun saveDownloadDate(serverInstant: Instant?, localDate: Instant?) {
         timestampLocalDataSource.saveSyncDates(
             syncKey = syncKey,
-            serverDate = instant,
-            localDate = Clock.System.now(),
+            serverDate = serverInstant,
+            localDate = localDate,
         )
     }
 

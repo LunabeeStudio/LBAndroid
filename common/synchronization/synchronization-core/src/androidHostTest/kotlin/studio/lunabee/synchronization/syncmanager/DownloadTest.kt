@@ -358,5 +358,35 @@ class DownloadTest {
         )
     }
 
+    @Test
+    fun mid_paging_failure_does_not_stamp_the_local_sync_date() = runManagerTest { store, scope ->
+        // A checkpoint persists the server cursor mid-paging, but the local "last successful sync" marker
+        // must stay unset until the whole download completes — a mid-paging failure is not a success.
+        val pages = listOf(
+            FetchPage(objects = listOf(obj(0L), obj(1L), obj(1L)), pageInfo = 1),
+        )
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = pages,
+            hasNextPageOverride = { pageInfo -> pageInfo > 0 },
+            fetchErrorOnPage = 1,
+            supportIncremental = true,
+        )
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Failure, "the mid-paging fetch failure surfaces as a failed sync")
+        assertEquals(
+            expected = obj(0L).updatedAt,
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "the server cursor is still checkpointed mid-paging",
+        )
+        assertNull(
+            manager.lastSuccessfulSyncDate(),
+            "a partial download does not stamp the local last-successful-sync date",
+        )
+    }
+
     // endregion
 }
