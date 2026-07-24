@@ -198,6 +198,19 @@ artifact (`com.github.parse-community.Parse-SDK-Android:coroutines`) instead of 
 only transitively inside the Parse SDK. LiveQuery subscription, reconnect and the synchronize-on-create/update trigger are
 behaviorally unchanged.
 
+## 2026-06-12
+
+```
+LbcpresenterKsp 2.0.0-rc04
+LbcpresenterKoinKsp 2.0.0-rc04
+```
+
+- Forward `@org.koin.core.annotation.Provided` from a `@GenerateReducerFactory` reducer constructor parameter onto the
+  generated reducer factory constructor parameter. Previously only Koin qualifiers (`@Named` / custom `@Qualifier`) were
+  propagated, so a `@Provided` reducer dependency was silently dropped and the `@Factory`-annotated generated factory still
+  required it in the compile-verified Koin graph. Reducer dependencies provided outside the module's compile-safety scope
+  (DSL definitions, cross-module types) can now be marked `@Provided` instead of having to be annotated.
+
 ## 2026-0610
 
 ```
