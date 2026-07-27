@@ -26,6 +26,12 @@ android {
     namespace = "studio.lunabee.onitoring.okhttp"
 }
 
+kotlin {
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
+}
+
 dependencies {
     implementation(libs.kotlinxDatetime)
     implementation(libs.kotlinxSerializationJson)

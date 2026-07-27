@@ -24,6 +24,8 @@ tasks.withType<Test> {
 }
 
 kotlin {
+    jvmToolchain(AndroidConfig.JVM_TARGET.target.toInt())
+
     listOf(
         iosArm64(),
         iosSimulatorArm64(),

@@ -86,7 +86,8 @@ ksp {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
-        freeCompilerArgs.add("-Xexplicit-backing-fields")
+        freeCompilerArgs.add("-XXLanguage:+ExplicitBackingFields")
+        optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
     }
 }
