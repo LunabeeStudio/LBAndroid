@@ -38,7 +38,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 import kotlin.reflect.KClass
 
 @OptIn(ExperimentalForeignApi::class)
-actual class LBNetworkEventListener : LBSyncEventListener {
+actual object LBNetworkEventListener : LBSyncEventListener {
     private var networkListenerJob: Job? = null
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
