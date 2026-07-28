@@ -15,30 +15,9 @@
  */
 
 plugins {
-    id("org.jetbrains.kotlin.multiplatform")
-    id("co.touchlab.skie")
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
+    id("lunabee.kmp-library-conventions")
 }
 
 kotlin {
-    jvmToolchain(AndroidConfig.JVM_TARGET.target.toInt())
-
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach {
-        it.binaries.framework {
-            baseName = project.name
-            isStatic = true
-        }
-    }
-
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-        freeCompilerArgs.add("-opt-in=kotlin.time.ExperimentalTime")
-        freeCompilerArgs.add("-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi")
-    }
+    jvm()
 }

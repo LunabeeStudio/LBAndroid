@@ -18,6 +18,7 @@ package studio.lunabee.synchronization.syncmanager
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 
 /**

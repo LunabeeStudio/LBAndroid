@@ -145,6 +145,7 @@ dependencies {
     implementation(projects.monitoringUi)
     implementation(projects.synchronizationCore)
     implementation(projects.synchronizationCoreRoom)
+    implementation(projects.synchronizationEvents)
 
     debugImplementation(libs.androidxUiTooling)
     debugImplementation(libs.composeUiTestManifest)
