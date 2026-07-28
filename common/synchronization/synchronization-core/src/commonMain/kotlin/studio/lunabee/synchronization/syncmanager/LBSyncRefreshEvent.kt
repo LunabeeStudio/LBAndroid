@@ -16,8 +16,6 @@
 
 package studio.lunabee.synchronization.syncmanager
 
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent.AppForeground
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent.InternetIsBack
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant

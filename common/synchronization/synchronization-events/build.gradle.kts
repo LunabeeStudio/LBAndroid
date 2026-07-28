@@ -15,17 +15,32 @@
  */
 
 plugins {
-    id("lunabee.kmp-jvm-library-conventions")
+    id("lunabee.kmp-android-library-conventions")
     id("lunabee.library-publish-conventions")
 }
 
-description = "Lunabee Studio synchronization engine (storage-agnostic core)"
-version = AndroidConfig.SYNCHRONIZATION_CORE_VERSION
+description = "Synchronization events platform implementation for the Lunabee synchronization engine"
+version = AndroidConfig.SYNCHRONIZATION_CORE_EVENTS_VERSION
 
 kotlin {
+    android {
+        namespace = "studio.lunabee.synchronization.events"
+        minSdk = AndroidConfig.SynchronizationMinSdk
+    }
+
     sourceSets {
         all {
             languageSettings.optIn("kotlin.time.ExperimentalTime")
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidxAppcompat)
+            implementation(libs.androidxCore)
+            implementation(libs.androidxLifecycleProcess)
+            implementation(libs.kotlinxCoroutinesAndroid)
+
+            implementation(projects.coreAndroid)
+            implementation(projects.loggerKermit)
         }
 
         commonMain.dependencies {
@@ -33,11 +48,7 @@ kotlin {
 
             implementation(libs.kotlinxCoroutinesCore)
 
-            api(projects.core)
-        }
-        commonTest.dependencies {
-            implementation(libs.kotlinTest)
-            implementation(libs.kotlinxCoroutinesTest)
+            api(projects.synchronizationCore)
         }
     }
 }

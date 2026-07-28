@@ -47,6 +47,9 @@ private val qualifierMetaAnnotations: Set<String> = setOf(
     "javax.inject.Qualifier",
     "org.koin.core.annotation.Qualifier",
 )
+private val providedAnnotations: Set<String> = setOf(
+    "org.koin.core.annotation.Provided",
+)
 private val kotlinUnitClassName: ClassName = ClassName("kotlin", "Unit")
 private const val SingleReducerQualifiedName = "studio.lunabee.compose.presenter.LBSingleReducer"
 
@@ -97,6 +100,7 @@ class ReducerSignatureParser {
                     hasDefault = parameter.hasDefault,
                     isVararg = parameter.isVararg,
                     qualifier = parameter.toDiQualifier(),
+                    isProvided = parameter.isProvided(),
                 )
             },
         )
@@ -115,6 +119,11 @@ class ReducerSignatureParser {
         Modifier.INTERNAL in modifiers -> Visibility.Internal
         else -> Visibility.Public
     }
+
+    private fun KSValueParameter.isProvided(): Boolean =
+        annotations.any { annotation ->
+            annotation.annotationType.resolve().declaration.qualifiedName?.asString() in providedAnnotations
+        }
 
     private fun KSValueParameter.toDiQualifier(): DiQualifier? {
         val qualifiers = annotations.mapNotNull { it.toDiQualifier() }.toList()

@@ -67,7 +67,7 @@ object AndroidConfig {
     const val LBCPRESENTER_VERSION: String = "2.0.0-rc01"
     const val LBCPRESENTER_ANNOTATIONS_VERSION: String = "2.0.0-rc01"
     const val LBCPRESENTER_KOIN_VERSION: String = "2.0.0-rc01"
-    const val LBCPRESENTER_KSP_VERSION: String = "2.0.0-rc03"
+    const val LBCPRESENTER_KSP_VERSION: String = "2.0.0-rc04"
     const val LBCPRESENTER_KOIN_KSP_VERSION: String = LBCPRESENTER_KSP_VERSION
     const val LBCNAVIGATION_VERSION: String = "1.1.0"
     const val LBCROBOLECTRICTEST_VERSION: String = "1.1.0"
@@ -85,10 +85,11 @@ object AndroidConfig {
     const val MONITORING_OKHTTP_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_ROOM_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_UI_VERSION: String = MONITORING_CORE_VERSION
-    const val SYNCHRONIZATION_CORE_VERSION: String = "2.0.0-rc01-bb"
-    const val SYNCHRONIZATION_CORE_DATASTORE_VERSION: String = "2.0.0-rc01"
-    const val SYNCHRONIZATION_CORE_ROOM_VERSION: String = "2.0.0-rc01-bb"
-    const val SYNCHRONIZATION_PARSE_ROOM_VERSION: String = "2.0.0-rc01"
+    const val SYNCHRONIZATION_CORE_VERSION: String = "2.0.0-rc02"
+    const val SYNCHRONIZATION_CORE_EVENTS_VERSION: String = "2.0.0-rc02"
+    const val SYNCHRONIZATION_CORE_DATASTORE_VERSION: String = "2.0.0-rc02"
+    const val SYNCHRONIZATION_CORE_ROOM_VERSION: String = "2.0.0-rc02"
+    const val SYNCHRONIZATION_PARSE_ROOM_VERSION: String = "2.0.0-rc02"
 
     val JDK_VERSION: JavaVersion = JavaVersion.VERSION_21
     val JVM_TARGET: JvmTarget = JvmTarget.JVM_21
