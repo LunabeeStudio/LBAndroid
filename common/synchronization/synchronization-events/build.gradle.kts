@@ -19,7 +19,7 @@ plugins {
     id("lunabee.library-publish-conventions")
 }
 
-description = "Synchronization events listener for the Lunabee synchronization engine"
+description = "Synchronization events listeners for the Lunabee synchronization engine"
 version = AndroidConfig.SYNCHRONIZATION_CORE_EVENTS_VERSION
 
 kotlin {
