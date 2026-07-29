@@ -40,7 +40,7 @@ import kotlin.reflect.KClass
 /**
  * Use LBSyncOperator to manage all sync managers in your app
  * It takes list of LBSyncGroup
- * It can listen for device network changes AND app life cycle
+ * Refreshes can be triggered by events emitted from registered [LBSyncEventListener] (see [registerEventListeners])
  */
 @Suppress("unused")
 object LBSyncOperator {
@@ -50,8 +50,8 @@ object LBSyncOperator {
     private val registeredListeners: MutableList<Job> = mutableListOf()
 
     /**
-     * Registers listeners that will be used to trigger refreshes of groups related to the emitted events.
-     * (see [LBSyncGroup.refreshEvents]).
+     * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
+     * (see [LBSyncGroup.refreshEvents]). Replaces any previously registered listeners (their jobs are cancelled).
      */
     fun registerEventListeners(
         listeners: List<LBSyncEventListener<*>>,

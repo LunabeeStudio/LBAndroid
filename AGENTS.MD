@@ -20,7 +20,7 @@ Per-module versions live as `LBC*_VERSION` / `*_VERSION` constants in `buildSrc/
 - **JDK 21**, Kotlin `2.3.x`, AGP `9.x`, `compileSdk 37`, `minSdk 23` (defined in `BuildConfigs.kt` and `AndroidConfig.kt`).
 - Version catalog: `gradle/libs.versions.toml`.
 - Two convention-plugin containers (both are used — don't merge):
-    - `buildSrc/` — precompiled script plugins: `lunabee.android-library-conventions`, `lunabee.android-compose-library-conventions`, `lunabee.kmp-library-conventions`, `lunabee.kmp-android-library-conventions`, `lunabee.java-library-conventions`.
+    - `buildSrc/` — precompiled script plugins: `lunabee.android-library-conventions`, `lunabee.android-compose-library-conventions`, `lunabee.kmp-library-conventions`, `lunabee.kmp-android-library-conventions`, `lunabee.kmp-jvm-library-conventions`, `lunabee.java-library-conventions`.
     - `build-logic/` (included build) — `lunabee.library-publish-conventions` (Maven Central via JReleaser + signing + Dokka).
 - `enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")` is on in `settings.gradle.kts`; reference modules with `projects.foo.bar`, not string paths.
 - Repositories are locked with `FAIL_ON_PROJECT_REPOS`; declare new repos in `settings.gradle.kts`.

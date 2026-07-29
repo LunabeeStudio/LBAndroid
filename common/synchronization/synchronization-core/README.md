@@ -5,8 +5,9 @@ Coroutine-native, storage-agnostic synchronization engine. Publishes as
 
 Three layers, top to bottom:
 
-- **`LBSyncOperator`** — app-wide singleton registry of groups. Runs groups **sequentially**, listens to
-  network / app-lifecycle events to trigger refreshes.
+- **`LBSyncOperator`** — app-wide singleton registry of groups. Runs groups **sequentially**, reacts to
+  events emitted by registered `LBSyncEventListener`s to trigger refreshes (the network / app-lifecycle
+  listener implementations ship in the `synchronization-events` module).
 - **`LBSyncGroup`** — a set of managers synchronized **in parallel**. Model table dependencies by putting
   the dependency in an earlier group. A suspend `isEnabled` gate can disable a whole group.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine running the
@@ -201,20 +202,24 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Sys as System
+    participant L as LBSyncEventListener<br/>(synchronization-events)
     participant OP as LBSyncOperator
     participant G as Groups with matching refreshEvent
 
-    Note over OP: initNetworkListener(context) /<br/>initAppLifecycleListener() at startup
+    Note over OP: registerEventListeners(listeners) at startup
 
     alt reconnection detected
-        Sys->>OP: network callback (offline → online)
-        OP->>OP: triggerRefresh(InternetIsBack)
+        Sys->>L: network callback (offline → online)
+        L->>OP: InternetIsBack
+        OP->>OP: triggerRefresh
     else app enters foreground
-        Sys->>OP: ProcessLifecycleOwner onStart
-        OP->>OP: triggerRefresh(AppForeground)
+        Sys->>L: platform lifecycle (foreground)
+        L->>OP: AppForeground(isForeground = true)
+        OP->>OP: triggerRefresh
         OP->>G: startServerNotificationListeners()
     else app enters background
-        Sys->>OP: ProcessLifecycleOwner onStop
+        Sys->>L: platform lifecycle (background)
+        L->>OP: AppForeground(isForeground = false)
         OP->>G: stopServerNotificationListeners()
     end
 
@@ -238,10 +243,14 @@ sequenceDiagram
 // 1. Install a cursor-storage backend once at startup (pick one backend module):
 LBSyncStorage.install(context.dataStoreSyncTimestampLocalDataSource()) // or roomSyncTimestampLocalDataSource()
 
-// 2. Register groups and init listeners:
+// 2. Register groups and event listeners (listeners ship in the synchronization-events module):
 LBSyncOperator.groups["main"] = LBSyncGroup(syncManagers = linkedSetOf(myManager))
-LBSyncOperator.initNetworkListener(context)
-LBSyncOperator.initAppLifecycleListener()
+LBSyncOperator.registerEventListeners(
+    listeners = listOf(
+        LBNetworkEventListener(context = context), // object on iOS (no Context)
+        LBAppForegroundEventListener,
+    ),
+)
 
 // 3. Seed statuses from persisted cursors (otherwise NeverSync until first sync):
 LBSyncOperator.loadAllStatuses()
