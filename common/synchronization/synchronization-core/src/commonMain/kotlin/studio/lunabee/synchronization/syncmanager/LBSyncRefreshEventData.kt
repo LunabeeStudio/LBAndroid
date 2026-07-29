@@ -16,16 +16,16 @@
 
 package studio.lunabee.synchronization.syncmanager
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlin.reflect.KClass
 
-/**
- * Shared, library-owned [CoroutineScope] every sync manager built with the no-store constructor runs
- * in: receiver-triggered syncs and automatic retries fire independently of any caller scope. A
- * [SupervisorJob] keeps one failing sync from tearing the others down, and [Dispatchers.IO] fits the
- * I/O-bound work.
- *
- * The operator reuses this same scope for receiver-triggered launches.
- */
-internal val defaultSyncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+sealed interface LBSyncRefreshEventData {
+    val type: KClass<out LBSyncRefreshEvent>
+
+    data class AppForeground(val isForeground: Boolean) : LBSyncRefreshEventData {
+        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.AppForeground::class
+    }
+
+    data object InternetIsBack : LBSyncRefreshEventData {
+        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.InternetIsBack::class
+    }
+}

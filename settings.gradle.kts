@@ -141,5 +141,6 @@ addCommonModule(
     "synchronization/synchronization-core-datastore",
     "synchronization/synchronization-core-room",
     "synchronization/synchronization-parse-room",
+    "synchronization/synchronization-events",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")

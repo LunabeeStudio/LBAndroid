@@ -18,6 +18,8 @@ package studio.lunabee.compose.demo.synchronization
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import studio.lunabee.synchronization.LBAppForegroundEventListener
+import studio.lunabee.synchronization.LBNetworkEventListener
 import studio.lunabee.synchronization.LBSyncGroup
 import studio.lunabee.synchronization.LBSyncOperator
 import studio.lunabee.synchronization.room.roomSyncTimestampLocalDataSource
@@ -43,17 +45,22 @@ class SyncDemoRegistry @Inject constructor(
     val syncManager: DemoItemSyncManager,
 ) {
 
-    private val group: LBSyncGroup = LBSyncGroup()
+    private val group: LBSyncGroup = LBSyncGroup(
+        syncManagers = linkedSetOf(syncManager),
+        refreshEvents = emptyList(),
+    )
 
     init {
         // Install the cursor store once, before any manager resolves it lazily on the first sync.
         LBSyncStorage.install(context.roomSyncTimestampLocalDataSource())
-        group.syncManagers = linkedSetOf(syncManager)
         LBSyncOperator.groups[GroupKey] = group
-        // Built-in events: the operator observes ProcessLifecycleOwner (foreground) and connectivity;
-        // the group only reacts to events present in its refreshEvents list.
-        LBSyncOperator.initAppLifecycleListener()
-        LBSyncOperator.initNetworkListener(context)
+        // Register listeners for events we want to respond to.
+        LBSyncOperator.registerEventListeners(
+            listeners = listOf(
+                LBNetworkEventListener(context = context),
+                LBAppForegroundEventListener,
+            ),
+        )
     }
 
     fun setRefreshEvents(onForeground: Boolean, onInternetBack: Boolean) {

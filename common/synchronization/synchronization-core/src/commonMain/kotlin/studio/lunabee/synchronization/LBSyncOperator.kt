@@ -16,18 +16,9 @@
 
 package studio.lunabee.synchronization
 
-import android.content.Context
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import co.touchlab.kermit.Logger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
@@ -37,101 +28,45 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
-import studio.lunabee.synchronization.connectivity.LBConnectivityManager
-import studio.lunabee.synchronization.connectivity.NetworkState
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 import studio.lunabee.synchronization.syncmanager.defaultSyncScope
 import kotlin.reflect.KClass
 
 /**
  * Use LBSyncOperator to manage all sync managers in your app
  * It takes list of LBSyncGroup
- * It can listen for device network changes AND app life cycle
+ * Refreshes can be triggered by events emitted from registered [LBSyncEventListener] (see [registerEventListeners])
  */
 @Suppress("unused")
 object LBSyncOperator {
 
-    private lateinit var lastNetworkState: NetworkState
-    private var networkListenerJob: Job? = null
-    private var appLifecycleJob: Job? = null
-
-    // Lifecycle observation must touch ProcessLifecycleOwner on the main thread. Lazy so merely touching
-    // the operator (e.g. triggerRefresh in JVM host tests) never forces Dispatchers.Main to load.
-    private val mainScope: CoroutineScope by lazy {
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    }
-
     val groups: LinkedHashMap<String, LBSyncGroup> = LinkedHashMap()
 
+    private val registeredListeners: MutableList<Job> = mutableListOf()
+
     /**
-     * Call this to let the LBSyncOperator refresh the sync managers for network changes. The refresh is
-     * performed when a reconnection is detected (new state is connected AND the previous state was not),
-     * by collecting [LBConnectivityManager.observeNetworkStates] in the shared [defaultSyncScope].
-     *
-     * **WARNING** : A sync manager can only be refreshed if its group carries
-     * [LBSyncRefreshEvent.InternetIsBack].
+     * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
+     * (see [LBSyncGroup.refreshEvents]). Replaces any previously registered listeners (their jobs are cancelled).
      */
-    fun initNetworkListener(context: Context) {
-        val appContext = context.applicationContext
-        lastNetworkState = LBConnectivityManager.getNetworkState(appContext)
-        networkListenerJob?.cancel()
-        networkListenerJob = defaultSyncScope.launch {
-            LBConnectivityManager.observeNetworkStates(appContext).collect { networkState ->
-                if (networkState.isConnected) {
-                    networkLogger.v("Internet is available with transport ${networkState.connectionType}")
-                    if (!lastNetworkState.isConnected) {
-                        triggerRefresh(LBSyncRefreshEvent.InternetIsBack::class)
-                    }
-                } else {
-                    networkLogger.v("Internet is disabled")
-                }
-                lastNetworkState = networkState
-            }
+    fun registerEventListeners(
+        listeners: List<LBSyncEventListener<*>>,
+    ) {
+        unregisterListeners()
+        listeners.forEach { listener ->
+            registeredListeners += listener.register(
+                onEvent = ::triggerRefresh,
+            )
         }
     }
 
-    /**
-     * Call this to let the LBSyncOperator refresh the sync managers when the app enters the foreground.
-     * Observes [ProcessLifecycleOwner]'s lifecycle as a [Flow] (no broadcasts): a foreground transition
-     * triggers the refresh and starts the server-notification listeners; a background transition stops
-     * them.
-     *
-     * **WARNING** : A sync manager can only be refreshed if its group carries
-     * [LBSyncRefreshEvent.AppForeground].
-     */
-    fun initAppLifecycleListener() {
-        appLifecycleJob?.cancel()
-        appLifecycleJob = mainScope.launch {
-            appForegroundFlow()
-                .distinctUntilChanged()
-                .collect { isForeground ->
-                    if (isForeground) {
-                        triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
-                        startServerNotificationListeners()
-                    } else {
-                        stopServerNotificationListeners()
-                    }
-                }
-        }
-    }
-
-    private fun appForegroundFlow(): Flow<Boolean> = callbackFlow {
-        val lifecycle = ProcessLifecycleOwner.get().lifecycle
-        val observer = object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) {
-                trySend(true)
-            }
-
-            override fun onStop(owner: LifecycleOwner) {
-                trySend(false)
-            }
-        }
-        lifecycle.addObserver(observer)
-        awaitClose { lifecycle.removeObserver(observer) }
+    private fun unregisterListeners() {
+        registeredListeners.forEach { it.cancel() }
+        registeredListeners.clear()
     }
 
     fun syncManagers(): List<LBGenericSyncManager> = groups.values.flatMap { it.syncManagers }
@@ -170,12 +105,43 @@ object LBSyncOperator {
             }
         }
 
-    internal fun triggerRefresh(eventType: KClass<out LBSyncRefreshEvent>) {
-        val availableGroups = groupsForEvent(eventType)
-        availableGroups.flatMap { it.syncManagers }.forEach {
-            it.setStatusInternal(LBSyncProcessStatus.PendingSync)
+    internal suspend fun triggerRefresh(
+        data: LBSyncRefreshEventData,
+    ) {
+        if (shouldRefresh(data = data)) {
+            val availableGroups = groupsForEvent(data.type)
+            availableGroups.flatMap { it.syncManagers }.forEach {
+                it.setStatusInternal(LBSyncProcessStatus.PendingSync)
+            }
+            defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
         }
-        defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
+        handleEventData(data = data)
+    }
+
+    /**
+     * Given an [LBSyncRefreshEventData], checks if the we should refresh sync managers.
+     */
+    private fun shouldRefresh(data: LBSyncRefreshEventData): Boolean =
+        when (data) {
+            is LBSyncRefreshEventData.AppForeground -> data.isForeground
+            LBSyncRefreshEventData.InternetIsBack -> true
+        }
+
+    /**
+     * Additional action to do depending on a given [LBSyncRefreshEventData]
+     */
+    private suspend fun handleEventData(data: LBSyncRefreshEventData) {
+        when (data) {
+            is LBSyncRefreshEventData.AppForeground -> if (data.isForeground) {
+                startServerNotificationListeners()
+            } else {
+                stopServerNotificationListeners()
+            }
+
+            LBSyncRefreshEventData.InternetIsBack -> {
+                // no-op
+            }
+        }
     }
 
     /**
@@ -282,4 +248,3 @@ object LBSyncOperator {
 }
 
 private val logger: Logger = LBLogger.get("$LogTag ${LBSyncOperator::class.simpleName}")
-private val networkLogger: Logger = LBLogger.get("$LogTag Network")

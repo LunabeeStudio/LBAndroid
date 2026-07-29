@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-28
+
+```
+Synchronization Core 2.0.0-rc02
+Synchronization Events 2.0.0-rc02
+Synchronization Core-Datastore 2.0.0-rc02
+Synchronization Core-Room 2.0.0-rc02
+Synchronization Parse-Room 2.0.0-rc02
+```
+
+- Made `synchronization-core` platform-neutral: removed its Android target, moved the synchronization
+  engine and operator APIs to `commonMain`, added a JVM publication, and migrated its tests to
+  `commonTest`.
+- Added `synchronization-events`, a KMP module containing the platform lifecycle and connectivity
+  integrations previously shipped by `synchronization-core`.
+- Added Android foreground and network listeners backed by `ProcessLifecycleOwner` and
+  `ConnectivityManager`; the `ACCESS_NETWORK_STATE` manifest declaration now belongs to
+  `synchronization-events`.
+- Added iOS foreground and network listeners backed by `NSNotificationCenter` and Network.framework's
+  path monitor.
+- Added the platform-neutral `LBSyncEventListener` API and
+  `LBSyncOperator.registerEventListeners(...)`, replacing the Android-only
+  `initAppLifecycleListener()` and `initNetworkListener(Context)` entry points.
+- Updated `synchronization-parse-room` to use the connectivity implementation from
+  `synchronization-events` when waiting for Parse LiveQuery reconnection.
+
 ## 2026-07-17
 
 ```

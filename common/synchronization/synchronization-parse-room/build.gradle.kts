@@ -47,6 +47,7 @@ kotlin {
 
             implementation(projects.loggerKermit)
             api(projects.synchronizationCore)
+            implementation(projects.synchronizationEvents)
         }
     }
 }

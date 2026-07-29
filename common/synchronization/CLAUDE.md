@@ -6,7 +6,8 @@ modules.
 
 | Module | Path | Type | Namespace | Version const | Has README |
 |---|---|---|---|---|---|
-| `:synchronization-core` | `synchronization-core/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization` | `SYNCHRONIZATION_CORE_VERSION` | yes — flow/sequence diagrams; sharp edges documented below |
+| `:synchronization-core` | `synchronization-core/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_CORE_VERSION` | yes — flow/sequence diagrams; sharp edges documented below |
+| `:synchronization-events` | `synchronization-events/` | KMP android-library (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.events` | `SYNCHRONIZATION_EVENTS_VERSION` | no — documented below |
 | `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
 | `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
@@ -15,9 +16,12 @@ The engine (`:synchronization-core`) is **storage-agnostic**: it persists sync c
 `SyncTimestampLocalDataSource` interface and never constructs a backend. A backend module provides the concrete
 store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor storage" below).
 `:synchronization-core-datastore` is the DataStore backend (preserves the legacy on-disk cursor file);
-`:synchronization-core-room` is the Room backend (standalone DB, monitoring-room pattern). Type-safe
-accessors: `projects.synchronizationCore`, `projects.synchronizationCoreDatastore`,
-`projects.synchronizationCoreRoom`, `projects.synchronizationParseRoom`.
+`:synchronization-core-room` is the Room backend (standalone DB, monitoring-room pattern);
+`:synchronization-events` ships the platform event listeners (Android/iOS foreground + connectivity)
+consumed via `LBSyncOperator.registerEventListeners(...)`. Type-safe
+accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
+`projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
+`projects.synchronizationParseRoom`.
 
 `:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
 (storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
@@ -31,12 +35,13 @@ the artifact is at 2.0.0 here).
 
 ## The `:synchronization-core` engine
 
-Generic sync framework. **Source-set split**: the whole engine (`LBSyncManager`, `LBSyncGroup`,
-`LBSyncOperator`, connectivity, lifecycle) lives in `androidMain`; `commonMain` holds the pure
-`runner/SyncRunner`, the framework-agnostic `store/SyncTimestampLocalDataSource` **interface** (`SyncKey` keys,
-`kotlin.time.Instant` dates; the DataStore backend persists epoch-millis under the key scheme
-`"${syncKey}lastSyncDate"` / `…_localDate`), and the `store/LBSyncStorage` registry. No backend
-(DataStore/Room) is referenced from core.
+Generic sync framework, entirely in `commonMain` (JVM + iOS targets, no Android): `LBSyncManager`,
+`LBSyncGroup`, `LBSyncOperator`, the pure `runner/SyncRunner`, the framework-agnostic
+`store/SyncTimestampLocalDataSource` **interface** (`SyncKey` keys, `kotlin.time.Instant` dates; the
+DataStore backend persists epoch-millis under the key scheme `"${syncKey}lastSyncDate"` /
+`…_localDate`), and the `store/LBSyncStorage` registry. No backend (DataStore/Room) is referenced from
+core. The platform integrations (connectivity, app lifecycle) live in `:synchronization-events` as
+`LBSyncEventListener` implementations.
 
 Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
 callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
@@ -46,9 +51,11 @@ Detached-from-caller execution (receiver-triggered syncs, automatic retry) runs 
 library-owned `CoroutineScope` — the no-store constructor defaults it to the shared internal
 `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
 collapse-and-join + failure-retry machinery is extracted into the `SyncRunner` deep module in
-`commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time. All four modules
-declare `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`) — the connectivity engine relies on
+`commonMain` (`runner/SyncRunner.kt`), unit-tested in isolation with virtual time. The Android-target
+modules (`:synchronization-events`, both backends, `:synchronization-parse-room`) declare `minSdk 24`
+(`AndroidConfig.SynchronizationMinSdk`) — the connectivity listener relies on
 `registerDefaultNetworkCallback` (API 24) — while the rest of the repo stays at `minSdk 23`.
+`:synchronization-core` itself has no Android target.
 
 ### Cursor storage (pluggable backend)
 
@@ -99,12 +106,13 @@ The old SharedPreferences default-prefs migration is gone, so an app upgrading f
 Three layers, top to bottom:
 
 - **`LBSyncOperator`** (object/singleton) — app-wide registry. Holds `groups: LinkedHashMap<String,
-  LBSyncGroup>`. `initNetworkListener(context)` collects `LBConnectivityManager.networkStates` (modern
-  `NetworkCallback` flow) to trigger `InternetIsBack`; `initAppLifecycleListener()` (no `Context`)
-  observes `ProcessLifecycleOwner` via a `DefaultLifecycleObserver`-backed flow to trigger
-  `AppForeground` and start/stop server-notification listeners (e.g. Parse LiveQuery) on
-  foreground/background. There is no broadcast bridge anymore — `LBSyncApplication` was removed; apps
-  just call these two init methods at startup. `syncManager<T>()` finds a registered manager by type.
+  LBSyncGroup>`. `registerEventListeners(listeners)` wires `LBSyncEventListener`s (each `register`
+  returns a `Job`; re-registering cancels the previous set): listeners emit `LBSyncRefreshEventData`
+  and the operator triggers the matching refresh (`InternetIsBack`, `AppForeground`) and starts/stops
+  the server-notification listeners (e.g. Parse LiveQuery) on foreground/background transitions. The
+  platform listeners — `LBNetworkEventListener` (Android needs a `Context`, iOS is an object) and
+  `LBAppForegroundEventListener` — ship in `:synchronization-events`. There is no broadcast bridge
+  anymore — `LBSyncApplication` was removed. `syncManager<T>()` finds a registered manager by type.
 - **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
   `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
   groups sequentially**. So model table dependencies by putting the dependency in an earlier group. A
@@ -127,8 +135,8 @@ as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentS
 read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combined
 `statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and `isSyncing(): Flow<Boolean>` (snapshot of
 the registry at collection time; KDoc spells out the snapshot + `syncKey`-collision caveats). Multiple
-failures aggregate into `LBSyncAggregateException`. App foreground/background is observed directly from
-`ProcessLifecycleOwner` by the operator (no custom `Application` needed).
+failures aggregate into `LBSyncAggregateException`. App foreground/background is observed by
+`:synchronization-events`' `LBAppForegroundEventListener` (no custom `Application` needed).
 
 ### Sharp edges
 
@@ -158,27 +166,28 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
 `synchronization-core/CHANGELOG.MD` is **frozen legacy** (header literally says "Deprecated, please
 update the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in the **root**
 `CHANGELOG.MD`; bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference
-modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationCoreDatastore`,
-`projects.synchronizationCoreRoom`, `projects.synchronizationParseRoom`.
+modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
+`projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
+`projects.synchronizationParseRoom`.
 
 ## Build & verify
 
 Standard repo flow (see root `AGENTS.MD`). Quick reference:
 
 ```bash
-./gradlew :synchronization-core:assemble :synchronization-core-datastore:assemble \
-  :synchronization-core-room:assemble :synchronization-parse-room:assemble
-./gradlew :synchronization-core:testAndroidHostTest          # engine tests (commonTest + androidHostTest) on the JVM host
+./gradlew :synchronization-core:assemble :synchronization-events:assemble \
+  :synchronization-core-datastore:assemble :synchronization-core-room:assemble \
+  :synchronization-parse-room:assemble
+./gradlew :synchronization-core:jvmTest                       # engine tests (commonTest) on the JVM target
 ./gradlew :synchronization-core-datastore:testAndroidHostTest # DataStore round-trip tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed
 ```
 
 Engine unit tests (`SyncRunner`, manager pipeline, group, operator, combined flows) live in
-`commonTest` (the pure `SyncRunner`) and `androidHostTest` (the `androidMain` engine), run via the
-`withHostTest {}` setup with `runTest` + virtual time and an in-memory `SyncTimestampLocalDataSource` fake — no
-device needed. The DataStore backend has its own round-trip tests; the Room backend has none (no
+`commonTest`, run on the JVM target (`jvmTest`) with `runTest` + virtual time and an in-memory
+`SyncTimestampLocalDataSource` fake — no device needed. The DataStore backend has its own round-trip tests; the Room backend has none (no
 context-free host DB builder, matching `monitoring-room`) — it shares the `SyncTimestampLocalDataSource` contract.
 
-The backend + parse-room modules opt into `kotlin.time.ExperimentalTime` where needed and each keep a
-distinct android namespace (`…datastore`, `…room`, `…parseroom`) from `:synchronization-core` so
-generated `R`/`BuildConfig` don't collide.
+The events, backend and parse-room modules opt into `kotlin.time.ExperimentalTime` where needed and
+each keep a distinct android namespace (`…events`, `…datastore`, `…room`, `…parseroom`) so generated
+`R`/`BuildConfig` don't collide.
