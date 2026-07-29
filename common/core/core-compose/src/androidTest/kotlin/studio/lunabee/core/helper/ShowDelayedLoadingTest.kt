@@ -31,13 +31,20 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class ShowDelayedLoadingTest {
 
     @get:Rule
     val composeTestRule: ComposeContentTestRule = createComposeRule()
+
+    /**
+     * [LBLoadingVisibilityDelayDelegate] schedules on [kotlinx.coroutines.Dispatchers.Main] in real
+     * time, not on the Compose test clock, so every delay asserted here must dwarf composition and
+     * frame work — a short one races with a loaded CI agent. Exact timing is covered deterministically
+     * by `LBLoadingVisibilityDelayDelegateTest` with a virtual-time dispatcher.
+     */
+    private val testDelay: Duration = 2.seconds
 
     @Test
     fun rememberShowDelayedLoading_no_loading_test() {
@@ -76,9 +83,7 @@ class ShowDelayedLoadingTest {
     @Test
     fun rememberShowDelayedLoading_show_after_delay_test() {
         var actualShowLoading: Boolean? = null
-        // The pending show elapses on real time (Dispatchers.Main), so the delay must outlast the
-        // composition itself, which can take a few hundred ms on a loaded CI agent.
-        val delayBeforeShow = 2.seconds
+        val delayBeforeShow = testDelay
 
         composeTestRule.setContent {
             val showLoading: Boolean by rememberShowDelayedLoading(
@@ -115,10 +120,10 @@ class ShowDelayedLoadingTest {
     }
 
     @Test
-    fun rememberShowDelayedLoading_hide_min_loading_test(): TestResult = runTest {
+    fun rememberShowDelayedLoading_hide_min_loading_test() {
         var actualShowLoading: Boolean? = null
         val shouldShowLoading = mutableStateOf(true)
-        val minLoadingShowDuration = 100.milliseconds
+        val minLoadingShowDuration = testDelay
 
         composeTestRule.setContent {
             val showLoading: Boolean by rememberShowDelayedLoading(
@@ -138,15 +143,14 @@ class ShowDelayedLoadingTest {
         composeTestRule.mainClock.advanceTimeByFrame()
         assertTrue(actualShowLoading) // Still true because of minLoadingShowDuration
 
-        composeTestRule.wait(minLoadingShowDuration)
-        assertFalse(actualShowLoading)
+        composeTestRule.waitUntil(timeoutMillis = (minLoadingShowDuration * 3).inWholeMilliseconds) { actualShowLoading == false }
     }
 
     @Test
     fun rememberShowDelayedLoading_hide_before_delay_test(): TestResult = runTest {
         val actualShowLoading = mutableListOf<Boolean>()
         val shouldShowLoading = mutableStateOf(true)
-        val delayBeforeShow = 200.milliseconds
+        val delayBeforeShow = testDelay
         val minLoadingShowDuration = Duration.INFINITE
 
         composeTestRule.setContent {
@@ -167,11 +171,8 @@ class ShowDelayedLoadingTest {
         composeTestRule.mainClock.advanceTimeByFrame()
         assertFalse(actualShowLoading.last())
 
-        // Wait well beyond the show delay; the cancelled show must never become visible.
-        // Asserting after the full delay has elapsed (instead of relying on a wall-clock
-        // window shorter than delayBeforeShow) removes the timing race that made this test
-        // flaky on loaded CI agents, where the real wait could overshoot delayBeforeShow.
-        composeTestRule.wait(delayBeforeShow * 2)
+        // Wait well beyond the show delay; the cancelled show must never become visible
+        composeTestRule.wait(delayBeforeShow * 1.5)
         assertFalse(actualShowLoading.any { it })
     }
 }
