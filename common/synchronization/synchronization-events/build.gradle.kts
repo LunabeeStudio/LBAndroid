@@ -20,7 +20,7 @@ plugins {
 }
 
 description = "Synchronization events listeners for the Lunabee synchronization engine"
-version = AndroidConfig.SYNCHRONIZATION_CORE_EVENTS_VERSION
+version = AndroidConfig.SYNCHRONIZATION_EVENTS_VERSION
 
 kotlin {
     android {
@@ -34,13 +34,8 @@ kotlin {
         }
 
         androidMain.dependencies {
-            implementation(libs.androidxAppcompat)
-            implementation(libs.androidxCore)
             implementation(libs.androidxLifecycleProcess)
             implementation(libs.kotlinxCoroutinesAndroid)
-
-            implementation(projects.coreAndroid)
-            implementation(projects.loggerKermit)
         }
 
         commonMain.dependencies {
@@ -48,7 +43,8 @@ kotlin {
 
             implementation(libs.kotlinxCoroutinesCore)
 
-            api(projects.synchronizationCore)
+            implementation(projects.loggerKermit)
+            implementation(projects.synchronizationCore)
         }
     }
 }

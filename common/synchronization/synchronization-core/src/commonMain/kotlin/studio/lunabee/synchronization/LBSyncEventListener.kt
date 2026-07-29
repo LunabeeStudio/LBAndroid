@@ -16,11 +16,16 @@
 
 package studio.lunabee.synchronization
 
+import kotlinx.coroutines.Job
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
-interface LBSyncEventListener {
+/**
+ * Listener for a [LBSyncRefreshEvent].
+ * This is used by [LBSyncOperator] to listen to change related to registered events (see [LBSyncGroup.refreshEvents]).
+ */
+interface LBSyncEventListener<T : LBSyncRefreshEventData> {
     fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    )
+        onEvent: suspend (data: T) -> Unit,
+    ): Job
 }

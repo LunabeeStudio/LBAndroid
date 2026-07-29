@@ -17,14 +17,23 @@
 package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.Job
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
-expect class LBNetworkEventListener : LBSyncEventListener {
+expect class LBNetworkEventListener : LBSyncEventListener<LBSyncRefreshEventData.InternetIsBack> {
+
+    /**
+     * Call this to let the LBSyncOperator refresh the sync managers for network changes. The refresh is
+     * performed when a reconnection is detected (new state is connected AND the previous state was not).
+     *
+     * **WARNING** : A sync manager can only be refreshed if its group carries
+     * [LBSyncRefreshEvent.InternetIsBack].
+     */
     override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    )
+        onEvent: suspend (data: LBSyncRefreshEventData.InternetIsBack) -> Unit,
+    ): Job
 }
 
 internal val networkLogger: Logger = LBLogger.get("$LogTag Network")
