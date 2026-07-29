@@ -32,6 +32,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ShowDelayedLoadingTest {
 
@@ -73,9 +74,11 @@ class ShowDelayedLoadingTest {
     }
 
     @Test
-    fun rememberShowDelayedLoading_show_after_delay_test(): TestResult = runTest {
+    fun rememberShowDelayedLoading_show_after_delay_test() {
         var actualShowLoading: Boolean? = null
-        val delayBeforeShow = 100.milliseconds
+        // The pending show elapses on real time (Dispatchers.Main), so the delay must outlast the
+        // composition itself, which can take a few hundred ms on a loaded CI agent.
+        val delayBeforeShow = 2.seconds
 
         composeTestRule.setContent {
             val showLoading: Boolean by rememberShowDelayedLoading(
@@ -88,8 +91,7 @@ class ShowDelayedLoadingTest {
         }
 
         assertFalse(actualShowLoading!!)
-        composeTestRule.wait(delayBeforeShow * 1.5)
-        assertTrue(actualShowLoading)
+        composeTestRule.waitUntil(timeoutMillis = (delayBeforeShow * 3).inWholeMilliseconds) { actualShowLoading == true }
     }
 
     @Test
