@@ -34,12 +34,10 @@ import platform.Network.nw_path_monitor_set_update_handler
 import platform.Network.nw_path_monitor_start
 import platform.Network.nw_path_status_satisfied
 import platform.darwin.dispatch_get_main_queue
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
 @OptIn(ExperimentalForeignApi::class)
-actual object LBNetworkEventListener : LBSyncEventListener {
-    private var networkListenerJob: Job? = null
+actual object LBNetworkEventListener : LBSyncEventListener<LBSyncRefreshEventData.InternetIsBack> {
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private fun networkStateFlow(): Flow<Boolean> = callbackFlow {
@@ -53,16 +51,15 @@ actual object LBNetworkEventListener : LBSyncEventListener {
     }.distinctUntilChanged()
 
     actual override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    ) {
-        networkListenerJob?.cancel()
-        networkListenerJob = scope.launch {
+        onEvent: suspend (data: LBSyncRefreshEventData.InternetIsBack) -> Unit,
+    ): Job {
+        return scope.launch {
             var lastIsConnected: Boolean? = null
             networkStateFlow().collect { isConnected ->
                 if (isConnected) {
                     networkLogger.v("Internet is available")
                     if (lastIsConnected == false) {
-                        onEvent(LBSyncRefreshEvent.InternetIsBack::class)
+                        onEvent(LBSyncRefreshEventData.InternetIsBack)
                     }
                 } else {
                     networkLogger.v("Internet is disabled")

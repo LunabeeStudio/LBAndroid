@@ -16,22 +16,19 @@
 
 package studio.lunabee.synchronization
 
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Job
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
-expect class LBAppForegroundEventListener : LBSyncEventListener {
+expect object LBAppForegroundEventListener : LBSyncEventListener<LBSyncRefreshEventData.AppForeground> {
 
     /**
      * Call this to let the LBSyncOperator refresh the sync managers when the app enters the foreground.
-     * Observes [ProcessLifecycleOwner]'s lifecycle as a [Flow] (no broadcasts): a foreground transition
-     * triggers the refresh and starts the server-notification listeners; a background transition stops
-     * them.
      *
      * **WARNING** : A sync manager can only be refreshed if its group carries
      * [LBSyncRefreshEvent.AppForeground].
      */
     override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    )
+        onEvent: suspend (data: LBSyncRefreshEventData.AppForeground) -> Unit,
+    ): Job
 }

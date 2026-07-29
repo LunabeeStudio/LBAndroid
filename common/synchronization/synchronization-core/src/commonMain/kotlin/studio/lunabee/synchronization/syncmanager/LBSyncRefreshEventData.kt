@@ -14,29 +14,18 @@
  * limitations under the License.
  */
 
-plugins {
-    id("org.jetbrains.kotlin.multiplatform")
-    id("co.touchlab.skie")
-}
+package studio.lunabee.synchronization.syncmanager
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-}
+import kotlin.reflect.KClass
 
-kotlin {
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach {
-        it.binaries.framework {
-            baseName = project.name
-            isStatic = true
-        }
+sealed interface LBSyncRefreshEventData {
+    val type: KClass<out LBSyncRefreshEvent>
+
+    data class AppForeground(val isForeground: Boolean) : LBSyncRefreshEventData {
+        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.AppForeground::class
     }
 
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-        freeCompilerArgs.add("-opt-in=kotlin.time.ExperimentalTime")
-        freeCompilerArgs.add("-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi")
+    data object InternetIsBack : LBSyncRefreshEventData {
+        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.InternetIsBack::class
     }
 }

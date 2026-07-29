@@ -32,15 +32,11 @@ import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationState
-import studio.lunabee.synchronization.LBSyncOperator.startServerNotificationListeners
-import studio.lunabee.synchronization.LBSyncOperator.stopServerNotificationListeners
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
 @OptIn(ExperimentalForeignApi::class)
-actual object LBAppForegroundEventListener : LBSyncEventListener {
+actual object LBAppForegroundEventListener : LBSyncEventListener<LBSyncRefreshEventData.AppForeground> {
     private val mainScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var appLifecycleJob: Job? = null
 
     private fun appForegroundFlow(): Flow<Boolean> = callbackFlow {
         val notificationCenter = NSNotificationCenter.defaultCenter
@@ -66,20 +62,14 @@ actual object LBAppForegroundEventListener : LBSyncEventListener {
     }
 
     actual override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    ) {
-        appLifecycleJob?.cancel()
-        appLifecycleJob = mainScope.launch {
-            appForegroundFlow()
-                .distinctUntilChanged()
-                .collect { isForeground ->
-                    if (isForeground) {
-                        onEvent(LBSyncRefreshEvent.AppForeground::class)
-                        startServerNotificationListeners()
-                    } else {
-                        stopServerNotificationListeners()
-                    }
-                }
-        }
+        onEvent: suspend (data: LBSyncRefreshEventData.AppForeground) -> Unit,
+    ): Job = mainScope.launch {
+        appForegroundFlow()
+            .distinctUntilChanged()
+            .collect { isForeground ->
+                onEvent(
+                    LBSyncRefreshEventData.AppForeground(isForeground = isForeground),
+                )
+            }
     }
 }

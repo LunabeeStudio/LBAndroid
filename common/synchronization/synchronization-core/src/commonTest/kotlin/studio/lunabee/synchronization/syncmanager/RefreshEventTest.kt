@@ -105,7 +105,7 @@ class RefreshEventTest {
         // triggerRefresh sets PendingSync synchronously on every matched manager before launching the sync
         // detached. The actual pipeline only advances when the test scheduler does, so until then PendingSync
         // is the latest recorded transition.
-        LBSyncOperator.triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
+        LBSyncOperator.triggerRefresh(LBSyncRefreshEventData.AppForeground(isForeground = true))
 
         assertTrue(
             LBSyncProcessStatus.PendingSync in recorded,
@@ -125,7 +125,7 @@ class RefreshEventTest {
             refreshEvents = listOf(LBSyncRefreshEvent.InternetIsBack(minimumDelay = Duration.ZERO)),
         )
 
-        LBSyncOperator.triggerRefresh(LBSyncRefreshEvent.AppForeground::class)
+        LBSyncOperator.triggerRefresh(LBSyncRefreshEventData.AppForeground(isForeground = true))
 
         assertEquals(
             expected = LBSyncProcessStatus.NeverSync,

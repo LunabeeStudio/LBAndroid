@@ -17,6 +17,7 @@
 package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -27,13 +28,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
-import studio.lunabee.synchronization.LBSyncOperator.groups
-import studio.lunabee.synchronization.LBSyncOperator.statusByKey
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 import studio.lunabee.synchronization.syncmanager.defaultSyncScope
 import kotlin.reflect.KClass
 
@@ -47,16 +47,26 @@ object LBSyncOperator {
 
     val groups: LinkedHashMap<String, LBSyncGroup> = LinkedHashMap()
 
+    private val registeredListeners: MutableList<Job> = mutableListOf()
+
+    /**
+     * Registers listeners that will be used to trigger refreshes of groups related to the emitted events.
+     * (see [LBSyncGroup.refreshEvents]).
+     */
     fun registerEventListeners(
-        listeners: List<LBSyncEventListener>,
+        listeners: List<LBSyncEventListener<*>>,
     ) {
+        unregisterListeners()
         listeners.forEach { listener ->
-            listener.register(
-                onEvent = {
-                    triggerRefresh(it)
-                },
+            registeredListeners += listener.register(
+                onEvent = ::triggerRefresh,
             )
         }
+    }
+
+    private fun unregisterListeners() {
+        registeredListeners.forEach { it.cancel() }
+        registeredListeners.clear()
     }
 
     fun syncManagers(): List<LBGenericSyncManager> = groups.values.flatMap { it.syncManagers }
@@ -95,12 +105,43 @@ object LBSyncOperator {
             }
         }
 
-    internal fun triggerRefresh(eventType: KClass<out LBSyncRefreshEvent>) {
-        val availableGroups = groupsForEvent(eventType)
-        availableGroups.flatMap { it.syncManagers }.forEach {
-            it.setStatusInternal(LBSyncProcessStatus.PendingSync)
+    internal suspend fun triggerRefresh(
+        data: LBSyncRefreshEventData,
+    ) {
+        if (shouldRefresh(data = data)) {
+            val availableGroups = groupsForEvent(data.type)
+            availableGroups.flatMap { it.syncManagers }.forEach {
+                it.setStatusInternal(LBSyncProcessStatus.PendingSync)
+            }
+            defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
         }
-        defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
+        handleEventData(data = data)
+    }
+
+    /**
+     * Given an [LBSyncRefreshEventData], checks if the we should refresh sync managers.
+     */
+    private fun shouldRefresh(data: LBSyncRefreshEventData): Boolean =
+        when (data) {
+            is LBSyncRefreshEventData.AppForeground -> data.isForeground
+            LBSyncRefreshEventData.InternetIsBack -> true
+        }
+
+    /**
+     * Additional action to do depending on a given [LBSyncRefreshEventData]
+     */
+    private suspend fun handleEventData(data: LBSyncRefreshEventData) {
+        when (data) {
+            is LBSyncRefreshEventData.AppForeground -> if (data.isForeground) {
+                startServerNotificationListeners()
+            } else {
+                stopServerNotificationListeners()
+            }
+
+            LBSyncRefreshEventData.InternetIsBack -> {
+                // no-op
+            }
+        }
     }
 
     /**

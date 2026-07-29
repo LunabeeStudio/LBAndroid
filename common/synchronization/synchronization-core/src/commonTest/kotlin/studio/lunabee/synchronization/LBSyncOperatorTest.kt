@@ -228,4 +228,3 @@ private class FakeOperatorManager(
 
     override suspend fun hasSomethingToUpload(): Boolean = false
 }
-

@@ -47,15 +47,14 @@ class SyncDemoRegistry @Inject constructor(
 
     private val group: LBSyncGroup = LBSyncGroup(
         syncManagers = linkedSetOf(syncManager),
-        refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(), LBSyncRefreshEvent.InternetIsBack()),
+        refreshEvents = emptyList(),
     )
 
     init {
         // Install the cursor store once, before any manager resolves it lazily on the first sync.
         LBSyncStorage.install(context.roomSyncTimestampLocalDataSource())
         LBSyncOperator.groups[GroupKey] = group
-        // Built-in events: the operator observes ProcessLifecycleOwner (foreground) and connectivity;
-        // the group only reacts to events present in its refreshEvents list.
+        // Register listeners for events we want to respond to.
         LBSyncOperator.registerEventListeners(
             listeners = listOf(
                 LBNetworkEventListener(context = context),

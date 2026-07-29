@@ -28,19 +28,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import studio.lunabee.synchronization.LBSyncOperator.startServerNotificationListeners
-import studio.lunabee.synchronization.LBSyncOperator.stopServerNotificationListeners
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
-actual object LBAppForegroundEventListener : LBSyncEventListener {
+actual object LBAppForegroundEventListener : LBSyncEventListener<LBSyncRefreshEventData.AppForeground> {
     // Lifecycle observation must touch ProcessLifecycleOwner on the main thread. Lazy so merely touching
     // the operator (e.g. triggerRefresh in JVM host tests) never forces Dispatchers.Main to load.
     private val mainScope: CoroutineScope by lazy {
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     }
-
-    private var appLifecycleJob: Job? = null
 
     private fun appForegroundFlow(): Flow<Boolean> = callbackFlow {
         val lifecycle = ProcessLifecycleOwner.get().lifecycle
@@ -58,20 +53,12 @@ actual object LBAppForegroundEventListener : LBSyncEventListener {
     }
 
     actual override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    ) {
-        appLifecycleJob?.cancel()
-        appLifecycleJob = mainScope.launch {
-            appForegroundFlow()
-                .distinctUntilChanged()
-                .collect { isForeground ->
-                    if (isForeground) {
-                        onEvent(LBSyncRefreshEvent.AppForeground::class)
-                        startServerNotificationListeners()
-                    } else {
-                        stopServerNotificationListeners()
-                    }
-                }
-        }
+        onEvent: suspend (data: LBSyncRefreshEventData.AppForeground) -> Unit,
+    ): Job = mainScope.launch {
+        appForegroundFlow()
+            .distinctUntilChanged()
+            .collect { isForeground ->
+                onEvent(LBSyncRefreshEventData.AppForeground(isForeground = isForeground))
+            }
     }
 }

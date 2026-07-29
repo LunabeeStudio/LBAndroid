@@ -24,28 +24,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.connectivity.NetworkState
-import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
-import kotlin.reflect.KClass
+import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
 actual class LBNetworkEventListener(
     private val context: Context,
-) : LBSyncEventListener {
+) : LBSyncEventListener<LBSyncRefreshEventData.InternetIsBack> {
     private lateinit var lastNetworkState: NetworkState
-    private var networkListenerJob: Job? = null
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     actual override fun register(
-        onEvent: (eventType: KClass<out LBSyncRefreshEvent>) -> Unit,
-    ) {
+        onEvent: suspend (data: LBSyncRefreshEventData.InternetIsBack) -> Unit,
+    ): Job {
         val appContext = context.applicationContext
         lastNetworkState = LBConnectivityManager.getNetworkState(appContext)
-        networkListenerJob?.cancel()
-        networkListenerJob = scope.launch {
+        return scope.launch {
             LBConnectivityManager.observeNetworkStates(appContext).collect { networkState ->
                 if (networkState.isConnected) {
                     networkLogger.v("Internet is available with transport ${networkState.connectionType}")
                     if (!lastNetworkState.isConnected) {
-                        onEvent(LBSyncRefreshEvent.InternetIsBack::class)
+                        onEvent(LBSyncRefreshEventData.InternetIsBack)
                     }
                 } else {
                     networkLogger.v("Internet is disabled")
