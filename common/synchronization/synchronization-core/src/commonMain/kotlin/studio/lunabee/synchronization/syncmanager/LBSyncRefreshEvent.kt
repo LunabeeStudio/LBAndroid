@@ -16,7 +16,6 @@
 
 package studio.lunabee.synchronization.syncmanager
 
-import kotlin.reflect.KClass
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -36,16 +35,4 @@ sealed class LBSyncRefreshEvent(private val minimumDelay: Duration) {
     class AppForeground(minimumDelay: Duration = Duration.ZERO) : LBSyncRefreshEvent(minimumDelay)
 
     class InternetIsBack(minimumDelay: Duration = Duration.ZERO) : LBSyncRefreshEvent(minimumDelay)
-}
-
-sealed interface LBSyncRefreshEventData {
-    val type: KClass<out LBSyncRefreshEvent>
-
-    data class AppForeground(val isForeground: Boolean) : LBSyncRefreshEventData {
-        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.AppForeground::class
-    }
-
-    data object InternetIsBack : LBSyncRefreshEventData {
-        override val type: KClass<out LBSyncRefreshEvent> = LBSyncRefreshEvent.InternetIsBack::class
-    }
 }
