@@ -37,7 +37,7 @@ import platform.darwin.dispatch_get_main_queue
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 
 @OptIn(ExperimentalForeignApi::class)
-actual class LBNetworkEventListener : LBSyncEventListener<LBSyncRefreshEventData.InternetIsBack> {
+actual object LBNetworkEventListener : LBSyncEventListener<LBSyncRefreshEventData.InternetIsBack> {
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private fun networkStateFlow(): Flow<Boolean> = callbackFlow {
