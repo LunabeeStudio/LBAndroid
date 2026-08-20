@@ -23,6 +23,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -292,6 +293,31 @@ class SyncRunnerTest {
 
         scope.cancel()
     }
+
+    @Test
+    fun a_run_completing_without_suspending_on_an_eager_dispatcher_does_not_leak_an_uninitialized_handle() =
+        runTest {
+            // UnconfinedTestDispatcher runs the launched body eagerly, before `scope.launch` returns — the
+            // window in which `startRunLocked` had not yet assigned its `handle`. Combined with a block that
+            // never suspends, this reproduces the UninitializedPropertyAccessException the LAZY start fixes.
+            val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+            val runner = SyncRunner(scope = scope, retryDelay = { null })
+            var invocations = 0
+
+            val result: LBResult<Unit> = runner.run {
+                invocations++
+                LBResult.Success(Unit)
+            }
+
+            assertEquals(expected = 1, actual = invocations)
+            assertTrue(result is LBResult.Success, "expected a Success result")
+
+            // The runner must still be usable: a leaked handle would have left `inFlight` inconsistent.
+            val second: LBResult<Unit> = runner.run { LBResult.Success(Unit) }
+            assertTrue(second is LBResult.Success, "runner should stay reusable after an eager run")
+
+            scope.cancel()
+        }
 
     /**
      * Drives [body] with a [SyncRunner] whose scope runs on the test scheduler, so all of the runner's

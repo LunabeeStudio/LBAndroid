@@ -19,6 +19,7 @@ package studio.lunabee.synchronization.runner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -133,13 +134,19 @@ class SyncRunner(
      * settling *before* completing the result deferred so any awaiter that resumes already sees
      * consistent state. On cancellation it still completes [result] (so awaiters never hang) and still
      * settles, under [NonCancellable]. Must be called while holding [mutex].
+     *
+     * The job is started [lazily][CoroutineStart.LAZY] and only started once [handle] has been assigned:
+     * the coroutine body passes its own handle to [settle], so an eagerly dispatched body could observe
+     * the handle before assignment. That happens whenever [block] completes without suspending or a
+     * multi-threaded dispatcher picks the body up immediately, and surfaces as an
+     * [UninitializedPropertyAccessException] escaping [scope].
      */
     private fun startRunLocked(
         block: suspend () -> LBResult<Unit>,
         result: CompletableDeferred<LBResult<Unit>>,
     ): RunHandle {
         lateinit var handle: RunHandle
-        val job = scope.launch {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             val outcome: LBResult<Unit> = try {
                 block()
             } catch (cancellation: CancellationException) {
@@ -154,6 +161,7 @@ class SyncRunner(
             result.complete(outcome)
         }
         handle = RunHandle(job = job, result = result)
+        job.start()
         return handle
     }
 
