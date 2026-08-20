@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+```
+Synchronization Core 2.0.0-rc03
+Synchronization Events 2.0.0-rc03
+Synchronization Core-Datastore 2.0.0-rc03
+Synchronization Core-Room 2.0.0-rc03
+Synchronization Parse-Room 2.0.0-rc03
+```
+
+- Fixed a race in `SyncRunner` where a run whose block completed without suspending — or whose body was
+  dispatched eagerly by a multi-threaded dispatcher — could observe its own `lateinit` run handle before
+  it was assigned, throwing `UninitializedPropertyAccessException` out of the runner's scope and leaving
+  `run(...)` awaiters hanging. The run coroutine is now started lazily, after the handle is published.
+- Bumped the modules depending on `synchronization-core` so consumers pinning every synchronization
+  artifact to a single version can resolve the fix.
+
 ## 2026-07-28
 
 ```
