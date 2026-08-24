@@ -24,6 +24,8 @@ LbcImage 1.9.2
   artifact to a single version can resolve the fix.
 - Fixed `LbcImage` rendering nothing for `LbcImageSpec.ImageDrawable` in Compose previews: Coil skips
   its request in inspection mode, so the drawable is now passed as the request placeholder there.
+- Fixed `LbcImageSpec.ImageDrawable.uiMode` overriding the whole `Configuration.uiMode` field: the device ui mode type
+  (car, television, watch…) is now preserved and only the masks set by the caller are overridden.
 
 ## 2026-07-28
 

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -240,6 +241,20 @@ private fun UriImage(
     }
 }
 
+/**
+ * The [Configuration.uiMode] field packs both the type and the night masks, so overriding it as a whole would drop the
+ * device values (car, television, watch…) not set by the caller. Only override the masks actually set on [override].
+ */
+private fun mergeUiMode(current: Int, override: Int): Int {
+    val type = (override and Configuration.UI_MODE_TYPE_MASK)
+        .takeIf { it != Configuration.UI_MODE_TYPE_UNDEFINED }
+        ?: (current and Configuration.UI_MODE_TYPE_MASK)
+    val night = (override and Configuration.UI_MODE_NIGHT_MASK)
+        .takeIf { it != Configuration.UI_MODE_NIGHT_UNDEFINED }
+        ?: (current and Configuration.UI_MODE_NIGHT_MASK)
+    return type or night
+}
+
 @Composable
 private fun DrawableImage(
     imageSpec: LbcImageSpec.ImageDrawable,
@@ -252,13 +267,15 @@ private fun DrawableImage(
     errorPainter: Painter?,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
+
     // Resolve the drawable through a configuration context so Coil picks the right uiMode (day/night) variant.
-    val requestContext = remember(context, imageSpec.uiMode) {
+    val requestContext = remember(context, resources.configuration, imageSpec.uiMode) {
         if (imageSpec.uiMode == Configuration.UI_MODE_TYPE_UNDEFINED) {
             context
         } else {
-            val configuration = Configuration().apply {
-                uiMode = imageSpec.uiMode
+            val configuration = Configuration(resources.configuration).apply {
+                uiMode = mergeUiMode(current = uiMode, override = imageSpec.uiMode)
             }
             context.createConfigurationContext(configuration)
         }
