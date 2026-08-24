@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -262,6 +263,12 @@ private fun DrawableImage(
             context.createConfigurationContext(configuration)
         }
     }
+    // Coil skips its request in inspection mode and only draws the loading painter, hence the preview placeholder.
+    val placeholder: Painter? = if (LocalInspectionMode.current) {
+        painterResource(id = imageSpec.drawableRes)
+    } else {
+        null
+    }
     // Let Coil load the drawable: it downsamples to the layout size instead of decoding the full bitmap.
     AsyncImage(
         model = ImageRequest
@@ -272,6 +279,7 @@ private fun DrawableImage(
         modifier = modifier,
         alignment = alignment,
         contentScale = contentScale,
+        placeholder = placeholder,
         error = errorPainter,
         onError = onState,
         onLoading = onState,

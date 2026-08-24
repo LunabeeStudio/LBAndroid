@@ -13,6 +13,7 @@ Synchronization Events 2.0.0-rc03
 Synchronization Core-Datastore 2.0.0-rc03
 Synchronization Core-Room 2.0.0-rc03
 Synchronization Parse-Room 2.0.0-rc03
+LbcImage 1.9.2
 ```
 
 - Fixed a race in `SyncRunner` where a run whose block completed without suspending — or whose body was
@@ -21,6 +22,8 @@ Synchronization Parse-Room 2.0.0-rc03
   `run(...)` awaiters hanging. The run coroutine is now started lazily, after the handle is published.
 - Bumped the modules depending on `synchronization-core` so consumers pinning every synchronization
   artifact to a single version can resolve the fix.
+- Fixed `LbcImage` rendering nothing for `LbcImageSpec.ImageDrawable` in Compose previews: Coil skips
+  its request in inspection mode, so the drawable is now passed as the request placeholder there.
 
 ## 2026-07-28
 
