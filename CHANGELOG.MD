@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 2026-08-24
+
+```
+LbcImage 1.9.2
+```
+
+- Fixed `LbcImage` rendering nothing for `LbcImageSpec.ImageDrawable` in Compose previews: Coil skips
+  its request in inspection mode, so the drawable is now passed as the request placeholder there.
+- Fixed `LbcImageSpec.ImageDrawable.uiMode` overriding the whole `Configuration.uiMode` field: the device ui mode type
+  (car, television, watch…) is now preserved and only the masks set by the caller are overridden.
+
+## 2026-08-20
 
 ```
 Synchronization Core 2.0.0-rc03
@@ -13,7 +24,6 @@ Synchronization Events 2.0.0-rc03
 Synchronization Core-Datastore 2.0.0-rc03
 Synchronization Core-Room 2.0.0-rc03
 Synchronization Parse-Room 2.0.0-rc03
-LbcImage 1.9.2
 ```
 
 - Fixed a race in `SyncRunner` where a run whose block completed without suspending — or whose body was
@@ -22,10 +32,6 @@ LbcImage 1.9.2
   `run(...)` awaiters hanging. The run coroutine is now started lazily, after the handle is published.
 - Bumped the modules depending on `synchronization-core` so consumers pinning every synchronization
   artifact to a single version can resolve the fix.
-- Fixed `LbcImage` rendering nothing for `LbcImageSpec.ImageDrawable` in Compose previews: Coil skips
-  its request in inspection mode, so the drawable is now passed as the request placeholder there.
-- Fixed `LbcImageSpec.ImageDrawable.uiMode` overriding the whole `Configuration.uiMode` field: the device ui mode type
-  (car, television, watch…) is now preserved and only the masks set by the caller are overridden.
 
 ## 2026-07-28
 
