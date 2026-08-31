@@ -13,6 +13,15 @@ LbcpresenterAnnotations 2.0.0
 LbcpresenterKoin 2.0.0
 ```
 
+- Introduce presenter v2 generated reducer factories with the new `lbcpresenter-annotations` and `lbcpresenter-ksp` modules, plus optional
+  generated Koin reducer modules
+- **break:** Replace `LBSinglePresenter.initReducer()` with `createReducer(context)` and add `LBFactorySinglePresenter` for reducer
+  factories injected by DI
+- Add [MIGRATION_V2.MD](compose/presenter/MIGRATION_V2.MD) to help client projects migrate and keep generated factories and Koin bindings
+  aligned with reducer visibility, qualifiers, and multiplatform / incremental KSP builds
+
+_Changes from presenter 2.0.0-rc01_
+
 - `LBPresenter` now rejects navigation requests coming from a screen that already navigated and is no longer resumed, and
   requests emitted while another navigation is still pending. This blocks the duplicated navigations caused by button flooding
   (double tap or several clickable elements triggering navigation within the same frame).
