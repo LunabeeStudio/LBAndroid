@@ -54,6 +54,18 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
 ) : ViewModel() {
 
     /**
+     * Last known lifecycle state of the screen hosting this presenter.
+     */
+    @Volatile
+    private var lifecycleState: Lifecycle.State = Lifecycle.State.INITIALIZED
+
+    /**
+     * Set as soon as a navigation is performed, reset when the screen gets resumed again.
+     */
+    @Volatile
+    private var hasNavigated: Boolean = false
+
+    /**
      * Channel to send user actions to the active reducer.
      */
     private val userActionChannel: Channel<Action> = Channel(Channel.UNLIMITED)
@@ -83,12 +95,18 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
         extraBufferCapacity = 10,
     )
 
-    private fun consumeNavigation() {
-        navigation.value = null
-    }
-
     private fun performNavigation(navigateAction: NavScope.() -> Unit) {
-        navigation.value = navigateAction
+        val isLeavingScreen = hasNavigated && !lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+        when {
+            navigation.value != null -> log { "Reject navigation, another one is already pending" }
+
+            isLeavingScreen -> log { "Reject navigation due to lifecycle state: $lifecycleState" }
+
+            else -> {
+                hasNavigated = true
+                navigation.value = navigateAction
+            }
+        }
     }
 
     private fun useActivity(action: suspend (Activity) -> Unit) {
@@ -150,12 +168,22 @@ abstract class LBPresenter<UiState : PresenterUiState, NavScope : Any, Action>(
             LaunchedEffect(navigation) {
                 log { "Running navigation" }
                 it(navScope)
-                consumeNavigation()
+                this@LBPresenter.navigation.value = null
             }
         }
 
         val activity by rememberUpdatedState(LocalActivity.current)
         val lifecycleOwner = LocalLifecycleOwner.current
+        LaunchedEffect(lifecycleOwner) {
+            lifecycleOwner.lifecycle.currentStateFlow.collect { state ->
+                log { "$lifecycleOwner -> ${state.name}" }
+                lifecycleState = state
+                if (state.isAtLeast(Lifecycle.State.RESUMED)) {
+                    hasNavigated = false
+                }
+            }
+        }
+
         LaunchedEffect(lifecycleOwner) {
             log { "Starting activity effect" }
             lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
