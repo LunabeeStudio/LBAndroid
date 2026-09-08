@@ -34,7 +34,11 @@ Target migration:
       The five artifacts are released in lockstep, so keep them on the same version.
 2. If the project already consumes `studio.lunabee:bom`, prefer the BOM over per-artifact versions. From 4.16.0-alpha01 the BOM pins the
    five `studio.lunabee.synchronization` artifacts, so the project can drop its own synchronization versions:
-    - bump the BOM to 4.16.0-alpha01 or later (check Maven Central), keeping the existing `platform(...)` declarations as they are
+    - bump the BOM to 4.16.0-alpha01 or later (check Maven Central)
+    - a versionless dependency needs the BOM in the same scope it is declared in: a module that exposes a synchronization artifact with
+      `api(...)` must also declare `api(platform(...))`, otherwise the constraint is not exported and every consumer module fails with
+      `Could not find studio.lunabee.synchronization:<artifact>:.` (note the empty version). `implementation(platform(...))` is enough for a
+      module that only uses the artifact internally
     - remove the `version` / `version.ref` from every synchronization dependency so the BOM supplies it, e.g.
       `synchronizationCore = { module = "studio.lunabee.synchronization:synchronization-core" }` in `libs.versions.toml`
     - delete the now-unused synchronization version aliases
@@ -52,6 +56,11 @@ Target migration:
       which also stops a lookup miss from silently skipping the sync
     - `LBSyncOperator.syncAllManagers()` is unchanged — leave those call sites alone
     - all of these are `suspend` and return `LBResult<Unit>`, exactly like the functions they replace, so the surrounding code does not move
+    - one exception: `syncGroup(name)` and `sync<T>()` return a non-null `LBResult<Unit>`, while the lookups they replace
+      (`groups[key]?.syncManagers()`, `syncManager<T>()?.synchronize()`) returned `LBResult<Unit>?`. Delete the `?:` fallback that used to
+      handle the miss and the `null` branch of any `when` over the result, otherwise the build fails or warns on dead code. A fallback that
+      mapped a miss to `LBResult.Success` was hiding a skipped sync and now reports the miss as a failure — that is the intended change, but
+      check what the call site does with a failure
 5. Migrate the call sites that live **inside** a sync manager subclass — typically a custom `onLiveQueryCreateOrUpdate` override, or a
    listener callback that re-triggers its own manager:
     - `liveQueryScope.launch { synchronize() }` → `liveQueryScope.launch { LBSyncOperator.sync(manager = this@MyParseRoomSyncManager) }`
@@ -109,11 +118,15 @@ Verification:
 - Run the test suites that exercise synchronization.
 - Run detekt after the migration. If repo instructions specify an exact detekt command, use that exact command.
 - Fix warnings/errors related to the migration instead of suppressing them.
+- Check where the chosen version actually resolves from. A pre-release that only exists in the local Maven repository builds on the machine
+  that published it and fails everywhere else, so it has to be published before the branch can go through CI.
 
 In your final summary, include:
 
 - the synchronization version the project now depends on, and whether it comes from the BOM or from explicit versions
-- every migrated call site, grouped by replacement (`sync(manager)`, `sync(group)`, `syncGroup(name)`)
+- every migrated call site, grouped by replacement (`sync(manager)`, `sync<T>()`, `sync(group)`, `syncGroup(name)`)
+- any `?:` fallback or `null` branch dropped because the replacement returns a non-null `LBResult`, and whether that changed what the call
+  site reports on a miss
 - any call site that was inside a manager's own SPI and how it was restructured
 - the tests that had to change because requests are now serialized
 - whether any manager needed `retryTempo = null`
