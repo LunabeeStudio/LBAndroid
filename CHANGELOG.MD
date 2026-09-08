@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-08
+
+```
+Synchronization Core 2.1.0-alpha01
+Synchronization Events 2.1.0-alpha01
+Synchronization Core-Datastore 2.1.0-alpha01
+Synchronization Core-Room 2.1.0-alpha01
+Synchronization Parse-Room 2.1.0-alpha01
+```
+
+- **break:** `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are now `internal`. Every sync
+  request goes through `LBSyncOperator`, which is therefore the only place ordering is decided. Replace
+  `myManager.synchronize()` with `LBSyncOperator.sync(manager = myManager)` and `myGroup.syncManagers()`
+  with `LBSyncOperator.sync(group = myGroup)`.
+- Added `LBSyncOperator.sync(manager)`, `LBSyncOperator.sync(group)` and `LBSyncOperator.syncGroup(name)`
+  (the latter returns a `Failure` carrying an `IllegalArgumentException` for an unregistered key).
+- Sync requests are now serialized by the operator: a manager or group synchronized on its own waits for
+  the run already in progress instead of overlapping it, so group registration order also holds for
+  direct requests. The automatic retry of a failed run stays detached (set `retryTempo = null` on a
+  manager whose retry must not run out of order), and calling an `LBSyncOperator` sync API from inside a
+  manager's own SPI deadlocks — don't.
+- Enqueueing a sync request pre-empts the pending automatic retry of the managers it targets immediately,
+  before it waits for its turn: `SyncRunner`'s pre-emption only applies once a request reaches `run()`, so
+  without this a retry could fire in front of a request already queued behind the operator. Added
+  `SyncRunner.cancelPendingRetry()`, which cancels a parked retry without touching the in-flight run.
+- `LBParseRoomSyncManager` LiveQuery notifications now trigger their sync through `LBSyncOperator`.
+
 ## 2026-08-31
 
 ```
