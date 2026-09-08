@@ -61,8 +61,12 @@ modules (`:synchronization-events`, both backends, `:synchronization-parse-room`
 
 ### Single sync entry point
 
+Client-facing 2.0.0 → 2.1.0 migration: `MIGRATION-SYNCHRONIZATION-2.1.0.MD` (agent-executable, same shape as
+`compose/presenter/MIGRATION_V2.MD`).
+
 `LBSyncOperator` is the only public way to start a sync: `syncAllManagers()`, `sync(group)`,
-`syncGroup(name)` (unknown key → `Failure(IllegalArgumentException)`), `sync(manager)`.
+`syncGroup(name)`, `sync(manager)`, `sync<T>()` (reified lookup over the registry, same match as
+`syncManager<T>()`). A `syncGroup`/`sync<T>()` lookup miss → `Failure(IllegalArgumentException)`.
 `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are `internal` (still callable from
 `commonTest`, which is a friend source set — the existing tests call them directly).
 

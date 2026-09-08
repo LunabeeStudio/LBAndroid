@@ -41,7 +41,11 @@ LBSyncOperator.syncAllManagers()              // every group, sequentially
 LBSyncOperator.sync(group = myGroup)          // one group, its managers in parallel
 LBSyncOperator.syncGroup(name = "main")       // same, by registration key
 LBSyncOperator.sync(manager = myManager)      // one manager
+LBSyncOperator.sync<UserSyncManager>()        // same, by type — first registered manager of that type
 ```
+
+`syncGroup(name)` and `sync<T>()` return an `LBResult.Failure` carrying an `IllegalArgumentException` when
+nothing matches, so a lookup miss surfaces as a failed sync instead of being silently skipped.
 
 Requests are **serialized**: each one waits for the sync already running before it starts, so a manager
 synchronized on its own never overlaps a full run and the "dependency in an earlier group" rule holds for

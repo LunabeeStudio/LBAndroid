@@ -13,14 +13,16 @@ Synchronization Events 2.1.0-alpha01
 Synchronization Core-Datastore 2.1.0-alpha01
 Synchronization Core-Room 2.1.0-alpha01
 Synchronization Parse-Room 2.1.0-alpha01
+bom 4.16.0-alpha01
 ```
 
 - **break:** `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are now `internal`. Every sync
   request goes through `LBSyncOperator`, which is therefore the only place ordering is decided. Replace
   `myManager.synchronize()` with `LBSyncOperator.sync(manager = myManager)` and `myGroup.syncManagers()`
   with `LBSyncOperator.sync(group = myGroup)`.
-- Added `LBSyncOperator.sync(manager)`, `LBSyncOperator.sync(group)` and `LBSyncOperator.syncGroup(name)`
-  (the latter returns a `Failure` carrying an `IllegalArgumentException` for an unregistered key).
+- Added `LBSyncOperator.sync(manager)`, `LBSyncOperator.sync(group)`, `LBSyncOperator.syncGroup(name)` and the reified
+  `LBSyncOperator.sync<MyManager>()`, which synchronizes the first registered manager of that type. The two lookup variants return a
+  `Failure` carrying an `IllegalArgumentException` when nothing matches, instead of silently skipping the sync.
 - Sync requests are now serialized by the operator: a manager or group synchronized on its own waits for
   the run already in progress instead of overlapping it, so group registration order also holds for
   direct requests. The automatic retry of a failed run stays detached (set `retryTempo = null` on a
@@ -31,6 +33,10 @@ Synchronization Parse-Room 2.1.0-alpha01
   without this a retry could fire in front of a request already queued behind the operator. Added
   `SyncRunner.cancelPendingRetry()`, which cancels a parked retry without touching the in-flight run.
 - `LBParseRoomSyncManager` LiveQuery notifications now trigger their sync through `LBSyncOperator`.
+- Add [MIGRATION-SYNCHRONIZATION-2.1.0.MD](common/synchronization/MIGRATION-SYNCHRONIZATION-2.1.0.MD) to help client projects move their
+  sync call sites onto the operator.
+- Bump `bom` to 4.16.0-alpha01: it now pins the five `studio.lunabee.synchronization` artifacts, so a project can drop its per-artifact
+  synchronization versions.
 
 ## 2026-08-31
 

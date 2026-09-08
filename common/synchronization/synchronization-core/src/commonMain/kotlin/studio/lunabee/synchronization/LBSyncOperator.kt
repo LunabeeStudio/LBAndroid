@@ -45,7 +45,7 @@ import kotlin.reflect.KClass
  * Refreshes can be triggered by events emitted from registered [LBSyncEventListener] (see [registerEventListeners])
  *
  * **Single entry point.** Every sync request goes through this operator: [syncAllManagers] for the whole
- * registry, [sync] for one group or one manager. [LBSyncGroup.syncManagers] and
+ * registry, [sync] for one group or one manager (by instance, or by type with `sync<MyManager>()`). [LBSyncGroup.syncManagers] and
  * [LBGenericSyncManager.synchronize] are `internal`, so a consumer cannot start a run behind the
  * operator's back and the operator stays in charge of ordering.
  *
@@ -149,6 +149,22 @@ object LBSyncOperator {
     suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
         manager.cancelPendingRetry()
         return syncMutex.withLock { manager.synchronize() }
+    }
+
+    /**
+     * Synchronize the first registered manager of type [T], as [sync] does — the shorthand for
+     * `syncManager<T>()` followed by `sync(manager)`.
+     *
+     * @param T the manager type to look up in [groups], matched as [syncManager] does (first registered
+     * manager that is a [T]).
+     * @return the manager's synchronization result, or [LBResult.Failure] carrying an
+     * [IllegalArgumentException] when no manager of that type is registered.
+     */
+    suspend inline fun <reified T : LBGenericSyncManager> sync(): LBResult<Unit> {
+        val manager: T? = syncManager<T>()
+        return manager
+            ?.let { sync(manager = it) }
+            ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
     }
 
     /**

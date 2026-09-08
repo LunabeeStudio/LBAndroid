@@ -156,6 +156,25 @@ class LBSyncOperatorTest {
     }
 
     @Test
+    fun sync_by_type_runs_the_registered_manager_of_that_type() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("first", group(store, scope, "a", order = order, id = "first"))
+
+        val result = LBSyncOperator.sync<FakeOperatorManager>()
+
+        assertTrue(result is LBResult.Success, "the registered manager succeeding returns Success")
+        assertEquals(expected = listOf("first"), actual = order, "the manager found by type ran")
+    }
+
+    @Test
+    fun sync_by_type_fails_when_no_manager_of_that_type_is_registered() = runOperatorTest { _, _ ->
+        val result = LBSyncOperator.sync<FakeOperatorManager>()
+
+        assertTrue(result is LBResult.Failure, "an unregistered type returns Failure")
+        assertTrue(result.throwable is IllegalArgumentException, "the failure carries an IllegalArgumentException")
+    }
+
+    @Test
     fun sync_group_runs_only_the_named_group() = runOperatorTest { store, scope ->
         val order = mutableListOf<String>()
         register("first", group(store, scope, "a", order = order, id = "first"))
