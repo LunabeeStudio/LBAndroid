@@ -26,6 +26,7 @@ import com.parse.livequery.SubscriptionHandling
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import studio.lunabee.synchronization.LBSyncOperator
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncDao
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncManager
 import studio.lunabee.synchronization.syncmanager.FetchPage
@@ -102,13 +103,17 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
 
     /**
      * Override this if you want to do specific work on live query notification.
+     *
+     * The triggered sync goes through [LBSyncOperator] like every other sync request, so a LiveQuery
+     * notification never starts a run overlapping one already in progress.
+     *
      * @param event the live query event, can be used to know if it is a creation or an update
      */
     protected open fun onLiveQueryCreateOrUpdate(
         event: SubscriptionHandling.Event,
         parseObject: ParseObject,
     ) {
-        liveQueryScope.launch { synchronize() }
+        liveQueryScope.launch { LBSyncOperator.sync(manager = this@LBParseRoomSyncManager) }
     }
 
     /**

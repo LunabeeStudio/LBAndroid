@@ -242,9 +242,23 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * notifies of changes) re-download. Concurrent calls collapse into a single follow-up run via
      * [SyncRunner]; a failed run is retried automatically after [retryTempo].
      *
+     * Engine-internal: the public route is
+     * [studio.lunabee.synchronization.LBSyncOperator.sync], which serializes the run against every other
+     * sync request so the operator keeps ordering under control.
+     *
      * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the cause.
      */
-    suspend fun synchronize(): LBResult<Unit> = syncRunner.run { runPipeline() }
+    internal suspend fun synchronize(): LBResult<Unit> = syncRunner.run { runPipeline() }
+
+    /**
+     * Pre-empt a pending automatic retry now, without waiting for the sync request to actually start.
+     * Called by [studio.lunabee.synchronization.LBSyncOperator] when a request targeting this manager is
+     * enqueued, so a retry parked behind the operator's sync lock cannot fire while the explicit request
+     * waits its turn.
+     */
+    internal suspend fun cancelPendingRetry() {
+        syncRunner.cancelPendingRetry()
+    }
 
     /**
      * Reset the sync manager

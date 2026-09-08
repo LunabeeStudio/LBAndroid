@@ -69,6 +69,9 @@ class LBSyncGroup(
     /**
      * Synchronize all the managers of the group in parallel.
      *
+     * Engine-internal: call [LBSyncOperator.sync] with this group instead, so the operator serializes the
+     * run against the other sync requests.
+     *
      * The [isEnabled] gate is evaluated exactly once: when it returns false every manager is marked
      * [LBSyncProcessStatus.Disabled] and the result is [LBResult.Failure] carrying an
      * [LBSyncClosureException].
@@ -82,7 +85,7 @@ class LBSyncGroup(
      *
      * @return the combined synchronization result.
      */
-    suspend fun syncManagers(): LBResult<Unit> {
+    internal suspend fun syncManagers(): LBResult<Unit> {
         if (!isEnabled()) {
             syncManagers.forEach { it.setStatusInternal(LBSyncProcessStatus.Disabled) }
             return LBResult.Failure(LBSyncClosureException())
@@ -128,6 +131,14 @@ class LBSyncGroup(
                 .map { manager -> async { manager.stopServerNotificationListener() } }
                 .awaitAll()
         }
+    }
+
+    /**
+     * Pre-empt the pending automatic retry of every manager of the group, before the group's sync request
+     * actually starts. See [LBGenericSyncManager.cancelPendingRetry].
+     */
+    internal suspend fun cancelPendingRetries() {
+        syncManagers.forEach { it.cancelPendingRetry() }
     }
 
     suspend fun hasSomethingToUpload(): Boolean =
