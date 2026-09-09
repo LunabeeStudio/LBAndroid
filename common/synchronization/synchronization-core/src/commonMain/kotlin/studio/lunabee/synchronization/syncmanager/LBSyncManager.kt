@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.LogTag
+import studio.lunabee.synchronization.SyncEngineCallback
 import studio.lunabee.synchronization.SyncEngineMarker
 import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.LBSyncStorage
@@ -144,6 +145,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * Save the new fresh data you just got from the sync download
      * @param data: object list to be updated
      */
+    @SyncEngineCallback
     protected abstract suspend fun updateData(data: List<ServerData>)
 
     /**
@@ -159,16 +161,19 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param sinceLastDate: the last server `updatedAt` cursor, or `null` to fetch from the beginning.
      * @return the fetched page.
      */
+    @SyncEngineCallback
     protected abstract suspend fun fetchRequest(
         page: Int = 0,
         cursor: String? = null,
         sinceLastDate: Instant?,
     ): FetchPage<ServerData, PageInfo>
 
+    @SyncEngineCallback
     protected abstract fun updatedAt(obj: ServerData): Instant?
 
     protected abstract fun isInSync(obj: LocalData): Boolean
 
+    @SyncEngineCallback
     protected abstract suspend fun objectToBeUploaded(): List<LocalData>
 
     /**
@@ -179,6 +184,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      *
      * @param objects: the object list to push.
      */
+    @SyncEngineCallback
     protected abstract suspend fun pushObjectsToServer(objects: List<LocalData>)
 
     abstract suspend fun hasSomethingToUpload(): Boolean
@@ -187,12 +193,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * Override this if you want to support paging
      * @return the number of object you want to fetch by page
      */
+    @SyncEngineCallback
     protected open fun queryPageSize(): Int? = null
 
     /**
      * You can activate this option to optimize a sync failure.
      * This requires records fetched to be ordered by ascending updatedAt
      */
+    @SyncEngineCallback
     protected open fun supportIncrementalSync(): Boolean = false
 
     /**
@@ -209,6 +217,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * [startServerNotificationListener] subscribes a LiveQuery) must override this to `true` to actually
      * activate it; otherwise the listener is never started and every sync re-downloads after upload.
      */
+    @SyncEngineCallback
     open fun supportChangeNotificationFromServer(): Boolean = false
 
     /**
@@ -423,6 +432,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param pageInfo Data used to determine the pagination state. By default, the number of objects returned by the query as integer.
      * @return true if paged query has a next page
      */
+    @SyncEngineCallback
     protected open fun hasNextPage(pageInfo: PageInfo): Boolean = false
 
     private fun hasNextPage(objectCount: Int, pageInfo: PageInfo?): Boolean {
