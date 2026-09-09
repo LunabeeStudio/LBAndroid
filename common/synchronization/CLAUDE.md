@@ -21,7 +21,7 @@ store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor st
 consumed via `LBSyncOperator.registerEventListeners(...)`. Type-safe
 accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`.
+`projects.synchronizationParseRoom`, `projects.synchronizationChecks`.
 
 `:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
 (storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
@@ -87,8 +87,15 @@ Two paths deliberately escape the lock:
   collapses onto a follow-up behind it. A retry scheduled *after* the enqueue (a run failing while the
   request waits) is still pre-empted by `run()` itself.
 - **re-entrancy** — the `Mutex` is not reentrant, so calling an operator sync API from inside a manager's
-  SPI (`fetchRequest`, `pushObjectsToServer`, …) deadlocks. Fire-and-forget from a listener callback is
-  fine (`LBParseRoomSyncManager`'s LiveQuery hook does `liveQueryScope.launch { LBSyncOperator.sync(…) }`).
+  SPI (`fetchRequest`, `pushObjectsToServer`, …) would deadlock. It is **refused instead**: the engine runs
+  `runPipeline()` under a `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
+  every lock-taking operator entry point checks `currentCoroutineContext()[SyncEngineMarker]` first,
+  returning `Failure(LBSyncReentrantCallException)` — before `cancelPendingRetr*`, so a refused request
+  leaves the in-flight run untouched. Context inheritance draws the line: the callback's own
+  `withContext`/structured children are refused too, a request launched on an unrelated scope is not marked
+  and stays allowed (`LBParseRoomSyncManager`'s LiveQuery hook does
+  `liveQueryScope.launch { LBSyncOperator.sync(…) }`). The same trap is caught at compile time by the
+  `SyncOperatorReentrantCall` lint rule — see **Lint rules** below.
 
 ### Cursor storage (pluggable backend)
 
@@ -194,9 +201,35 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   serializes the requests themselves, so the collapse now only kicks in for the paths that bypass the
   operator (automatic retry, and a manager reached from two operator requests that were already queued).
 - **Never call `LBSyncOperator.sync*` from inside a manager's SPI** — the operator's `Mutex` is not
-  reentrant, and the calling coroutine already holds it. Deadlock, not an exception.
+  reentrant, and the calling coroutine already holds it. The request fails fast with
+  `LBSyncReentrantCallException` instead of deadlocking; launch it on your own scope, or model the
+  dependency as an earlier group.
 - `StateFlow` is conflated (status is state, not an event stream) and observer threading is the
   collector's choice — the old synchronous-background-thread closure sharp edge no longer applies.
+
+## Lint rules
+
+`common/synchronization/checks` (`:synchronization-checks`, no publication of its own) holds the
+`SyncOperatorReentrantCall` Android Lint rule: a sync request written inside a member annotated
+`@SyncEngineCallback` is an error. The annotation (public, `synchronization-core`) marks **exactly** the
+SPI the pipeline calls while holding the operator lock, so the detector follows the annotated set instead
+of a hardcoded name list — annotate a new pipeline-reached hook and the rule covers it. Members reached
+outside a run (`startServerNotificationListener`, `hasSomethingToUpload`, LiveQuery hooks) must stay
+unmarked: a sync request from there is legitimate.
+
+It reaches consumers through `lintPublish(projects.synchronizationChecks)` in
+`synchronization-core-datastore` and `synchronization-core-room` — the two storage backends, one of which
+every client installs — which embeds `lint.jar` in their AARs. It cannot be hung on
+`:synchronization-core` itself: that module is `kmp-jvm-library-conventions`, has no Android target and
+therefore no `lintPublish` configuration.
+
+Known blind spots, all covered by the runtime `SyncEngineMarker` check: a request handed to
+`launch`/`async` (deliberately skipped — that is the legit fire-and-forget, and syntax cannot tell the
+detached scopes from the run's own), a request behind a helper function the callback calls, and the
+`LBSyncGroup.isEnabled` gate (a `var` lambda, so there is no override to anchor on).
+
+Detector tests live in `checks/src/test` and use `com.android.tools.lint:lint-tests` (`libs.lintTests`)
+with source stubs — no dependency on the real modules.
 
 ## Changelog
 

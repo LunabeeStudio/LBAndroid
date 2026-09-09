@@ -26,8 +26,23 @@ bom 4.16.0-alpha01
 - Sync requests are now serialized by the operator: a manager or group synchronized on its own waits for
   the run already in progress instead of overlapping it, so group registration order also holds for
   direct requests. The automatic retry of a failed run stays detached (set `retryTempo = null` on a
-  manager whose retry must not run out of order), and calling an `LBSyncOperator` sync API from inside a
-  manager's own SPI deadlocks — don't.
+  manager whose retry must not run out of order).
+- Calling an `LBSyncOperator` sync API from inside a manager's own SPI (`fetchRequest`,
+  `pushObjectsToServer`, …) no longer deadlocks the operator: the request is refused with a `Failure`
+  carrying the new `LBSyncReentrantCallException`, and the run in progress is left alone. A request
+  launched on a scope of your own from a callback is unaffected and still queues normally.
+- Added the `@SyncEngineCallback` marker annotation on every SPI member the pipeline calls while holding
+  the lock (`fetchRequest`, `updateData`, `updatedAt`, `objectToBeUploaded`, `pushObjectsToServer`,
+  `queryPageSize`, `supportIncrementalSync`, `supportChangeNotificationFromServer`, `hasNextPage`, and the
+  `parse-room` hooks `createObjectFrom`, `push`, `parseQuery`, `tableParseName`, `update`). Members reached
+  outside a run — `startServerNotificationListener`, `hasSomethingToUpload`, the LiveQuery hooks — are
+  deliberately left unmarked, since a sync request from there is legitimate.
+- New Android Lint rule `SyncOperatorReentrantCall` (severity error) reports a sync request written inside
+  a `@SyncEngineCallback` member, so the deadlock is diagnosed at compile time instead of at runtime. It
+  ships inside `synchronization-core-datastore` and `synchronization-core-room` (`lintPublish`), so an
+  Android consumer of either storage backend gets it without wiring anything. A request handed to
+  `launch`/`async` is not reported (that is the documented fire-and-forget escape), and neither is one
+  hidden behind a helper function — the runtime refusal covers what static analysis cannot see.
 - Enqueueing a sync request pre-empts the pending automatic retry of the managers it targets immediately,
   before it waits for its turn: `SyncRunner`'s pre-emption only applies once a request reaches `run()`, so
   without this a retry could fire in front of a request already queued behind the operator. Added

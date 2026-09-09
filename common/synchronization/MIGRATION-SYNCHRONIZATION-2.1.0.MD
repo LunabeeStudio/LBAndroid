@@ -69,7 +69,9 @@ Target migration:
     - the default `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` already does this; only overrides need editing
 6. Never call `LBSyncOperator.sync(...)`, `syncGroup(...)` or `syncAllManagers()` from inside a manager's SPI — `fetchRequest`,
    `pushObjectsToServer`, `updateData`, `objectToBeUploaded`, `clearData`, `startServerNotificationListener`, `stopServerNotificationListener`
-   or `isEnabled`. The operator's lock is not reentrant and the calling coroutine already holds it: this deadlocks, it does not throw.
+   or `isEnabled`. The operator's lock is not reentrant and the calling coroutine already holds it, so the request is refused: it returns
+   `LBResult.Failure` carrying an `LBSyncReentrantCallException` (the run itself keeps going — check what the callback does with that
+   failure). Only requests made from inside the pipeline are refused; one launched on a scope of your own is not.
     - if the project has such a call (a manager that chains another manager itself), lift it out: register the two managers in two groups,
       the dependency first, and let the operator's ordering do the chaining
 7. Update the tests of the client repo the same way: `manager.synchronize()` is not visible from another module, so tests must call
