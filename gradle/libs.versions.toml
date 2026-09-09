@@ -76,7 +76,7 @@ okhttp = "5.5.0"
 parse = "4.4.0"
 parseLiveQuery = "1.2.2"
 robolectric = "4.16.1"
-touchlabKermit = "2.1.0"
+touchlabKermit = "2.2.0"
 touchlabSkie = "0.10.14"
 zoomable = "2.13.0"
 
