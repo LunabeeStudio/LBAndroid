@@ -154,8 +154,10 @@ Three layers, top to bottom:
   `LBAppForegroundEventListener` — ship in `:synchronization-events`. There is no broadcast bridge
   anymore — `LBSyncApplication` was removed. `syncManager<T>()` finds a registered manager by type.
 - **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
-  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
-  groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
+  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity), unless the group sets
+  `executionMode = LBSyncExecutionMode.Sequential`, which runs them one at a time in `syncManagers`
+  order (same gate, same aggregation, no short-circuit — it only removes the concurrency); the
+  **operator runs groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
   single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
   evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
   `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).

@@ -52,7 +52,8 @@ import kotlin.reflect.KClass
  *
  * **Ordering.** Requests are serialized: a request waits for the sync currently running to finish before
  * it starts. Inside one [syncAllManagers] (or event-triggered) run, groups run sequentially in
- * registration order and the managers of a group run in parallel. So a manager synchronized directly
+ * registration order and the managers of a group run in parallel, or one after another when the group
+ * sets [LBSyncGroup.executionMode] to [LBSyncExecutionMode.Sequential]. So a manager synchronized directly
  * through [sync] never overlaps a full run, and dependencies modelled as "earlier group" hold for direct
  * requests too.
  *
@@ -127,7 +128,8 @@ object LBSyncOperator {
     }
 
     /**
-     * Synchronize a single [LBSyncGroup] — its managers in parallel — without running the other groups.
+     * Synchronize a single [LBSyncGroup] — its managers as its [LBSyncGroup.executionMode] says — without
+     * running the other groups.
      *
      * Suspends until any sync already running through the operator has finished, so the group never
      * overlaps a [syncAllManagers] run.

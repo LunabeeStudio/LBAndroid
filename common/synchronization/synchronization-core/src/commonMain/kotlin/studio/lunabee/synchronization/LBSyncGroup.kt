@@ -35,16 +35,18 @@ import kotlin.time.Instant
 
 /**
  * Use this to group sync managers together.
- * Sync managers within the same group will be synchronized in parallel.
+ * Sync managers within the same group are synchronized in parallel, unless [executionMode] says otherwise.
  * Dependency between table can be manage using group.
  *
  * @param syncManagers: The sync managers managed by this group
  * @param refreshEvents: The refresh events list this group must be aware of
+ * @param executionMode: Whether the managers of this group run in parallel (default) or one after another
  */
 @Suppress("unused")
 class LBSyncGroup(
     var syncManagers: LinkedHashSet<LBGenericSyncManager> = linkedSetOf(),
     var refreshEvents: List<LBSyncRefreshEvent> = emptyList(),
+    var executionMode: LBSyncExecutionMode = LBSyncExecutionMode.Parallel,
 ) {
 
     /**
@@ -67,7 +69,7 @@ class LBSyncGroup(
         }
 
     /**
-     * Synchronize all the managers of the group in parallel.
+     * Synchronize all the managers of the group, in parallel or one after another as [executionMode] says.
      *
      * Engine-internal: call [LBSyncOperator.sync] with this group instead, so the operator serializes the
      * run against the other sync requests.
@@ -76,9 +78,10 @@ class LBSyncGroup(
      * [LBSyncProcessStatus.Disabled] and the result is [LBResult.Failure] carrying an
      * [LBSyncClosureException].
      *
-     * Otherwise every manager runs to completion via `async`/`awaitAll` — because each
-     * [LBGenericSyncManager.synchronize] returns its failure as a value, a failing sibling never
-     * cancels the others. The per-manager results are then combined:
+     * Otherwise every manager runs to completion — in [LBSyncExecutionMode.Parallel] via
+     * `async`/`awaitAll`, in [LBSyncExecutionMode.Sequential] one at a time in [syncManagers] order.
+     * Because each [LBGenericSyncManager.synchronize] returns its failure as a value, a failing manager
+     * never cancels (nor skips) the others in either mode. The per-manager results are then combined:
      * - no failure → [LBResult.Success];
      * - exactly one failure → [LBResult.Failure] carrying that manager's error;
      * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
@@ -91,10 +94,14 @@ class LBSyncGroup(
             return LBResult.Failure(LBSyncClosureException())
         }
 
-        val results: List<LBResult<Unit>> = coroutineScope {
-            syncManagers
-                .map { manager -> async { manager.synchronize() } }
-                .awaitAll()
+        val results: List<LBResult<Unit>> = when (executionMode) {
+            LBSyncExecutionMode.Parallel -> coroutineScope {
+                syncManagers
+                    .map { manager -> async { manager.synchronize() } }
+                    .awaitAll()
+            }
+
+            LBSyncExecutionMode.Sequential -> syncManagers.map { manager -> manager.synchronize() }
         }
 
         val errors: List<Throwable> = results.mapNotNull { (it as? LBResult.Failure)?.throwable }

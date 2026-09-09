@@ -9,8 +9,9 @@ Three layers, top to bottom:
   sync** (see [Triggering a sync](#triggering-a-sync)). Runs groups **sequentially**, reacts to
   events emitted by registered `LBSyncEventListener`s to trigger refreshes (the network / app-lifecycle
   listener implementations ship in the `synchronization-events` module).
-- **`LBSyncGroup`** — a set of managers synchronized **in parallel**. Model table dependencies by putting
-  the dependency in an earlier group. A suspend `isEnabled` gate can disable a whole group.
+- **`LBSyncGroup`** — a set of managers synchronized **in parallel**, or one at a time with
+  `executionMode = LBSyncExecutionMode.Sequential`. Model table dependencies by putting the dependency in
+  an earlier group. A suspend `isEnabled` gate can disable a whole group.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine running the
   download → upload → re-download pipeline. Subclasses implement the fetch/push SPI.
 
@@ -38,7 +39,7 @@ Every sync request goes through the operator — `LBSyncManager.synchronize()` a
 
 ```kotlin
 LBSyncOperator.syncAllManagers()              // every group, sequentially
-LBSyncOperator.sync(group = myGroup)          // one group, its managers in parallel
+LBSyncOperator.sync(group = myGroup)          // one group, its managers per its executionMode
 LBSyncOperator.syncGroup(name = "main")       // same, by registration key
 LBSyncOperator.sync(manager = myManager)      // one manager
 LBSyncOperator.sync<UserSyncManager>()        // same, by type — first registered manager of that type
@@ -191,7 +192,8 @@ runner stays reusable afterwards.
 ## Global flow — operator and groups
 
 `LBSyncOperator.syncAllManagers()` runs groups sequentially in registration order; each group runs its
-managers in parallel (`async`/`awaitAll` — a failing sibling never cancels the others). Failures
+managers in parallel (`async`/`awaitAll` — a failing sibling never cancels the others), or one after
+another when it is built with `executionMode = LBSyncExecutionMode.Sequential`. Failures
 aggregate: one failure surfaces as-is, several wrap into `LBSyncAggregateException`. A `sync(group)` /
 `sync(manager)` request takes the same operator lock, so it queues behind a run in progress instead of
 racing it.

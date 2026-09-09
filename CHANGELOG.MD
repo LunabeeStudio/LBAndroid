@@ -37,6 +37,12 @@ bom 4.16.0-alpha01
   `parse-room` hooks `createObjectFrom`, `push`, `parseQuery`, `tableParseName`, `update`). Members reached
   outside a run — `startServerNotificationListener`, `hasSomethingToUpload`, the LiveQuery hooks — are
   deliberately left unmarked, since a sync request from there is legitimate.
+- `LBSyncGroup` takes an `executionMode` (`LBSyncExecutionMode.Parallel` by default, so existing groups
+  are unchanged): `Sequential` runs the group's managers one at a time, in `syncManagers` order, for a
+  group whose managers must not hit the server concurrently. The `isEnabled` gate, the "every manager
+  attempts" rule and the failure aggregation are identical in both modes — only the concurrency changes.
+  A real dependency between managers still belongs in two groups, which the operator runs in
+  registration order.
 - New Android Lint rule `SyncOperatorReentrantCall` (severity error) reports a sync request written inside
   a `@SyncEngineCallback` member, so the deadlock is diagnosed at compile time instead of at runtime. It
   ships inside `synchronization-core-datastore` and `synchronization-core-room` (`lintPublish`), so an
