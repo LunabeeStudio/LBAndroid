@@ -182,6 +182,7 @@ ktorLogging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "
 libphonenumber = { group = "com.googlecode.libphonenumber", name = "libphonenumber", version.ref = "libphonenumber" }
 lintApi = { group = "com.android.tools.lint", name = "lint-api", version.ref = "lint" }
 lintChecks = { group = "com.android.tools.lint", name = "lint-checks", version.ref = "lint" }
+lintTests = { group = "com.android.tools.lint", name = "lint-tests", version.ref = "lint" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3Runtime" }
 navigationCompose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
