@@ -21,6 +21,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -288,6 +290,135 @@ class LBSyncOperatorTest {
 
     // endregion
 
+    // region re-entrancy guard
+
+    @Test
+    fun a_direct_request_from_inside_a_manager_callback_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.sync(manager = target) },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes — the nested request did not deadlock it")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "a request made from inside a callback is refused")
+        assertTrue(
+            nestedResult.throwable is LBSyncReentrantCallException,
+            "the refusal carries LBSyncReentrantCallException, not a hang",
+        )
+        assertEquals(expected = listOf("nesting"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun a_full_run_requested_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("grouped", group(store, scope, "grouped", order = order, id = "grouped"))
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.syncAllManagers() },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "syncAllManagers() from inside a callback is refused")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "no registered group ran")
+    }
+
+    @Test
+    fun a_named_group_requested_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("grouped", group(store, scope, "grouped", order = order, id = "grouped"))
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.syncGroup(name = "grouped") },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "syncGroup() from inside a callback is refused")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "the named group never ran")
+    }
+
+    @Test
+    fun a_request_launched_structurally_from_a_manager_callback_is_refused_too() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = {
+                // A child coroutine of the callback inherits the marker, and deadlocks just as it does.
+                coroutineScope { launch { nested = LBSyncOperator.sync(manager = target) } }
+            },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "a child coroutine of the callback is refused as well")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun a_request_launched_on_an_unrelated_scope_from_a_manager_callback_is_allowed() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var fireAndForget: Deferred<LBResult<Unit>>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { fireAndForget = scope.async { LBSyncOperator.sync(manager = target) } },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run completes")
+        val queued = fireAndForget
+        assertTrue(queued != null, "the callback launched a request on its own scope")
+        assertTrue(queued.await() is LBResult.Success, "a request that does not inherit the engine marker still runs")
+        assertEquals(
+            expected = listOf("nesting", "target"),
+            actual = order,
+            "it simply queued behind the run it was launched from",
+        )
+    }
+
+    // endregion
+
     // region test infrastructure
 
     private fun register(key: String, group: LBSyncGroup) {
@@ -326,7 +457,8 @@ private data class OperatorLocalObj(val id: String)
  * appends [runId] to [runOrder] as its `fetchRequest` runs, so sequential group order can be observed.
  * Setting [fetchError] makes every run fail (download error), [failFetchTimes] only the first N; setting
  * [fetchGate] parks the fetch — after the [runId] has been recorded — until the gate completes, so a run
- * can be held in flight. Automatic retry is disabled unless [retryTempo] is passed, so a failure resolves
+ * can be held in flight; [duringFetch] runs an arbitrary block from inside the callback (used by the
+ * re-entrancy tests). Automatic retry is disabled unless [retryTempo] is passed, so a failure resolves
  * immediately under virtual time.
  */
 private class FakeOperatorManager(
@@ -337,6 +469,7 @@ private class FakeOperatorManager(
     private val runId: String? = null,
     private val fetchError: Exception? = null,
     private val fetchGate: CompletableDeferred<Unit>? = null,
+    private val duringFetch: (suspend () -> Unit)? = null,
     private var failFetchTimes: Int = 0,
     retryTempo: Duration? = null,
 ) : LBSyncManager<OperatorServerObj, OperatorLocalObj, Nothing>(scope = scope) {
@@ -354,6 +487,7 @@ private class FakeOperatorManager(
     override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<OperatorServerObj, Nothing> {
         runId?.let { runOrder?.add(it) }
         fetchGate?.await()
+        duringFetch?.invoke()
         fetchError?.let { throw it }
         if (failFetchTimes > 0) {
             failFetchTimes -= 1

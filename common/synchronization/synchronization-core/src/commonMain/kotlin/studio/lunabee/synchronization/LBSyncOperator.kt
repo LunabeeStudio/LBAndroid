@@ -18,6 +18,7 @@ package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -64,7 +65,9 @@ import kotlin.reflect.KClass
  *   pre-empted when the request finally reaches the runner;
  * - a run started from inside a manager's own SPI. Never call [sync] / [syncAllManagers] from
  *   `fetchRequest`, `pushObjectsToServer` or another engine callback: the calling coroutine already owns
- *   the sync lock and would deadlock.
+ *   the sync lock, so instead of deadlocking the request fails fast with an
+ *   [LBSyncReentrantCallException] (detected through [SyncEngineMarker]). A request launched on a scope
+ *   of your own from a callback is not nested and stays allowed.
  */
 @Suppress("unused")
 object LBSyncOperator {
@@ -118,6 +121,7 @@ object LBSyncOperator {
      * @return the combined synchronization result across all groups.
      */
     suspend fun syncAllManagers(): LBResult<Unit> {
+        reentrantCallFailure(target = "syncAllManagers()")?.let { return it }
         groups.values.forEach { it.cancelPendingRetries() }
         return syncMutex.withLock { runGroupsSequentially(groups.values) }
     }
@@ -132,6 +136,7 @@ object LBSyncOperator {
      * @return the group's combined synchronization result.
      */
     suspend fun sync(group: LBSyncGroup): LBResult<Unit> {
+        reentrantCallFailure(target = "sync(group)")?.let { return it }
         group.cancelPendingRetries()
         return syncMutex.withLock { group.syncManagers() }
     }
@@ -147,6 +152,7 @@ object LBSyncOperator {
      * @return the manager's synchronization result.
      */
     suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
+        reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
         manager.cancelPendingRetry()
         return syncMutex.withLock { manager.synchronize() }
     }
@@ -177,6 +183,25 @@ object LBSyncOperator {
     suspend fun syncGroup(name: String): LBResult<Unit> = groups[name]
         ?.let { group -> sync(group = group) }
         ?: LBResult.Failure(IllegalArgumentException("No LBSyncGroup registered under the key \"$name\""))
+
+    /**
+     * Refuses a sync request issued from inside a manager's pipeline, where the calling coroutine already
+     * holds [syncMutex]: taking the non-reentrant lock again would deadlock the operator for the lifetime
+     * of the process. Detected through the [SyncEngineMarker] the engine installs around the pipeline, so
+     * a callback's own `withContext`/child coroutines are covered while a request launched on an
+     * unrelated scope is not.
+     *
+     * @param target the refused request, quoted back in the failure message.
+     * @return the failure to return to the caller, or `null` when the request is not nested.
+     */
+    private suspend fun reentrantCallFailure(target: String): LBResult.Failure<Unit>? =
+        if (currentCoroutineContext()[SyncEngineMarker] != null) {
+            val exception = LBSyncReentrantCallException(target = target)
+            logger.e(exception.message.orEmpty())
+            LBResult.Failure(exception)
+        } else {
+            null
+        }
 
     private suspend fun runGroupsSequentially(groups: Collection<LBSyncGroup>): LBResult<Unit> {
         val errors: MutableList<Throwable> = mutableListOf()

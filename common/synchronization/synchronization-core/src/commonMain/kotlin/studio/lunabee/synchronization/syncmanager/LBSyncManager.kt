@@ -22,9 +22,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.LogTag
+import studio.lunabee.synchronization.SyncEngineMarker
 import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
@@ -246,9 +248,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * [studio.lunabee.synchronization.LBSyncOperator.sync], which serializes the run against every other
      * sync request so the operator keeps ordering under control.
      *
+     * The pipeline runs under a [SyncEngineMarker], which is what lets the operator refuse a sync request
+     * made from inside a manager callback instead of deadlocking on its lock.
+     *
      * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the cause.
      */
-    internal suspend fun synchronize(): LBResult<Unit> = syncRunner.run { runPipeline() }
+    internal suspend fun synchronize(): LBResult<Unit> = syncRunner.run {
+        withContext(SyncEngineMarker()) { runPipeline() }
+    }
 
     /**
      * Pre-empt a pending automatic retry now, without waiting for the sync request to actually start.
