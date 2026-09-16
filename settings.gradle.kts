@@ -105,6 +105,8 @@ addComposeModule(
     "test/robolectrictest",
     "presenter/presenter",
     "presenter/presenter-annotations",
+    "presenter/presenter-hilt",
+    "presenter/presenter-hilt-ksp",
     "presenter/presenter-koin",
     "presenter/presenter-koin-ksp",
     "presenter/presenter-ksp",
