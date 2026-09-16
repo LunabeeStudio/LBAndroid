@@ -83,14 +83,38 @@ it through constructor injection with no module to write and no KSP option to se
 reducer constructor parameters (`@Named`, or a custom `@Qualifier` annotation) are propagated onto the generated factory
 constructor parameters.
 
-A presenter is then a plain `@HiltViewModel`:
+A presenter is then a plain `@HiltViewModel` injecting the generated factory:
 
 ```kotlin
 @HiltViewModel
 class TimerPresenter @Inject constructor(
-    reducerFactory: TimerReducerFactory,
-) : LBFactorySinglePresenter<TimerUiState, TimerNavScope, TimerAction>(reducerFactory = reducerFactory)
+    private val reducerFactory: TimerReducerFactory,
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>() {
+    private val currentTime = Clock.System.now()
+
+    override fun createReducer(context: LBPresenterContext<TimerAction>): TimerReducer =
+        reducerFactory.create(context = context, currentTime = currentTime)
+}
 ```
+
+When the reducer declares no `@FactoryArg`, the generated factory implements `LBSingleReducerFactory` and the presenter
+can extend `LBFactorySinglePresenter` instead:
+
+```kotlin
+@HiltViewModel
+class SimplePresenter @Inject constructor(
+    reducerFactory: SimpleReducerFactory,
+) : LBFactorySinglePresenter<SimpleUiState, SimpleNavScope, SimpleAction>(reducerFactory = reducerFactory)
+```
+
+KSP options:
+- `studio.lunabee.presenter.annotateFactory`: leave it unset. `presenter-hilt-ksp` takes factory generation over from
+  `presenter-ksp` by default; setting it to `false` generates the factories without the `@javax.inject.Inject`
+  constructor, so Hilt can no longer bind them without a hand-written `@Provides`
+
+Keep a single DI processor on the KSP classpath: when `presenter-koin-ksp` is also applied, `presenter-hilt-ksp` owns
+generation and the factories carry `@Inject` only, so Koin must bind them through `generatedReducerFactoryModule`
+rather than `@ComponentScan`. The processor warns about it at compile time.
 
 ## Koin integration
 

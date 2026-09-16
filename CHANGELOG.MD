@@ -25,6 +25,14 @@ LbcpresenterKoinKsp 2.0.0-rc05
   `studio.lunabee.compose:lbccore`). Add the dependency explicitly if your screens needed it transitively
 - `lbcpresenter-ksp` now exposes `GeneratedFactoryDecorator.constructorAnnotations` and stands down from factory generation when
   `lbcpresenter-hilt-ksp` is on the KSP classpath, so a Hilt project only needs `ksp(lbcpresenter-hilt-ksp)` with no extra KSP option
+- `lbcpresenter-ksp` now exposes `FactoryOwningProcessorProvider`, the contract a DI specific processor provider implements to take
+  factory generation over. Ownership is resolved through the KSP service registrations instead of a hard-coded class name, and
+  `lbcpresenter-hilt-ksp` warns when another DI processor is on the KSP classpath (its factories then carry `@Inject` only) or when
+  `studio.lunabee.presenter.annotateFactory` is disabled (its factories then carry no `@Inject` constructor at all)
+- `@Named` qualifiers propagated onto a generated factory keep the `jakarta.inject` flavour when the reducer declared it, instead of
+  always falling back to `javax.inject.Named`
+- `lbcpresenter-hilt` and `lbcpresenter-koin` expose `hilt-navigation-compose` / `koin-compose-viewmodel` as `api`: both are called from
+  the inline `PresentScreen`, so a consumer could not compile it without declaring them again
 
 ## 2026-08-31
 
