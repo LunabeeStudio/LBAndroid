@@ -142,6 +142,7 @@ class ReducerSignatureParser {
             return resolveNamedQualifier(
                 value = stringArgumentValue(),
                 type = classArgumentValue(argumentName = "type"),
+                annotationClassName = annotationDeclaration.toClassName(),
             )
         }
 
@@ -187,9 +188,10 @@ class ReducerSignatureParser {
 internal fun resolveNamedQualifier(
     value: String?,
     type: ClassName?,
+    annotationClassName: ClassName,
 ): DiQualifier {
     value?.takeIf { it.isNotEmpty() }?.let { qualifierName ->
-        return DiQualifier.Named(qualifierName)
+        return DiQualifier.Named(value = qualifierName, annotationClassName = annotationClassName)
     }
     type?.takeUnless { it == kotlinUnitClassName }?.let { qualifierType ->
         return DiQualifier.Typed(qualifierType)

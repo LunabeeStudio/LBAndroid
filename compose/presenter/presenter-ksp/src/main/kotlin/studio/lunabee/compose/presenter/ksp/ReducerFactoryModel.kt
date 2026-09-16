@@ -86,10 +86,12 @@ data class ValidatedReducerParameter(
  */
 sealed interface DiQualifier {
     /**
-     * String qualifier declared with a `@Named` annotation.
+     * String qualifier declared with a `@Named` annotation, [annotationClassName] being the `@Named` flavour the
+     * reducer declared (`javax.inject`, `jakarta.inject` or Koin).
      */
     data class Named(
         val value: String,
+        val annotationClassName: ClassName,
     ) : DiQualifier
 
     /**

@@ -30,6 +30,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val Package = "studio.lunabee.compose.demo.presenter.timer"
+private val jakartaNamed: ClassName = ClassName("jakarta.inject", "Named")
 
 class HiltFactoryDecoratorTest {
     private val validator: ReducerFactorySignatureValidator = ReducerFactorySignatureValidator()
@@ -55,7 +56,7 @@ class HiltFactoryDecoratorTest {
                         hasRuntimeAnnotation = false,
                         hasDefault = false,
                         isVararg = false,
-                        qualifier = DiQualifier.Named("api"),
+                        qualifier = DiQualifier.Named(value = "api", annotationClassName = ClassName("javax.inject", "Named")),
                     ),
                     RawReducerParameter(
                         name = "qualifierScopedDependency",
@@ -85,6 +86,29 @@ class HiltFactoryDecoratorTest {
         // @FactoryArg params stay out of the injectable constructor (they live in the FactoryArgs data class).
         assertFalse(generatedSource.contains("private val `external`"))
         assertTrue(generatedSource.contains("public data class TimerReducerFactoryArgs"))
+    }
+
+    @Test
+    fun generate_factory_keeping_the_jakarta_named_flavour_test() {
+        val validSignature = validator.validate(
+            rawSignature(
+                parameters = presenterContextParameters() + listOf(
+                    RawReducerParameter(
+                        name = "apiClient",
+                        typeName = ClassName(Package, "TimerApiClient"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = DiQualifier.Named(value = "api", annotationClassName = jakartaNamed),
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = generator.render(generator.generate(validSignature))
+
+        assertTrue(generatedSource.contains("jakarta.inject.Named"))
+        assertFalse(generatedSource.contains("javax.inject.Named"))
     }
 
     @Test

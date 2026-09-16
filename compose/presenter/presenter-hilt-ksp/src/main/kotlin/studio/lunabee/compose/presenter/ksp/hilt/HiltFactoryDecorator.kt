@@ -24,7 +24,8 @@ import studio.lunabee.compose.presenter.ksp.ValidReducerSignature
 import studio.lunabee.compose.presenter.ksp.ValidatedReducerParameter
 
 private val injectAnnotation: ClassName = ClassName("javax.inject", "Inject")
-private val namedAnnotation: ClassName = ClassName("javax.inject", "Named")
+private val javaxNamedAnnotation: ClassName = ClassName("javax.inject", "Named")
+private val jakartaNamedAnnotation: ClassName = ClassName("jakarta.inject", "Named")
 
 internal object HiltFactoryDecorator : GeneratedFactoryDecorator {
     override fun classAnnotations(signature: ValidReducerSignature): List<AnnotationSpec> = emptyList()
@@ -38,10 +39,13 @@ internal object HiltFactoryDecorator : GeneratedFactoryDecorator {
     private fun qualifierAnnotation(qualifier: DiQualifier?): AnnotationSpec? = when (qualifier) {
         null -> null
 
-        is DiQualifier.Named -> AnnotationSpec.builder(namedAnnotation)
+        is DiQualifier.Named -> AnnotationSpec.builder(namedAnnotation(qualifier.annotationClassName))
             .addMember("%S", qualifier.value)
             .build()
 
         is DiQualifier.Typed -> AnnotationSpec.builder(qualifier.annotationClassName).build()
     }
+
+    private fun namedAnnotation(declaredAnnotation: ClassName): ClassName =
+        declaredAnnotation.takeIf { it == jakartaNamedAnnotation } ?: javaxNamedAnnotation
 }
