@@ -26,19 +26,26 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.validate
+import studio.lunabee.compose.presenter.ksp.AnnotateFactoryOption
+import studio.lunabee.compose.presenter.ksp.FactoryOwningProcessorProvider
 import studio.lunabee.compose.presenter.ksp.ReducerFactoryProcessor
 import studio.lunabee.compose.presenter.ksp.ValidReducerSignature
 
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
-private const val AnnotateFactoryOption = "studio.lunabee.presenter.annotateFactory"
 
-class KoinReducerFactoryProcessorProvider : SymbolProcessorProvider {
+class KoinReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwningProcessorProvider {
+    /**
+     * Factory generation is only taken over from the lbcpresenter-ksp processor when explicitly requested, because
+     * a Koin factory stays usable without the `@Factory` annotation when it is bound by the generated Koin module.
+     */
+    override fun ownsFactoryGeneration(annotateFactoryOption: Boolean?): Boolean = annotateFactoryOption == true
+
     /**
      * Creates the processor used to generate the Koin bindings of generated reducer factories.
      */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val annotateFactory = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull() == true
+        val annotateFactory = ownsFactoryGeneration(environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull())
         val koinModuleGenerationRequested = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true
         val generateKoinModule = koinModuleGenerationRequested && shouldGenerateKoinModuleForCompilation(environment.platforms)
         if (koinModuleGenerationRequested && !generateKoinModule) {

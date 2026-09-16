@@ -112,6 +112,15 @@ class HiltFactoryDecoratorTest {
     }
 
     @Test
+    fun own_factory_generation_unless_explicitly_disabled_test() {
+        val provider = HiltReducerFactoryProcessorProvider()
+
+        assertTrue(provider.ownsFactoryGeneration(annotateFactoryOption = null))
+        assertTrue(provider.ownsFactoryGeneration(annotateFactoryOption = true))
+        assertFalse(provider.ownsFactoryGeneration(annotateFactoryOption = false))
+    }
+
+    @Test
     fun generate_inject_constructor_without_injected_dependency_test() {
         val validSignature = validator.validate(rawSignature(parameters = presenterContextParameters()))
 

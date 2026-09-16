@@ -21,35 +21,62 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import studio.lunabee.compose.presenter.ksp.AnnotateFactoryOption
+import studio.lunabee.compose.presenter.ksp.FactoryOwningProcessorProvider
 import studio.lunabee.compose.presenter.ksp.ReducerFactoryProcessor
+import studio.lunabee.compose.presenter.ksp.factoryOwningProviders
 
-private const val AnnotateFactoryOption = "studio.lunabee.presenter.annotateFactory"
-
-class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider {
+class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwningProcessorProvider {
     /**
-     * Creates the processor generating Hilt ready reducer factories.
-     *
      * Factory generation is taken over from the lbcpresenter-ksp processor by default, because a Hilt factory is
-     * unusable without the `@Inject` constructor this processor adds. Set the KSP option
-     * `studio.lunabee.presenter.annotateFactory` to false to fall back to the undecorated factories.
+     * unusable without the `@Inject` constructor this processor adds.
      */
+    override fun ownsFactoryGeneration(annotateFactoryOption: Boolean?): Boolean = annotateFactoryOption != false
+
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
         val configuredAnnotateFactory = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull()
-        val annotateFactory = configuredAnnotateFactory ?: true
-        // Koin only takes over factory generation when the option is explicitly enabled, so this is the single
-        // configuration where both DI processors would emit the same factory file.
-        if (configuredAnnotateFactory == true && isKoinProcessorOnClasspath()) {
-            environment.logger.error(
-                "lbcpresenter-hilt-ksp and lbcpresenter-koin-ksp both take over factory generation when " +
-                    "'$AnnotateFactoryOption' is enabled, which would generate the same factory file twice. " +
-                    "Keep a single DI processor on the KSP classpath, or leave '$AnnotateFactoryOption' unset.",
-            )
-        }
+        val otherProviders = factoryOwningProviders().filterNot { it.javaClass == javaClass }
+        val clashingProviders = otherProviders.filter { it.ownsFactoryGeneration(configuredAnnotateFactory) }
+        val annotateFactory = ownsFactoryGeneration(configuredAnnotateFactory) && clashingProviders.isEmpty()
+        reportConfiguration(
+            environment = environment,
+            configuredAnnotateFactory = configuredAnnotateFactory,
+            otherProviders = otherProviders,
+            clashingProviders = clashingProviders,
+        )
         return HiltReducerFactoryProcessor(
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
             annotateFactory = annotateFactory,
         )
+    }
+
+    private fun reportConfiguration(
+        environment: SymbolProcessorEnvironment,
+        configuredAnnotateFactory: Boolean?,
+        otherProviders: List<FactoryOwningProcessorProvider>,
+        clashingProviders: List<FactoryOwningProcessorProvider>,
+    ) {
+        when {
+            clashingProviders.isNotEmpty() -> environment.logger.error(
+                "lbcpresenter-hilt-ksp and ${clashingProviders.joinToString { it.javaClass.name }} both take over factory " +
+                    "generation with '$AnnotateFactoryOption' enabled, which would generate the same factory file twice. " +
+                    "Keep a single DI processor on the KSP classpath, or leave '$AnnotateFactoryOption' unset.",
+            )
+
+            configuredAnnotateFactory == false -> environment.logger.warn(
+                "KSP option '$AnnotateFactoryOption' is disabled: reducer factories are generated without the " +
+                    "'@javax.inject.Inject' constructor, so Hilt cannot bind them without a hand-written '@Provides'. " +
+                    "Leave the option unset to let lbcpresenter-hilt-ksp annotate the factories.",
+            )
+
+            otherProviders.isNotEmpty() -> environment.logger.warn(
+                "lbcpresenter-hilt-ksp owns reducer factory generation, so the generated factories carry " +
+                    "'@javax.inject.Inject' but none of the annotations of ${otherProviders.joinToString { it.javaClass.name }}. " +
+                    "A Koin project relying on '@ComponentScan' must bind them through 'generatedReducerFactoryModule', or drop " +
+                    "lbcpresenter-hilt-ksp from the KSP classpath.",
+            )
+        }
     }
 }
 
@@ -63,12 +90,3 @@ internal class HiltReducerFactoryProcessor(
     generateFactories = annotateFactory,
     factoryDecorator = HiltFactoryDecorator.takeIf { annotateFactory },
 )
-
-private fun isKoinProcessorOnClasspath(): Boolean =
-    runCatching {
-        Class.forName(
-            "studio.lunabee.compose.presenter.ksp.koin.KoinReducerFactoryProcessorProvider",
-            false,
-            HiltReducerFactoryProcessorProvider::class.java.classLoader,
-        )
-    }.isSuccess
