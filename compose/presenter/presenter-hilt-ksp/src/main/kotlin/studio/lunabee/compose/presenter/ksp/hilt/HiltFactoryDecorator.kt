@@ -26,27 +26,12 @@ import studio.lunabee.compose.presenter.ksp.ValidatedReducerParameter
 private val injectAnnotation: ClassName = ClassName("javax.inject", "Inject")
 private val namedAnnotation: ClassName = ClassName("javax.inject", "Named")
 
-/**
- * Annotates the generated factory primary constructor with `@javax.inject.Inject` so Dagger/Hilt binds the factory
- * through constructor injection, without any hand-written module. Qualifiers declared on injected reducer constructor
- * parameters are propagated onto the generated factory constructor parameters so the factory resolves the same
- * bindings as the reducer would.
- *
- * The constructor annotation is emitted even for a reducer with no injected dependency: Dagger only considers a type
- * for constructor injection when the constructor itself carries `@Inject`.
- */
 internal object HiltFactoryDecorator : GeneratedFactoryDecorator {
     override fun classAnnotations(signature: ValidReducerSignature): List<AnnotationSpec> = emptyList()
 
-    /**
-     * Adds `@javax.inject.Inject` on the generated factory primary constructor.
-     */
     override fun constructorAnnotations(signature: ValidReducerSignature): List<AnnotationSpec> =
         listOf(AnnotationSpec.builder(injectAnnotation).build())
 
-    /**
-     * Propagates the qualifier declared on [parameter] onto the generated factory constructor parameter.
-     */
     override fun parameterAnnotations(parameter: ValidatedReducerParameter): List<AnnotationSpec> =
         listOfNotNull(qualifierAnnotation(parameter.qualifier))
 

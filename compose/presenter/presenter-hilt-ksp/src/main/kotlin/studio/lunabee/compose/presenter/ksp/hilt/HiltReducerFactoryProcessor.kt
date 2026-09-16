@@ -53,10 +53,6 @@ class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider {
     }
 }
 
-/**
- * Generates the reducer factories of the lbcpresenter-ksp processor with the Hilt constructor injection annotations
- * added by [HiltFactoryDecorator].
- */
 internal class HiltReducerFactoryProcessor(
     codeGenerator: CodeGenerator,
     logger: KSPLogger,
