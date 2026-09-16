@@ -18,7 +18,8 @@ LbcpresenterKoinKsp 2.0.0-rc05
 
 - Add `lbcpresenter-hilt` with the Hilt flavour of `PresentScreen`, resolving the presenter through `hiltViewModel()`, plus an
   overload taking an explicit `ViewModelStoreOwner` and `ViewModelProvider.Factory` for hosts that are not a Hilt view model
-  store owner, such as an input method service
+  store owner, such as an input method service, and an overload taking a `@HiltViewModel(assistedFactory = …)` creation callback for
+  presenters needing a runtime value only the composition has
 - Add `lbcpresenter-hilt-ksp`, generating reducer factories with a `@javax.inject.Inject` primary constructor so Hilt binds them without
   any hand-written module. Qualifiers declared on injected reducer constructor parameters are propagated onto the generated factory, and
   `@FactoryArg` parameters keep living in the generated `FactoryArgs` data class

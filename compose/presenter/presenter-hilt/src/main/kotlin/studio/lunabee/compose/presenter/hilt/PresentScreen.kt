@@ -48,3 +48,18 @@ inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>> Pre
     val presenter: Presenter = viewModel(viewModelStoreOwner = viewModelStoreOwner, factory = factory)
     presenter.invoke(navScope)
 }
+
+/**
+ * Inject presenter as viewmodel through an assisted factory and initialize it.
+ *
+ * Use this overload when the presenter needs a runtime value the composition has and Hilt does not, supplied through a
+ * `@HiltViewModel(assistedFactory = …)` factory.
+ */
+@Composable
+inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>, reified AssistedFactory> PresentScreen(
+    navScope: NavScope,
+    noinline creationCallback: (AssistedFactory) -> Presenter,
+) {
+    val presenter: Presenter = hiltViewModel(creationCallback = creationCallback)
+    presenter.invoke(navScope)
+}
