@@ -16,6 +16,7 @@
 
 package studio.lunabee.compose.presenter.ksp.hilt
 
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.LambdaTypeName
 import com.squareup.kotlinpoet.asTypeName
@@ -109,6 +110,35 @@ class HiltFactoryDecoratorTest {
 
         assertTrue(generatedSource.contains("jakarta.inject.Named"))
         assertFalse(generatedSource.contains("javax.inject.Named"))
+    }
+
+    @Test
+    fun generate_factory_keeping_the_typed_qualifier_arguments_test() {
+        val qualifierType = ClassName(Package, "InternalDir")
+        val validSignature = validator.validate(
+            rawSignature(
+                parameters = presenterContextParameters() + listOf(
+                    RawReducerParameter(
+                        name = "logsDir",
+                        typeName = ClassName("java.io", "File"),
+                        hasRuntimeAnnotation = false,
+                        hasDefault = false,
+                        isVararg = false,
+                        qualifier = DiQualifier.Typed(
+                            annotationClassName = qualifierType,
+                            annotationSpec = AnnotationSpec.builder(qualifierType)
+                                .addMember("type = %T.Type.Logs", qualifierType)
+                                .build(),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val generatedSource = generator.render(generator.generate(validSignature))
+
+        // A qualifier whose arguments are mandatory does not compile once they are dropped.
+        assertTrue(generatedSource.contains("@InternalDir(type = InternalDir.Type.Logs)"))
     }
 
     @Test

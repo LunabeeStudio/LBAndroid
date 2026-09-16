@@ -26,6 +26,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.ksp.toAnnotationSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import studio.lunabee.compose.presenter.FactoryArg
@@ -147,7 +148,10 @@ class ReducerSignatureParser {
         }
 
         return if (annotationDeclaration.isQualifierAnnotation()) {
-            DiQualifier.Typed(annotationDeclaration.toClassName())
+            DiQualifier.Typed(
+                annotationClassName = annotationDeclaration.toClassName(),
+                annotationSpec = toAnnotationSpec(),
+            )
         } else {
             null
         }
