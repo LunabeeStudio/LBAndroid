@@ -31,6 +31,7 @@ dependencies {
     implementation(platform(libs.composeBom))
 
     api(libs.androidxHiltNavigationCompose)
+    implementation(libs.androidxLifecycleViewmodelCompose)
     implementation(libs.composeUi)
 
     api(projects.compose.presenter)

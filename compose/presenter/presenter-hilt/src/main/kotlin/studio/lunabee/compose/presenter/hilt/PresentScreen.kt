@@ -18,6 +18,9 @@ package studio.lunabee.compose.presenter.hilt
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import studio.lunabee.compose.presenter.LBPresenter
 
 /**
@@ -26,5 +29,22 @@ import studio.lunabee.compose.presenter.LBPresenter
 @Composable
 inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>> PresentScreen(navScope: NavScope) {
     val presenter: Presenter = hiltViewModel()
+    presenter.invoke(navScope)
+}
+
+/**
+ * Build the presenter from [factory] rather than from the Hilt graph, then initialize it.
+ *
+ * Use this overload when the host is not a Hilt view model store owner. An input method service is the usual case: it
+ * creates its own store, so [hiltViewModel] cannot resolve a presenter there and the host has to supply its own
+ * [ViewModelProvider.Factory].
+ */
+@Composable
+inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>> PresentScreen(
+    navScope: NavScope,
+    viewModelStoreOwner: ViewModelStoreOwner,
+    factory: ViewModelProvider.Factory,
+) {
+    val presenter: Presenter = viewModel(viewModelStoreOwner = viewModelStoreOwner, factory = factory)
     presenter.invoke(navScope)
 }

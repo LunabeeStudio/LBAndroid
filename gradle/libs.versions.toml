@@ -102,6 +102,7 @@ androidxLifecycleProcess = { group = "androidx.lifecycle", name = "lifecycle-pro
 androidxLifecycleRuntime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "androidxLifecycle" }
 androidxLifecycleRuntimeCompose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 androidxLifecycleViewmodelAndroid = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-android", version.ref = "lifecycleViewmodelAndroid" }
+androidxLifecycleViewmodelCompose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
 androidxPagingCommon = { group = "androidx.paging", name = "paging-common", version.ref = "androidxPaging" }
 androidxPreferenceKtx = { group = "androidx.preference", name = "preference-ktx", version.ref = "androidxPreference" }
 androidxRecyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "androidxRecyclerview" }
