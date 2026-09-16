@@ -32,8 +32,8 @@ dependencies {
     api(platform(libs.koinBom))
 
     implementation(libs.composeUi)
+    api(libs.koinComposeViewmodel)
     implementation(libs.koinCore)
 
-    api(libs.koinComposeViewmodel)
     api(projects.compose.presenter)
 }
