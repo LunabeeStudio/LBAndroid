@@ -32,6 +32,14 @@ import com.squareup.kotlinpoet.FileSpec
 private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val AnnotateFactoryOption = "studio.lunabee.presenter.annotateFactory"
 
+/**
+ * DI specific providers that decorate and emit the factories themselves as soon as they are on the KSP classpath, so
+ * this processor must stand down to avoid generating the same file twice.
+ */
+private val factoryOwningProviderNames: List<String> = listOf(
+    "studio.lunabee.compose.presenter.ksp.hilt.HiltReducerFactoryProcessorProvider",
+)
+
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
      * Creates the processor used to generate reducer factories.
@@ -40,8 +48,8 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
         val annotateFactoryRequested = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull() == true
         if (annotateFactoryRequested) {
             environment.logger.warn(
-                "KSP option '$AnnotateFactoryOption' is enabled: factory generation is delegated to the lbcpresenter-koin-ksp " +
-                    "processor. Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
+                "KSP option '$AnnotateFactoryOption' is enabled: factory generation is delegated to a DI specific processor. " +
+                    "Make sure lbcpresenter-koin-ksp or lbcpresenter-hilt-ksp is on the KSP classpath.",
             )
         }
         if (environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true) {
@@ -50,13 +58,32 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
                     "Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
             )
         }
+        val delegatedToDiProcessor = annotateFactoryRequested ||
+            (annotateFactoryOption(environment) == null && hasFactoryOwningProvider())
         return ReducerFactoryProcessor(
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
-            generateFactories = !annotateFactoryRequested,
+            generateFactories = !delegatedToDiProcessor,
         )
     }
 }
+
+private fun annotateFactoryOption(environment: SymbolProcessorEnvironment): Boolean? =
+    environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull()
+
+/**
+ * True when a DI specific processor owning factory generation is on the KSP classpath. All KSP processors of a
+ * compilation share the same classloader, so a successful lookup means that processor will run in the same rounds.
+ */
+internal fun hasFactoryOwningProvider(
+    providerNames: List<String> = factoryOwningProviderNames,
+    isOnClasspath: (String) -> Boolean = ::isClassOnClasspath,
+): Boolean = providerNames.any(isOnClasspath)
+
+private fun isClassOnClasspath(className: String): Boolean =
+    runCatching {
+        Class.forName(className, false, ReducerFactoryProcessorProvider::class.java.classLoader)
+    }.isSuccess
 
 /**
  * Generates a reducer factory for every class annotated with
