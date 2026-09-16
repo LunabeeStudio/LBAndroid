@@ -72,6 +72,26 @@ The template already shows the expected presenter shape with:
 - `getInitialState`
 - `content`
 
+## Hilt integration
+
+If your project uses Hilt, `presenter-hilt` provides `PresentScreen` to resolve the presenter as a ViewModel (via
+`hiltViewModel()`) and invoke it with the screen navigation scope.
+
+For generated reducer factories, apply the `presenter-hilt-ksp` processor instead of `presenter-ksp` (it pulls
+`presenter-ksp` transitively). It generates the factory with a `@javax.inject.Inject` primary constructor, so Hilt binds
+it through constructor injection with no module to write and no KSP option to set. Qualifiers declared on injected
+reducer constructor parameters (`@Named`, or a custom `@Qualifier` annotation) are propagated onto the generated factory
+constructor parameters.
+
+A presenter is then a plain `@HiltViewModel`:
+
+```kotlin
+@HiltViewModel
+class TimerPresenter @Inject constructor(
+    reducerFactory: TimerReducerFactory,
+) : LBFactorySinglePresenter<TimerUiState, TimerNavScope, TimerAction>(reducerFactory = reducerFactory)
+```
+
 ## Koin integration
 
 If your project uses Koin, `presenter-koin` provides `PresentScreen` to resolve the presenter as a ViewModel and invoke it with the screen navigation scope.

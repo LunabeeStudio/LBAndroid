@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-16
+
+```
+Lbcpresenter 2.1.0
+LbcpresenterHilt 2.1.0
+LbcpresenterKoin 2.1.0
+LbcpresenterHiltKsp 2.0.0-rc05
+LbcpresenterKsp 2.0.0-rc05
+LbcpresenterKoinKsp 2.0.0-rc05
+```
+
+- Add `lbcpresenter-hilt` with the Hilt flavour of `PresentScreen`, resolving the presenter through `hiltViewModel()`
+- Add `lbcpresenter-hilt-ksp`, generating reducer factories with a `@javax.inject.Inject` primary constructor so Hilt binds them without
+  any hand-written module. Qualifiers declared on injected reducer constructor parameters are propagated onto the generated factory, and
+  `@FactoryArg` parameters keep living in the generated `FactoryArgs` data class
+- **break:** `lbcpresenter` no longer depends on `lbccore` / `lbcimage`: neither was used by the presenter runtime, and shipping them
+  forced every consumer to resolve the `studio.lunabee.compose:core` coordinates (duplicate classes for projects still on
+  `studio.lunabee.compose:lbccore`). Add the dependency explicitly if your screens needed it transitively
+- `lbcpresenter-ksp` now exposes `GeneratedFactoryDecorator.constructorAnnotations` and stands down from factory generation when
+  `lbcpresenter-hilt-ksp` is on the KSP classpath, so a Hilt project only needs `ksp(lbcpresenter-hilt-ksp)` with no extra KSP option
+
 ## 2026-08-31
 
 ```
