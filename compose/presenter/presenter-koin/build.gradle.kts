@@ -29,11 +29,11 @@ version = AndroidConfig.LBCPRESENTER_KOIN_VERSION
 
 dependencies {
     implementation(platform(libs.composeBom))
-    implementation(platform(libs.koinBom))
+    api(platform(libs.koinBom))
 
     implementation(libs.composeUi)
-    implementation(libs.koinComposeViewmodel)
     implementation(libs.koinCore)
 
+    api(libs.koinComposeViewmodel)
     api(projects.compose.presenter)
 }
