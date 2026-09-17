@@ -51,6 +51,8 @@ dependencies {
     add("kspAndroid", libs.androidxRoomCompiler)
     add("kspIosArm64", libs.androidxRoomCompiler)
     add("kspIosSimulatorArm64", libs.androidxRoomCompiler)
+
+    lintPublish(projects.synchronizationChecks)
 }
 
 room {

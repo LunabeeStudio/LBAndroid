@@ -50,6 +50,8 @@ import kotlin.time.Duration.Companion.seconds
  *   The retry's result is not returned to anyone (awaiting callers already received the failure); a
  *   failing retry reschedules under the same rule, while a successful run never schedules a retry.
  * - **Pre-emption** — a new [run] request or a [cancel] call aborts any pending (not-yet-fired) retry.
+ *   A caller that cannot reach [run] straight away (it is queued behind another lock) pre-empts the retry
+ *   up front with [cancelPendingRetry].
  *
  * All internal state is guarded by a [Mutex]; runs are launched as children of the provided [scope].
  *
@@ -101,6 +103,19 @@ class SyncRunner(
             }
         }
         return result.await()
+    }
+
+    /**
+     * Cancels a pending (not-yet-fired) retry, leaving the in-flight run and the queued follow-up alone.
+     *
+     * [run] already does this on entry, which is enough for a caller that reaches it immediately. A caller
+     * that must first wait on another lock (the `LBSyncOperator` sync lock) calls this when its request is
+     * enqueued, so the parked retry cannot fire during that wait and steal the run it was pre-empted by.
+     * A retry scheduled after this call — by a run that fails while the caller waits — is still pre-empted
+     * by [run] itself.
+     */
+    suspend fun cancelPendingRetry() {
+        mutex.withLock { cancelPendingRetryLocked() }
     }
 
     /**
