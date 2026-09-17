@@ -30,8 +30,8 @@ version = AndroidConfig.LBCPRESENTER_HILT_VERSION
 dependencies {
     implementation(platform(libs.composeBom))
 
-    api(libs.androidxHiltNavigationCompose)
-    implementation(libs.androidxLifecycleViewmodelCompose)
+    api(libs.androidxHiltLifecycleViewmodelCompose)
+    api(libs.androidxLifecycleViewmodelCompose)
     implementation(libs.composeUi)
 
     api(projects.compose.presenter)

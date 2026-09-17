@@ -105,7 +105,7 @@ dependencies {
     implementation(libs.androidxActivityCompose)
     implementation(libs.androidxAppcompat)
     implementation(libs.androidxCore)
-    implementation(libs.androidxHiltNavigationCompose)
+    implementation(libs.androidxHiltLifecycleViewmodelCompose)
     implementation(libs.androidxLifecycleRuntimeCompose)
     implementation(libs.androidxRoomRuntime)
     implementation(libs.androidxUiToolingPreview)
