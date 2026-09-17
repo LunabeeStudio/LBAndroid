@@ -22,9 +22,9 @@ import studio.lunabee.compose.presenter.ksp.DiQualifier
 import studio.lunabee.compose.presenter.ksp.GeneratedFactoryDecorator
 import studio.lunabee.compose.presenter.ksp.ValidReducerSignature
 import studio.lunabee.compose.presenter.ksp.ValidatedReducerParameter
+import studio.lunabee.compose.presenter.ksp.javaxNamedAnnotation
 
 private val injectAnnotation: ClassName = ClassName("javax.inject", "Inject")
-private val javaxNamedAnnotation: ClassName = ClassName("javax.inject", "Named")
 private val jakartaNamedAnnotation: ClassName = ClassName("jakarta.inject", "Named")
 
 internal object HiltFactoryDecorator : GeneratedFactoryDecorator {

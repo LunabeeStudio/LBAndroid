@@ -26,6 +26,11 @@ private val coroutineScopeType: ClassName = ClassName("kotlinx.coroutines", "Cor
 private val kotlinUnitType: ClassName = ClassName("kotlin", "Unit")
 
 /**
+ * `@Named` annotation of the reference DI API, used when a qualifier is built without naming its own flavour.
+ */
+val javaxNamedAnnotation: ClassName = ClassName("javax.inject", "Named")
+
+/**
  * Reducer signature extracted from an annotated reducer declaration, before validation.
  */
 data class RawReducerSignature(
@@ -91,7 +96,7 @@ sealed interface DiQualifier {
      */
     data class Named(
         val value: String,
-        val annotationClassName: ClassName,
+        val annotationClassName: ClassName = javaxNamedAnnotation,
     ) : DiQualifier
 
     /**
