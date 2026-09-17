@@ -18,8 +18,10 @@ package studio.lunabee.compose.presenter.hilt
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import studio.lunabee.compose.presenter.LBPresenter
 
@@ -38,14 +40,26 @@ inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>> Pre
  * Use this overload when the host is not a Hilt view model store owner. An input method service is the usual case: it
  * creates its own store, so [hiltViewModel] cannot resolve a presenter there and the host has to supply its own
  * [ViewModelProvider.Factory].
+ *
+ * Such a host has no default [CreationExtras], so a presenter reading its route arguments from a `SavedStateHandle`
+ * needs them supplied through [extras].
  */
 @Composable
 inline fun <NavScope : Any, reified Presenter : LBPresenter<*, NavScope, *>> PresentScreen(
     navScope: NavScope,
     viewModelStoreOwner: ViewModelStoreOwner,
     factory: ViewModelProvider.Factory,
+    extras: CreationExtras = if (viewModelStoreOwner is HasDefaultViewModelProviderFactory) {
+        viewModelStoreOwner.defaultViewModelCreationExtras
+    } else {
+        CreationExtras.Empty
+    },
 ) {
-    val presenter: Presenter = viewModel(viewModelStoreOwner = viewModelStoreOwner, factory = factory)
+    val presenter: Presenter = viewModel(
+        viewModelStoreOwner = viewModelStoreOwner,
+        factory = factory,
+        extras = extras,
+    )
     presenter.invoke(navScope)
 }
 
