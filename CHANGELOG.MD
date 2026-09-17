@@ -8,9 +8,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-09-16
 
 ```
-Lbcpresenter 2.1.0
-LbcpresenterHilt 2.1.0
-LbcpresenterKoin 2.1.0
+Lbcpresenter 3.0.0
+LbcpresenterHilt 3.0.0
+LbcpresenterKoin 3.0.0
 LbcpresenterHiltKsp 2.0.0-rc05
 LbcpresenterKsp 2.0.0-rc05
 LbcpresenterKoinKsp 2.0.0-rc05
@@ -29,13 +29,20 @@ LbcpresenterKoinKsp 2.0.0-rc05
 - `lbcpresenter-ksp` now exposes `GeneratedFactoryDecorator.constructorAnnotations` and stands down from factory generation when
   `lbcpresenter-hilt-ksp` is on the KSP classpath, so a Hilt project only needs `ksp(lbcpresenter-hilt-ksp)` with no extra KSP option
 - `lbcpresenter-ksp` now exposes `FactoryOwningProcessorProvider`, the contract a DI specific processor provider implements to take
-  factory generation over. Ownership is resolved through the KSP service registrations instead of a hard-coded class name, and
-  `lbcpresenter-hilt-ksp` warns when another DI processor is on the KSP classpath (its factories then carry `@Inject` only) or when
-  `studio.lunabee.presenter.annotateFactory` is disabled (its factories then carry no `@Inject` constructor at all)
+  factory generation over. Ownership is resolved once through the KSP service registrations instead of a hard-coded class name, and
+  every processor of the compilation generates the factories only when it owns them. `lbcpresenter-hilt-ksp` warns when another DI
+  processor is on the KSP classpath (its factories then carry `@Inject` only) or when `studio.lunabee.presenter.annotateFactory` is
+  disabled (its factories then carry no `@Inject` constructor at all)
+- `lbcpresenter-ksp` fails the compilation, instead of generating a factory twice or none, when two DI specific processors take factory
+  generation over for the same configuration, when the KSP services of the processor classpath cannot be read, or when
+  `studio.lunabee.presenter.annotateFactory` is set to a value which is neither `true` nor `false`
 - `@Named` qualifiers propagated onto a generated factory keep the `jakarta.inject` flavour when the reducer declared it, instead of
   always falling back to `javax.inject.Named`
-- `lbcpresenter-hilt` and `lbcpresenter-koin` expose `hilt-navigation-compose` / `koin-compose-viewmodel` as `api`: both are called from
-  the inline `PresentScreen`, so a consumer could not compile it without declaring them again
+- `lbcpresenter-hilt` and `lbcpresenter-koin` expose `hilt-lifecycle-viewmodel-compose` + `lifecycle-viewmodel-compose` /
+  `koin-compose-viewmodel` as `api`: all of them are called from the inline `PresentScreen`, so a consumer could not compile it without
+  declaring them again
+- The `lbcpresenter-hilt` `PresentScreen` overload taking a `ViewModelStoreOwner` also takes the `CreationExtras` the presenter is built
+  with, so a presenter reading its route arguments from a `SavedStateHandle` works on a host with no default extras
 
 ## 2026-08-31
 
