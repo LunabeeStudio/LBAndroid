@@ -144,3 +144,4 @@ addCommonModule(
     "synchronization/synchronization-events",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")
+addModule(":synchronization-checks", File("common/synchronization/checks"), "synchronization-checks")

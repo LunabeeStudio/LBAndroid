@@ -5,11 +5,13 @@ Coroutine-native, storage-agnostic synchronization engine. Publishes as
 
 Three layers, top to bottom:
 
-- **`LBSyncOperator`** — app-wide singleton registry of groups. Runs groups **sequentially**, reacts to
+- **`LBSyncOperator`** — app-wide singleton registry of groups, and the **only public way to start a
+  sync** (see [Triggering a sync](#triggering-a-sync)). Runs groups **sequentially**, reacts to
   events emitted by registered `LBSyncEventListener`s to trigger refreshes (the network / app-lifecycle
   listener implementations ship in the `synchronization-events` module).
-- **`LBSyncGroup`** — a set of managers synchronized **in parallel**. Model table dependencies by putting
-  the dependency in an earlier group. A suspend `isEnabled` gate can disable a whole group.
+- **`LBSyncGroup`** — a set of managers synchronized **in parallel**, or one at a time with
+  `executionMode = LBSyncExecutionMode.Sequential`. Model table dependencies by putting the dependency in
+  an earlier group. A suspend `isEnabled` gate can disable a whole group.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine running the
   download → upload → re-download pipeline. Subclasses implement the fetch/push SPI.
 
@@ -30,9 +32,37 @@ flowchart TD
     R1 -->|runs| P[pipeline: download → upload → re-download]
 ```
 
+## Triggering a sync
+
+Every sync request goes through the operator — `LBSyncManager.synchronize()` and
+`LBSyncGroup.syncManagers()` are `internal`:
+
+```kotlin
+LBSyncOperator.syncAllManagers()              // every group, sequentially
+LBSyncOperator.sync(group = myGroup)          // one group, its managers per its executionMode
+LBSyncOperator.syncGroup(name = "main")       // same, by registration key
+LBSyncOperator.sync(manager = myManager)      // one manager
+LBSyncOperator.sync<UserSyncManager>()        // same, by type — first registered manager of that type
+```
+
+`syncGroup(name)` and `sync<T>()` return an `LBResult.Failure` carrying an `IllegalArgumentException` when
+nothing matches, so a lookup miss surfaces as a failed sync instead of being silently skipped.
+
+Requests are **serialized**: each one waits for the sync already running before it starts, so a manager
+synchronized on its own never overlaps a full run and the "dependency in an earlier group" rule holds for
+direct requests too. Enqueueing a request also pre-empts the pending automatic retry of the managers it
+targets right away, before it waits for its turn — otherwise a retry parked at +`retryTempo` would fire in
+front of a request that is already queued.
+
+Two things stay outside that serialization, by design: the automatic retry of a failed run (detached — set
+`retryTempo = null` to disable it on a manager whose retry must not run out of order), and any sync started
+from **inside** a manager's own SPI, which deadlocks on the operator lock — never call these APIs from
+`fetchRequest`, `pushObjectsToServer` or another engine callback.
+
 ## `LBSyncManager` pipeline
 
-One `suspend` entry point: `synchronize(): LBResult<Unit>`. The pipeline downloads every page, uploads
+One `suspend` entry point, `internal synchronize(): LBResult<Unit>`, reached through
+`LBSyncOperator.sync(manager)`. The pipeline downloads every page, uploads
 pending local objects, then re-downloads (unless the server pushes change notifications). Status is
 exposed as `status: StateFlow<LBSyncProcessStatus>`; only the engine mutates it.
 
@@ -131,7 +161,8 @@ sequenceDiagram
 
 A failed run with no queued follow-up schedules a re-run after `retryDelay` (default 30 s, `null`
 disables). The retry's result is discarded — awaiting callers already received the failure. A new
-explicit `run()` or a `cancel()` pre-empts a pending retry.
+explicit `run()` or a `cancel()` pre-empts a pending retry — and so does `cancelPendingRetry()`, for a
+caller that cannot reach `run()` yet because it is queued behind the operator's sync lock.
 
 ```mermaid
 sequenceDiagram
@@ -161,8 +192,11 @@ runner stays reusable afterwards.
 ## Global flow — operator and groups
 
 `LBSyncOperator.syncAllManagers()` runs groups sequentially in registration order; each group runs its
-managers in parallel (`async`/`awaitAll` — a failing sibling never cancels the others). Failures
-aggregate: one failure surfaces as-is, several wrap into `LBSyncAggregateException`.
+managers in parallel (`async`/`awaitAll` — a failing sibling never cancels the others), or one after
+another when it is built with `executionMode = LBSyncExecutionMode.Sequential`. Failures
+aggregate: one failure surfaces as-is, several wrap into `LBSyncAggregateException`. A `sync(group)` /
+`sync(manager)` request takes the same operator lock, so it queues behind a run in progress instead of
+racing it.
 
 ```mermaid
 sequenceDiagram
@@ -254,6 +288,9 @@ LBSyncOperator.registerEventListeners(
 
 // 3. Seed statuses from persisted cursors (otherwise NeverSync until first sync):
 LBSyncOperator.loadAllStatuses()
+
+// 4. Trigger syncs through the operator (never manager.synchronize() / group.syncManagers()):
+LBSyncOperator.syncAllManagers()
 ```
 
 Renaming a manager subclass silently resets its cursor unless `syncKey` is overridden — treat

@@ -18,6 +18,7 @@ package studio.lunabee.synchronization
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -159,6 +160,85 @@ class LBSyncGroupTest {
 
     // endregion
 
+    // region execution mode
+
+    @Test
+    fun a_group_runs_its_managers_in_parallel_by_default() = runGroupTest { store, scope ->
+        val events = mutableListOf<String>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeGroupManager(store = store, scope = scope, syncKey = "a", events = events, id = "a"),
+                FakeGroupManager(store = store, scope = scope, syncKey = "b", events = events, id = "b"),
+            ),
+        )
+
+        assertEquals(
+            expected = LBSyncExecutionMode.Parallel,
+            actual = group.executionMode,
+            "parallel stays the default",
+        )
+        assertTrue(group.syncManagers() is LBResult.Success, "the group succeeds")
+        assertEquals(
+            expected = listOf("a-start", "b-start", "a-end", "b-end"),
+            actual = events,
+            "both managers were in flight at the same time",
+        )
+    }
+
+    @Test
+    fun a_sequential_group_runs_one_manager_at_a_time_in_registration_order() = runGroupTest { store, scope ->
+        val events = mutableListOf<String>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeGroupManager(store = store, scope = scope, syncKey = "a", events = events, id = "a"),
+                FakeGroupManager(store = store, scope = scope, syncKey = "b", events = events, id = "b"),
+                FakeGroupManager(store = store, scope = scope, syncKey = "c", events = events, id = "c"),
+            ),
+            executionMode = LBSyncExecutionMode.Sequential,
+        )
+
+        assertTrue(group.syncManagers() is LBResult.Success, "the group succeeds")
+        assertEquals(
+            expected = listOf("a-start", "a-end", "b-start", "b-end", "c-start", "c-end"),
+            actual = events,
+            "each manager finished before the next one started, in registration order",
+        )
+    }
+
+    @Test
+    fun a_sequential_group_still_runs_every_manager_after_a_failure() = runGroupTest { store, scope ->
+        val boom = IllegalStateException("sequential boom")
+        val failing = FakeGroupManager(store = store, scope = scope, syncKey = "boom", fetchError = boom)
+        val after = FakeGroupManager(store = store, scope = scope, syncKey = "after")
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(failing, after),
+            executionMode = LBSyncExecutionMode.Sequential,
+        )
+
+        val result = group.syncManagers()
+
+        assertEquals(expected = 1, actual = after.fetchCalls, "the manager after the failing one still ran")
+        assertTrue(result is LBResult.Failure, "the failure surfaces")
+        assertSame(boom, result.throwable, "a single failure surfaces that manager's own error")
+        assertTrue(after.currentSyncStatus is LBSyncProcessStatus.SyncSuccessfully)
+    }
+
+    @Test
+    fun a_sequential_group_honours_the_disabled_gate() = runGroupTest { store, scope ->
+        val manager = FakeGroupManager(store = store, scope = scope, syncKey = "m1")
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(manager),
+            executionMode = LBSyncExecutionMode.Sequential,
+        ).apply { isEnabled = { false } }
+
+        val result = group.syncManagers()
+
+        assertTrue(result.let { it is LBResult.Failure && it.throwable is LBSyncClosureException }, "the gate still fails the group")
+        assertEquals(expected = 0, actual = manager.fetchCalls, "a disabled sequential group does not run its managers")
+    }
+
+    // endregion
+
     // region test infrastructure
 
     private fun runGroupTest(body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit) = runTest {
@@ -179,12 +259,16 @@ private data class GroupLocalObj(val id: String)
  * Configurable fake [LBSyncManager] whose SPI deterministically ends in success, or in a download
  * failure when [fetchError] is set, so group result/status aggregation can be asserted on observable
  * outcomes only. Automatic retry is disabled so a failure resolves immediately under virtual time.
+ * Passing [events] and [id] records `<id>-start` / `<id>-end` around the fetch, which is how the
+ * execution-mode tests tell an interleaved run from a serialized one.
  */
 private class FakeGroupManager(
     store: SyncTimestampLocalDataSource,
     scope: CoroutineScope,
     syncKey: String,
     private val fetchError: Exception? = null,
+    private val events: MutableList<String>? = null,
+    private val id: String? = null,
 ) : LBSyncManager<GroupServerObj, GroupLocalObj, Nothing>(scope = scope) {
 
     init {
@@ -202,6 +286,11 @@ private class FakeGroupManager(
 
     override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<GroupServerObj, Nothing> {
         fetchCalls += 1
+        id?.let { events?.add("$it-start") }
+        // Yields so a parallel group actually interleaves its managers under virtual time, instead of
+        // each fetch running start-to-end before the next coroutine is dispatched.
+        yield()
+        id?.let { events?.add("$it-end") }
         fetchError?.let { throw it }
         return FetchPage(objects = emptyList())
     }

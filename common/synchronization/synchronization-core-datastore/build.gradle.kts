@@ -53,3 +53,7 @@ kotlin {
         }
     }
 }
+
+dependencies {
+    lintPublish(projects.synchronizationChecks)
+}
