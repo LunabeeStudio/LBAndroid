@@ -110,11 +110,16 @@ class SimplePresenter @Inject constructor(
 KSP options:
 - `studio.lunabee.presenter.annotateFactory`: leave it unset. `presenter-hilt-ksp` takes factory generation over from
   `presenter-ksp` by default; setting it to `false` generates the factories without the `@javax.inject.Inject`
-  constructor, so Hilt can no longer bind them without a hand-written `@Provides`
+  constructor, so Hilt can no longer bind them without a hand-written `@Provides`. The option only accepts `true` or
+  `false`, any other value fails the compilation
 
-Keep a single DI processor on the KSP classpath: when `presenter-koin-ksp` is also applied, `presenter-hilt-ksp` owns
-generation and the factories carry `@Inject` only, so Koin must bind them through `generatedReducerFactoryModule`
-rather than `@ComponentScan`. The processor warns about it at compile time.
+Prefer a single DI processor on the KSP classpath. When `presenter-koin-ksp` is also applied, the two must not own
+factory generation together:
+- `annotateFactory` unset: `presenter-hilt-ksp` owns generation and the factories carry `@Inject` only, so Koin has to
+  bind them through `generatedReducerFactoryModule` rather than `@ComponentScan`. The processor warns about it at
+  compile time. The `demo-compose` module runs that setup
+- `annotateFactory` set to `true`: both processors own generation, no processor can pick a winner and the compilation
+  fails. Drop one of the two processors from the KSP classpath, or leave the option unset
 
 ## Koin integration
 
