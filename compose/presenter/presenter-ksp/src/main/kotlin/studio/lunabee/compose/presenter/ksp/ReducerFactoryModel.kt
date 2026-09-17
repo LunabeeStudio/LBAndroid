@@ -16,6 +16,7 @@
 
 package studio.lunabee.compose.presenter.ksp
 
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.LambdaTypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName
@@ -24,6 +25,11 @@ import com.squareup.kotlinpoet.TypeName
 
 private val coroutineScopeType: ClassName = ClassName("kotlinx.coroutines", "CoroutineScope")
 private val kotlinUnitType: ClassName = ClassName("kotlin", "Unit")
+
+/**
+ * `@Named` annotation of the reference DI API, used when a qualifier is built without naming its own flavour.
+ */
+val javaxNamedAnnotation: ClassName = ClassName("javax.inject", "Named")
 
 /**
  * Reducer signature extracted from an annotated reducer declaration, before validation.
@@ -86,17 +92,24 @@ data class ValidatedReducerParameter(
  */
 sealed interface DiQualifier {
     /**
-     * String qualifier declared with a `@Named` annotation.
+     * String qualifier declared with a `@Named` annotation, [annotationClassName] being the `@Named` flavour the
+     * reducer declared (`javax.inject`, `jakarta.inject` or Koin).
      */
     data class Named(
         val value: String,
+        val annotationClassName: ClassName = javaxNamedAnnotation,
     ) : DiQualifier
 
     /**
      * Custom qualifier annotation type, meta-annotated with `@Qualifier`.
+     *
+     * [annotationSpec] carries the qualifier arguments declared on the reducer parameter, so a qualifier with
+     * mandatory arguments (`@InternalDir(InternalDir.Type.Logs)`) is copied whole onto the generated factory. It
+     * defaults to the bare annotation for qualifiers built from a type rather than from a source annotation.
      */
     data class Typed(
         val annotationClassName: ClassName,
+        val annotationSpec: AnnotationSpec = AnnotationSpec.builder(annotationClassName).build(),
     ) : DiQualifier
 }
 

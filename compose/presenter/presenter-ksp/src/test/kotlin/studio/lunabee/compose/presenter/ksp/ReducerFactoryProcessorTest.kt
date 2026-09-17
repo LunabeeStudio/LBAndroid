@@ -53,6 +53,19 @@ class ReducerFactoryProcessorTest {
             resolveNamedQualifier(
                 value = null,
                 type = ClassName("studio.lunabee.compose.demo.presenter.timer", "TimerQualifier"),
+                annotationClassName = ClassName("org.koin.core.annotation", "Named"),
+            ),
+        )
+    }
+
+    @Test
+    fun resolve_named_qualifier_keeps_the_declared_named_flavour_test() {
+        assertEquals(
+            DiQualifier.Named(value = "api", annotationClassName = ClassName("jakarta.inject", "Named")),
+            resolveNamedQualifier(
+                value = "api",
+                type = null,
+                annotationClassName = ClassName("jakarta.inject", "Named"),
             ),
         )
     }
@@ -63,6 +76,7 @@ class ReducerFactoryProcessorTest {
             resolveNamedQualifier(
                 value = "",
                 type = ClassName("kotlin", "Unit"),
+                annotationClassName = ClassName("javax.inject", "Named"),
             )
         }
 
