@@ -49,6 +49,11 @@ dependencies {
         addModule(projects.monitoringOkhttp)
         addModule(projects.monitoringRoom)
         addModule(projects.monitoringUi)
+        addJvmModule(projects.synchronizationCore)
+        addModule(projects.synchronizationEvents)
+        addModule(projects.synchronizationCoreDatastore)
+        addModule(projects.synchronizationCoreRoom)
+        addModule(projects.synchronizationParseRoom)
     }
 }
 

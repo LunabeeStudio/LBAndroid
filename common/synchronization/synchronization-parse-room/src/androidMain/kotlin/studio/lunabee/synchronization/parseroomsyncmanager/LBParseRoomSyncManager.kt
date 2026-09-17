@@ -26,6 +26,8 @@ import com.parse.livequery.SubscriptionHandling
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import studio.lunabee.synchronization.LBSyncOperator
+import studio.lunabee.synchronization.SyncEngineCallback
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncDao
 import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncManager
 import studio.lunabee.synchronization.syncmanager.FetchPage
@@ -63,6 +65,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * @return the parse table name you want to sync
      * eg : "User"
      */
+    @SyncEngineCallback
     protected abstract fun tableParseName(): String
 
     /**
@@ -73,6 +76,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * @param parseObject the parse object to update
      * @param from the Room entity you want to update from
      */
+    @SyncEngineCallback
     protected abstract fun update(parseObject: ParseObject, from: RoomData)
 
     /**
@@ -89,6 +93,7 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
      * Override this if you want to create a custom parse query.
      * **WARNING** If you just want to select or include keys, @see [keysToSelect] and [keysToInclude].
      */
+    @SyncEngineCallback
     protected open suspend fun parseQuery(): ParseQuery<ParseObject> {
         val objectQuery: ParseQuery<ParseObject> = ParseQuery.getQuery(tableParseName())
         keysToInclude().forEach { keyToInclude ->
@@ -102,13 +107,17 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
 
     /**
      * Override this if you want to do specific work on live query notification.
+     *
+     * The triggered sync goes through [LBSyncOperator] like every other sync request, so a LiveQuery
+     * notification never starts a run overlapping one already in progress.
+     *
      * @param event the live query event, can be used to know if it is a creation or an update
      */
     protected open fun onLiveQueryCreateOrUpdate(
         event: SubscriptionHandling.Event,
         parseObject: ParseObject,
     ) {
-        liveQueryScope.launch { synchronize() }
+        liveQueryScope.launch { LBSyncOperator.sync(manager = this@LBParseRoomSyncManager) }
     }
 
     /**

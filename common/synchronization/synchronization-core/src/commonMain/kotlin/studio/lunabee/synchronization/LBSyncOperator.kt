@@ -18,6 +18,7 @@ package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.store.LBSyncStorage
@@ -41,6 +44,31 @@ import kotlin.reflect.KClass
  * Use LBSyncOperator to manage all sync managers in your app
  * It takes list of LBSyncGroup
  * Refreshes can be triggered by events emitted from registered [LBSyncEventListener] (see [registerEventListeners])
+ *
+ * **Single entry point.** Every sync request goes through this operator: [syncAllManagers] for the whole
+ * registry, [sync] for one group or one manager (by instance, or by type with `sync<MyManager>()`). [LBSyncGroup.syncManagers] and
+ * [LBGenericSyncManager.synchronize] are `internal`, so a consumer cannot start a run behind the
+ * operator's back and the operator stays in charge of ordering.
+ *
+ * **Ordering.** Requests are serialized: a request waits for the sync currently running to finish before
+ * it starts. Inside one [syncAllManagers] (or event-triggered) run, groups run sequentially in
+ * registration order and the managers of a group run in parallel, or one after another when the group
+ * sets [LBSyncGroup.executionMode] to [LBSyncExecutionMode.Sequential]. So a manager synchronized directly
+ * through [sync] never overlaps a full run, and dependencies modelled as "earlier group" hold for direct
+ * requests too.
+ *
+ * Two runs still escape the serialization, both by design:
+ * - the automatic retry of a failed run (see [studio.lunabee.synchronization.runner.SyncRunner]), which is
+ *   detached from any caller — set [LBGenericSyncManager.retryTempo] to `null` on a manager whose retry
+ *   must not run out of order. Enqueueing a request pre-empts the pending retry of the managers it
+ *   targets right away (before waiting for the lock), so a parked retry cannot fire in front of a request
+ *   that is already queued; a retry scheduled *after* that, by a run failing while the request waits, is
+ *   pre-empted when the request finally reaches the runner;
+ * - a run started from inside a manager's own SPI. Never call [sync] / [syncAllManagers] from
+ *   `fetchRequest`, `pushObjectsToServer` or another engine callback: the calling coroutine already owns
+ *   the sync lock, so instead of deadlocking the request fails fast with an
+ *   [LBSyncReentrantCallException] (detected through [SyncEngineMarker]). A request launched on a scope
+ *   of your own from a callback is not nested and stays allowed.
  */
 @Suppress("unused")
 object LBSyncOperator {
@@ -48,6 +76,13 @@ object LBSyncOperator {
     val groups: LinkedHashMap<String, LBSyncGroup> = LinkedHashMap()
 
     private val registeredListeners: MutableList<Job> = mutableListOf()
+
+    /**
+     * Serializes every sync request routed through the operator, so ordering is decided here and nowhere
+     * else. Held for the whole run (all groups of a [syncAllManagers], one group or one manager for
+     * [sync]), never while starting/stopping the server-notification listeners.
+     */
+    private val syncMutex: Mutex = Mutex()
 
     /**
      * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
@@ -82,9 +117,93 @@ object LBSyncOperator {
      * - exactly one failure → [LBResult.Failure] carrying that group's error;
      * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
      *
+     * Suspends until any sync already running through the operator has finished.
+     *
      * @return the combined synchronization result across all groups.
      */
-    suspend fun syncAllManagers(): LBResult<Unit> = runGroupsSequentially(groups.values)
+    suspend fun syncAllManagers(): LBResult<Unit> {
+        reentrantCallFailure(target = "syncAllManagers()")?.let { return it }
+        groups.values.forEach { it.cancelPendingRetries() }
+        return syncMutex.withLock { runGroupsSequentially(groups.values) }
+    }
+
+    /**
+     * Synchronize a single [LBSyncGroup] — its managers as its [LBSyncGroup.executionMode] says — without
+     * running the other groups.
+     *
+     * Suspends until any sync already running through the operator has finished, so the group never
+     * overlaps a [syncAllManagers] run.
+     *
+     * @param group the group to synchronize. It does not have to be registered in [groups].
+     * @return the group's combined synchronization result.
+     */
+    suspend fun sync(group: LBSyncGroup): LBResult<Unit> {
+        reentrantCallFailure(target = "sync(group)")?.let { return it }
+        group.cancelPendingRetries()
+        return syncMutex.withLock { group.syncManagers() }
+    }
+
+    /**
+     * Synchronize a single manager, without running the other managers of its group.
+     *
+     * This is the public route to a manager's pipeline ([LBGenericSyncManager.synchronize] itself is
+     * `internal`). Suspends until any sync already running through the operator has finished, so the
+     * manager never overlaps a group or full run.
+     *
+     * @param manager the manager to synchronize. It does not have to be registered in [groups].
+     * @return the manager's synchronization result.
+     */
+    suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
+        reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
+        manager.cancelPendingRetry()
+        return syncMutex.withLock { manager.synchronize() }
+    }
+
+    /**
+     * Synchronize the first registered manager of type [T], as [sync] does — the shorthand for
+     * `syncManager<T>()` followed by `sync(manager)`.
+     *
+     * @param T the manager type to look up in [groups], matched as [syncManager] does (first registered
+     * manager that is a [T]).
+     * @return the manager's synchronization result, or [LBResult.Failure] carrying an
+     * [IllegalArgumentException] when no manager of that type is registered.
+     */
+    suspend inline fun <reified T : LBGenericSyncManager> sync(): LBResult<Unit> {
+        val manager: T? = syncManager<T>()
+        return manager
+            ?.let { sync(manager = it) }
+            ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
+    }
+
+    /**
+     * Synchronize the registered group stored under [name], as [sync] does.
+     *
+     * @param name the [groups] key of the group to synchronize.
+     * @return the group's combined synchronization result, or [LBResult.Failure] carrying an
+     * [IllegalArgumentException] when no group is registered under [name].
+     */
+    suspend fun syncGroup(name: String): LBResult<Unit> = groups[name]
+        ?.let { group -> sync(group = group) }
+        ?: LBResult.Failure(IllegalArgumentException("No LBSyncGroup registered under the key \"$name\""))
+
+    /**
+     * Refuses a sync request issued from inside a manager's pipeline, where the calling coroutine already
+     * holds [syncMutex]: taking the non-reentrant lock again would deadlock the operator for the lifetime
+     * of the process. Detected through the [SyncEngineMarker] the engine installs around the pipeline, so
+     * a callback's own `withContext`/child coroutines are covered while a request launched on an
+     * unrelated scope is not.
+     *
+     * @param target the refused request, quoted back in the failure message.
+     * @return the failure to return to the caller, or `null` when the request is not nested.
+     */
+    private suspend fun reentrantCallFailure(target: String): LBResult.Failure<Unit>? =
+        if (currentCoroutineContext()[SyncEngineMarker] != null) {
+            val exception = LBSyncReentrantCallException(target = target)
+            logger.e(exception.message.orEmpty())
+            LBResult.Failure(exception)
+        } else {
+            null
+        }
 
     private suspend fun runGroupsSequentially(groups: Collection<LBSyncGroup>): LBResult<Unit> {
         val errors: MutableList<Throwable> = mutableListOf()
@@ -113,7 +232,10 @@ object LBSyncOperator {
             availableGroups.flatMap { it.syncManagers }.forEach {
                 it.setStatusInternal(LBSyncProcessStatus.PendingSync)
             }
-            defaultSyncScope.launch { runGroupsSequentially(availableGroups) }
+            defaultSyncScope.launch {
+                availableGroups.forEach { it.cancelPendingRetries() }
+                syncMutex.withLock { runGroupsSequentially(availableGroups) }
+            }
         }
         handleEventData(data = data)
     }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import studio.lunabee.synchronization.LBSyncOperator
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import javax.inject.Inject
@@ -154,7 +155,7 @@ class SyncDemoViewModel @Inject constructor(
 
     fun synchronize() {
         syncRequestCount.update { it + 1 }
-        viewModelScope.launch { syncManager.synchronize() }
+        viewModelScope.launch { LBSyncOperator.sync(manager = syncManager) }
     }
 
     fun clearLocalDb() {

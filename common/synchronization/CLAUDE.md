@@ -21,7 +21,7 @@ store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor st
 consumed via `LBSyncOperator.registerEventListeners(...)`. Type-safe
 accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`.
+`projects.synchronizationParseRoom`, `projects.synchronizationChecks`.
 
 `:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
 (storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
@@ -46,7 +46,9 @@ core. The platform integrations (connectivity, app lifecycle) live in `:synchron
 Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
 callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
 inside the Parse SDK). Each level has ONE suspend entry point returning `LBResult<Unit>`:
-`LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()`.
+`LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()` — but the
+first two are **`internal`**: every public sync request goes through `LBSyncOperator` (see "Single sync
+entry point" below).
 Detached-from-caller execution (receiver-triggered syncs, automatic retry) runs in an injected,
 library-owned `CoroutineScope` — the no-store constructor defaults it to the shared internal
 `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
@@ -56,6 +58,44 @@ modules (`:synchronization-events`, both backends, `:synchronization-parse-room`
 (`AndroidConfig.SynchronizationMinSdk`) — the connectivity listener relies on
 `registerDefaultNetworkCallback` (API 24) — while the rest of the repo stays at `minSdk 23`.
 `:synchronization-core` itself has no Android target.
+
+### Single sync entry point
+
+Client-facing 2.0.0 → 2.1.0 migration: `MIGRATION-SYNCHRONIZATION-2.1.0.MD` (agent-executable, same shape as
+`compose/presenter/MIGRATION_V2.MD`).
+
+`LBSyncOperator` is the only public way to start a sync: `syncAllManagers()`, `sync(group)`,
+`syncGroup(name)`, `sync(manager)`, `sync<T>()` (reified lookup over the registry, same match as
+`syncManager<T>()`). A `syncGroup`/`sync<T>()` lookup miss → `Failure(IllegalArgumentException)`.
+`LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are `internal` (still callable from
+`commonTest`, which is a friend source set — the existing tests call them directly).
+
+Requests are serialized by a private `Mutex` in the operator, held for the whole run: a `sync(manager)`
+queues behind an in-flight `syncAllManagers()` instead of racing it, so the "put the dependency in an
+earlier group" rule also holds for direct requests. The lock is NOT held while starting/stopping the
+server-notification listeners (`handleEventData`), and `triggerRefresh` takes it around its launched
+group loop.
+
+Two paths deliberately escape the lock:
+- **automatic retry** — `SyncRunner` re-runs the pipeline block directly, detached. It cannot take the
+  operator lock: the operator awaits managers while holding it, and a retry blocked on that lock would
+  deadlock against the collapsed follow-up run. `retryTempo = null` disables retry per manager.
+  `SyncRunner`'s "a new explicit request pre-empts a pending retry" only holds from `run()` entry, and the
+  operator lock delays that — so each operator entry point calls `cancelPendingRetry()` on the managers it
+  targets **before** taking the lock (`SyncRunner.cancelPendingRetry()`, `LBSyncGroup.cancelPendingRetries()`).
+  Without it, a retry parked at +`retryTempo` fires in front of a request already queued, then that request
+  collapses onto a follow-up behind it. A retry scheduled *after* the enqueue (a run failing while the
+  request waits) is still pre-empted by `run()` itself.
+- **re-entrancy** — the `Mutex` is not reentrant, so calling an operator sync API from inside a manager's
+  SPI (`fetchRequest`, `pushObjectsToServer`, …) would deadlock. It is **refused instead**: the engine runs
+  `runPipeline()` under a `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
+  every lock-taking operator entry point checks `currentCoroutineContext()[SyncEngineMarker]` first,
+  returning `Failure(LBSyncReentrantCallException)` — before `cancelPendingRetr*`, so a refused request
+  leaves the in-flight run untouched. Context inheritance draws the line: the callback's own
+  `withContext`/structured children are refused too, a request launched on an unrelated scope is not marked
+  and stays allowed (`LBParseRoomSyncManager`'s LiveQuery hook does
+  `liveQueryScope.launch { LBSyncOperator.sync(…) }`). The same trap is caught at compile time by the
+  `SyncOperatorReentrantCall` lint rule — see **Lint rules** below.
 
 ### Cursor storage (pluggable backend)
 
@@ -114,8 +154,10 @@ Three layers, top to bottom:
   `LBAppForegroundEventListener` — ship in `:synchronization-events`. There is no broadcast bridge
   anymore — `LBSyncApplication` was removed. `syncManager<T>()` finds a registered manager by type.
 - **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
-  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
-  groups sequentially**. So model table dependencies by putting the dependency in an earlier group. A
+  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity), unless the group sets
+  `executionMode = LBSyncExecutionMode.Sequential`, which runs them one at a time in `syncManagers`
+  order (same gate, same aggregation, no short-circuit — it only removes the concurrency); the
+  **operator runs groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
   single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
   evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
   `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).
@@ -157,9 +199,39 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   `null` disables retry). `cancelAllRequests()` cancels the in-flight run **and** any pending retry, and
   surfaces the terminal status `Cancelled` (so `isProcessing()` / `isSyncing` drop to `false`).
 - Concurrent `synchronize()` calls **collapse into a single follow-up run** whose real `LBResult` every
-  caller receives — the old immediate-success-while-dirty behavior is gone.
+  caller receives — the old immediate-success-while-dirty behavior is gone. Above that, the operator lock
+  serializes the requests themselves, so the collapse now only kicks in for the paths that bypass the
+  operator (automatic retry, and a manager reached from two operator requests that were already queued).
+- **Never call `LBSyncOperator.sync*` from inside a manager's SPI** — the operator's `Mutex` is not
+  reentrant, and the calling coroutine already holds it. The request fails fast with
+  `LBSyncReentrantCallException` instead of deadlocking; launch it on your own scope, or model the
+  dependency as an earlier group.
 - `StateFlow` is conflated (status is state, not an event stream) and observer threading is the
   collector's choice — the old synchronous-background-thread closure sharp edge no longer applies.
+
+## Lint rules
+
+`common/synchronization/checks` (`:synchronization-checks`, no publication of its own) holds the
+`SyncOperatorReentrantCall` Android Lint rule: a sync request written inside a member annotated
+`@SyncEngineCallback` is an error. The annotation (public, `synchronization-core`) marks **exactly** the
+SPI the pipeline calls while holding the operator lock, so the detector follows the annotated set instead
+of a hardcoded name list — annotate a new pipeline-reached hook and the rule covers it. Members reached
+outside a run (`startServerNotificationListener`, `hasSomethingToUpload`, LiveQuery hooks) must stay
+unmarked: a sync request from there is legitimate.
+
+It reaches consumers through `lintPublish(projects.synchronizationChecks)` in
+`synchronization-core-datastore` and `synchronization-core-room` — the two storage backends, one of which
+every client installs — which embeds `lint.jar` in their AARs. It cannot be hung on
+`:synchronization-core` itself: that module is `kmp-jvm-library-conventions`, has no Android target and
+therefore no `lintPublish` configuration.
+
+Known blind spots, all covered by the runtime `SyncEngineMarker` check: a request handed to
+`launch`/`async` (deliberately skipped — that is the legit fire-and-forget, and syntax cannot tell the
+detached scopes from the run's own), a request behind a helper function the callback calls, and the
+`LBSyncGroup.isEnabled` gate (a `var` lambda, so there is no override to anchor on).
+
+Detector tests live in `checks/src/test` and use `com.android.tools.lint:lint-tests` (`libs.lintTests`)
+with source stubs — no dependency on the real modules.
 
 ## Changelog
 
