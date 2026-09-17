@@ -20,14 +20,9 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import java.util.ServiceLoader
 
 /**
- * KSP option asking a DI specific processor to generate the reducer factories itself, with its DI annotations.
- */
-const val AnnotateFactoryOption: String = "studio.lunabee.presenter.annotateFactory"
-
-/**
  * Implemented by the [SymbolProcessorProvider] of a DI specific processor able to generate the reducer factories
- * itself. [ReducerFactoryProcessor] stands down as soon as one of them owns generation for the current configuration,
- * so a factory file is never written twice.
+ * itself. Every processor of the compilation resolves ownership with [factoryGenerationOwnership] and generates the
+ * factories only when it owns them, so a factory file is never written twice.
  */
 interface FactoryOwningProcessorProvider {
     /**
@@ -38,22 +33,109 @@ interface FactoryOwningProcessorProvider {
 }
 
 /**
- * Factory owning providers registered as KSP services on the processor classpath. All KSP processors of a compilation
- * share the same classloader, so a provider found here runs in the same rounds as the caller.
+ * Factory owning providers registered as KSP services on the processor classpath, and the [failures] met while loading
+ * them. All KSP processors of a compilation share the same classloader, so a provider found here runs in the same
+ * rounds as the caller.
  */
-fun factoryOwningProviders(
-    providers: Sequence<SymbolProcessorProvider> = registeredProcessorProviders(),
-): List<FactoryOwningProcessorProvider> = providers.filterIsInstance<FactoryOwningProcessorProvider>().toList()
+class FactoryOwningProviderDiscovery(
+    val providers: List<FactoryOwningProcessorProvider>,
+    val failures: List<String> = emptyList(),
+)
 
-internal fun factoryGenerationOwner(
+/**
+ * Which processor generates the reducer factories for the current configuration. Resolved once by
+ * [factoryGenerationOwnership] and compared against each provider with [isOwnedBy], so every processor of the
+ * compilation reads the same decision.
+ */
+sealed interface FactoryGenerationOwnership {
+    /**
+     * No DI specific processor owns generation: [ReducerFactoryProcessor] generates the factories itself.
+     */
+    data object Base : FactoryGenerationOwnership
+
+    /**
+     * [owner] is the only DI specific processor owning generation.
+     */
+    data class Owned(
+        val owner: FactoryOwningProcessorProvider,
+    ) : FactoryGenerationOwnership
+
+    /**
+     * [claimants] all own generation for the current configuration, which no processor can resolve on its own.
+     */
+    data class Ambiguous(
+        val claimants: List<FactoryOwningProcessorProvider>,
+    ) : FactoryGenerationOwnership
+
+    /**
+     * The KSP services of the processor classpath could not be read, so ownership is unknown. [failures] describes
+     * what went wrong.
+     */
+    data class Unresolved(
+        val failures: List<String>,
+    ) : FactoryGenerationOwnership
+}
+
+/**
+ * True when [provider] is the single owner of factory generation. Providers are compared by type, because the
+ * instance discovered as a KSP service is not the instance KSP created for the compilation.
+ */
+fun FactoryGenerationOwnership.isOwnedBy(provider: FactoryOwningProcessorProvider): Boolean =
+    this is FactoryGenerationOwnership.Owned && owner.javaClass == provider.javaClass
+
+/**
+ * Resolves the single processor generating the reducer factories for the given [annotateFactoryOption] value among
+ * [discovery].
+ */
+fun factoryGenerationOwnership(
     annotateFactoryOption: Boolean?,
-    providers: List<FactoryOwningProcessorProvider> = factoryOwningProviders(),
-): FactoryOwningProcessorProvider? = providers.firstOrNull { it.ownsFactoryGeneration(annotateFactoryOption) }
+    discovery: FactoryOwningProviderDiscovery,
+): FactoryGenerationOwnership {
+    if (discovery.failures.isNotEmpty()) {
+        return FactoryGenerationOwnership.Unresolved(discovery.failures)
+    }
+    val claimants = discovery.providers.filter { it.ownsFactoryGeneration(annotateFactoryOption) }
+    return when (claimants.size) {
+        0 -> FactoryGenerationOwnership.Base
+        1 -> FactoryGenerationOwnership.Owned(claimants.single())
+        else -> FactoryGenerationOwnership.Ambiguous(claimants)
+    }
+}
 
-private fun registeredProcessorProviders(): Sequence<SymbolProcessorProvider> =
-    runCatching {
+/**
+ * Factory owning providers registered as KSP services, loaded once per processor classloader.
+ */
+fun factoryOwningProviderDiscovery(): FactoryOwningProviderDiscovery = discoveredFactoryOwningProviders
+
+/**
+ * Keeps the factory owning providers of [providers], whatever the DI framework they belong to.
+ */
+fun factoryOwningProviders(providers: Sequence<SymbolProcessorProvider>): List<FactoryOwningProcessorProvider> =
+    providers.filterIsInstance<FactoryOwningProcessorProvider>().toList()
+
+private val discoveredFactoryOwningProviders: FactoryOwningProviderDiscovery by lazy { loadFactoryOwningProviders() }
+
+private fun loadFactoryOwningProviders(): FactoryOwningProviderDiscovery {
+    val failures = mutableListOf<String>()
+    val registeredProviders = runCatching {
         ServiceLoader.load(
             SymbolProcessorProvider::class.java,
             ReducerFactoryProcessorProvider::class.java.classLoader,
-        ).toList()
-    }.getOrDefault(emptyList()).asSequence()
+        ).stream().toList()
+    }.getOrElse { failure ->
+        failures += failure.describeDiscoveryFailure()
+        emptyList()
+    }
+    val providers = registeredProviders.mapNotNull { registeredProvider ->
+        runCatching { registeredProvider.get() }.getOrElse { failure ->
+            failures += failure.describeDiscoveryFailure()
+            null
+        }
+    }
+    return FactoryOwningProviderDiscovery(
+        providers = factoryOwningProviders(providers.asSequence()),
+        failures = failures,
+    )
+}
+
+private fun Throwable.describeDiscoveryFailure(): String = "${javaClass.name}: ${message.orEmpty()}"

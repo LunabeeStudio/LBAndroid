@@ -22,10 +22,17 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import studio.lunabee.compose.presenter.ksp.AnnotateFactoryOption
+import studio.lunabee.compose.presenter.ksp.FactoryGenerationOwnership
 import studio.lunabee.compose.presenter.ksp.FactoryOwningProcessorProvider
 import studio.lunabee.compose.presenter.ksp.ReducerFactoryProcessor
-import studio.lunabee.compose.presenter.ksp.factoryOwningProviders
+import studio.lunabee.compose.presenter.ksp.booleanKspOption
+import studio.lunabee.compose.presenter.ksp.factoryGenerationOwnership
+import studio.lunabee.compose.presenter.ksp.factoryOwningProviderDiscovery
+import studio.lunabee.compose.presenter.ksp.isOwnedBy
 
+/**
+ * Registers the processor generating reducer factories Hilt can bind through constructor injection.
+ */
 class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwningProcessorProvider {
     /**
      * Factory generation is taken over from the lbcpresenter-ksp processor by default, because a Hilt factory is
@@ -33,16 +40,19 @@ class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwni
      */
     override fun ownsFactoryGeneration(annotateFactoryOption: Boolean?): Boolean = annotateFactoryOption != false
 
+    /**
+     * Creates the processor used to generate reducer factories with their Hilt annotations.
+     */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val configuredAnnotateFactory = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull()
-        val otherProviders = factoryOwningProviders().filterNot { it.javaClass == javaClass }
-        val clashingProviders = otherProviders.filter { it.ownsFactoryGeneration(configuredAnnotateFactory) }
-        val annotateFactory = ownsFactoryGeneration(configuredAnnotateFactory) && clashingProviders.isEmpty()
+        val configuredAnnotateFactory = environment.options.booleanKspOption(AnnotateFactoryOption)
+        val discovery = factoryOwningProviderDiscovery()
+        val ownership = factoryGenerationOwnership(annotateFactoryOption = configuredAnnotateFactory, discovery = discovery)
+        val annotateFactory = ownership.isOwnedBy(this)
         reportConfiguration(
             environment = environment,
             configuredAnnotateFactory = configuredAnnotateFactory,
-            otherProviders = otherProviders,
-            clashingProviders = clashingProviders,
+            ownership = ownership,
+            otherProviders = discovery.providers.filterNot { it.javaClass == javaClass },
         )
         return HiltReducerFactoryProcessor(
             codeGenerator = environment.codeGenerator,
@@ -54,23 +64,17 @@ class HiltReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwni
     private fun reportConfiguration(
         environment: SymbolProcessorEnvironment,
         configuredAnnotateFactory: Boolean?,
+        ownership: FactoryGenerationOwnership,
         otherProviders: List<FactoryOwningProcessorProvider>,
-        clashingProviders: List<FactoryOwningProcessorProvider>,
     ) {
         when {
-            clashingProviders.isNotEmpty() -> environment.logger.error(
-                "lbcpresenter-hilt-ksp and ${clashingProviders.joinToString { it.javaClass.name }} both take over factory " +
-                    "generation with '$AnnotateFactoryOption' enabled, which would generate the same factory file twice. " +
-                    "Keep a single DI processor on the KSP classpath, or leave '$AnnotateFactoryOption' unset.",
-            )
-
             configuredAnnotateFactory == false -> environment.logger.warn(
                 "KSP option '$AnnotateFactoryOption' is disabled: reducer factories are generated without the " +
                     "'@javax.inject.Inject' constructor, so Hilt cannot bind them without a hand-written '@Provides'. " +
                     "Leave the option unset to let lbcpresenter-hilt-ksp annotate the factories.",
             )
 
-            otherProviders.isNotEmpty() -> environment.logger.warn(
+            ownership.isOwnedBy(this) && otherProviders.isNotEmpty() -> environment.logger.warn(
                 "lbcpresenter-hilt-ksp owns reducer factory generation, so the generated factories carry " +
                     "'@javax.inject.Inject' but none of the annotations of ${otherProviders.joinToString { it.javaClass.name }}. " +
                     "A Koin project relying on '@ComponentScan' must bind them through 'generatedReducerFactoryModule', or drop " +

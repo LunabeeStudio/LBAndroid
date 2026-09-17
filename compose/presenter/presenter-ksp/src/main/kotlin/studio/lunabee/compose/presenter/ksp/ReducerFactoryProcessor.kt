@@ -29,23 +29,23 @@ import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.FileSpec
 
-private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
-
 class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
     /**
      * Creates the processor used to generate reducer factories.
      */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val annotateFactory = environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull()
-        val factoryOwner = factoryGenerationOwner(annotateFactory)
-        if (annotateFactory == true && factoryOwner == null) {
-            environment.logger.warn(
-                "KSP option '$AnnotateFactoryOption' is enabled but no DI specific processor owning factory generation was found " +
-                    "on the KSP classpath: factories are generated without DI annotations. " +
-                    "Make sure lbcpresenter-koin-ksp or lbcpresenter-hilt-ksp is on the KSP classpath.",
+        val annotateFactory = environment.options.booleanKspOption(AnnotateFactoryOption) { rawValue ->
+            environment.logger.error(
+                "KSP option '$AnnotateFactoryOption' expects 'true' or 'false' but was '$rawValue'. " +
+                    "Remove the option to let the DI specific processor of the KSP classpath own factory generation.",
             )
         }
-        if (environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true) {
+        val ownership = factoryGenerationOwnership(
+            annotateFactoryOption = annotateFactory,
+            discovery = factoryOwningProviderDiscovery(),
+        )
+        reportOwnership(environment = environment, annotateFactoryOption = annotateFactory, ownership = ownership)
+        if (environment.options.booleanKspOption(GenerateKoinModuleOption) == true) {
             environment.logger.warn(
                 "KSP option '$GenerateKoinModuleOption' is handled by the lbcpresenter-koin-ksp processor. " +
                     "Make sure lbcpresenter-koin-ksp is on the KSP classpath.",
@@ -54,8 +54,42 @@ class ReducerFactoryProcessorProvider : SymbolProcessorProvider {
         return ReducerFactoryProcessor(
             codeGenerator = environment.codeGenerator,
             logger = environment.logger,
-            generateFactories = factoryOwner == null,
+            generateFactories = ownership is FactoryGenerationOwnership.Base,
         )
+    }
+
+    /**
+     * Reports the configurations no processor can generate factories for. This processor is always on the KSP
+     * classpath, so it is the single place reporting them.
+     */
+    private fun reportOwnership(
+        environment: SymbolProcessorEnvironment,
+        annotateFactoryOption: Boolean?,
+        ownership: FactoryGenerationOwnership,
+    ) {
+        when (ownership) {
+            is FactoryGenerationOwnership.Unresolved -> environment.logger.error(
+                "The KSP services of the processor classpath could not be read (${ownership.failures.joinToString()}), so the " +
+                    "processor owning reducer factory generation is unknown and no factory was generated. " +
+                    "Fix the KSP classpath, or keep lbcpresenter-ksp as the only reducer factory processor.",
+            )
+
+            is FactoryGenerationOwnership.Ambiguous -> environment.logger.error(
+                "${ownership.claimants.joinToString { it.javaClass.name }} all take over reducer factory generation with " +
+                    "'$AnnotateFactoryOption' set to $annotateFactoryOption, and no processor can pick a winner, so no factory was " +
+                    "generated. Keep a single DI specific processor on the KSP classpath, or leave '$AnnotateFactoryOption' unset.",
+            )
+
+            is FactoryGenerationOwnership.Base -> if (annotateFactoryOption == true) {
+                environment.logger.warn(
+                    "KSP option '$AnnotateFactoryOption' is enabled but no DI specific processor owning factory generation was found " +
+                        "on the KSP classpath: factories are generated without DI annotations. " +
+                        "Make sure lbcpresenter-koin-ksp or lbcpresenter-hilt-ksp is on the KSP classpath.",
+                )
+            }
+
+            is FactoryGenerationOwnership.Owned -> Unit
+        }
     }
 }
 

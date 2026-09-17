@@ -28,10 +28,14 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.validate
 import studio.lunabee.compose.presenter.ksp.AnnotateFactoryOption
 import studio.lunabee.compose.presenter.ksp.FactoryOwningProcessorProvider
+import studio.lunabee.compose.presenter.ksp.GenerateKoinModuleOption
 import studio.lunabee.compose.presenter.ksp.ReducerFactoryProcessor
 import studio.lunabee.compose.presenter.ksp.ValidReducerSignature
+import studio.lunabee.compose.presenter.ksp.booleanKspOption
+import studio.lunabee.compose.presenter.ksp.factoryGenerationOwnership
+import studio.lunabee.compose.presenter.ksp.factoryOwningProviderDiscovery
+import studio.lunabee.compose.presenter.ksp.isOwnedBy
 
-private const val GenerateKoinModuleOption = "studio.lunabee.presenter.generateKoinModule"
 private const val KoinModulePackageOption = "studio.lunabee.presenter.koinModulePackage"
 
 class KoinReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwningProcessorProvider {
@@ -45,8 +49,12 @@ class KoinReducerFactoryProcessorProvider : SymbolProcessorProvider, FactoryOwni
      * Creates the processor used to generate the Koin bindings of generated reducer factories.
      */
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val annotateFactory = ownsFactoryGeneration(environment.options[AnnotateFactoryOption]?.toBooleanStrictOrNull())
-        val koinModuleGenerationRequested = environment.options[GenerateKoinModuleOption]?.toBooleanStrictOrNull() == true
+        val ownership = factoryGenerationOwnership(
+            annotateFactoryOption = environment.options.booleanKspOption(AnnotateFactoryOption),
+            discovery = factoryOwningProviderDiscovery(),
+        )
+        val annotateFactory = ownership.isOwnedBy(this)
+        val koinModuleGenerationRequested = environment.options.booleanKspOption(GenerateKoinModuleOption) == true
         val generateKoinModule = koinModuleGenerationRequested && shouldGenerateKoinModuleForCompilation(environment.platforms)
         if (koinModuleGenerationRequested && !generateKoinModule) {
             environment.logger.info(
