@@ -333,8 +333,28 @@ object LBSyncOperator {
      * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once when no manager is
      * registered (a `combine` over an empty set of flows would otherwise never emit).
      */
-    fun statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>> = flow {
-        val managers = groups.values.flatMap { it.syncManagers }
+    fun statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>> =
+        combineStatusByKey { groups.values.flatMap { group -> group.syncManagers } }
+
+    /**
+     * [statusByKey] restricted to the groups registered under [groupNames], for a consumer that watches
+     * a part of the registry (e.g. the groups feeding one screen) instead of the whole app.
+     *
+     * A name with no registered group is ignored; when no name resolves, the flow behaves as an empty
+     * registry and emits [emptyMap] once.
+     *
+     * Registry snapshot: the group lookup AND the member sets are read once, when collection starts. A
+     * group registered under one of [groupNames] AFTER a collection has begun is NOT picked up by that
+     * already-running collection — re-collect this flow to observe it.
+     *
+     * @param groupNames the [groups] keys to observe.
+     * @return a flow of member statuses keyed by `syncKey`, spanning the resolved groups.
+     */
+    fun statusByKey(groupNames: Collection<String>): Flow<Map<SyncKey, LBSyncProcessStatus>> =
+        combineStatusByKey { groupNames.mapNotNull { name -> groups[name] }.flatMap { group -> group.syncManagers } }
+
+    private fun combineStatusByKey(snapshot: () -> List<LBGenericSyncManager>): Flow<Map<SyncKey, LBSyncProcessStatus>> = flow {
+        val managers = snapshot()
         if (managers.isEmpty()) {
             emitAll(flowOf(emptyMap()))
         } else {
@@ -364,8 +384,51 @@ object LBSyncOperator {
      *
      * @return a flow of the app-wide aggregate syncing state.
      */
-    fun isSyncing(): Flow<Boolean> = statusByKey()
-        .map { statuses -> statuses.values.any { it.isProcessing() } }
+    fun isSyncing(): Flow<Boolean> = aggregate(statuses = statusByKey(), predicate = LBSyncProcessStatus::isProcessing)
+
+    /**
+     * [isSyncing] restricted to the groups registered under [groupNames], resolved as
+     * [statusByKey] resolves them.
+     *
+     * @param groupNames the [groups] keys to observe.
+     * @return a flow of the resolved groups' aggregate syncing state.
+     */
+    fun isSyncing(groupNames: Collection<String>): Flow<Boolean> =
+        aggregate(statuses = statusByKey(groupNames = groupNames), predicate = LBSyncProcessStatus::isProcessing)
+
+    /**
+     * Derived from [statusByKey]: `true` while ANY managed manager status
+     * [LBSyncProcessStatus.isActive], and `false` once every manager is idle. Consecutive duplicate
+     * values are dropped via [distinctUntilChanged].
+     *
+     * Wider than [isSyncing] by [LBSyncProcessStatus.PendingSync]: a request waiting behind the run
+     * currently holding the operator is already active here, and only turns [isSyncing] once it starts.
+     * Await this one to cover a request from the moment it is enqueued.
+     *
+     * Registry snapshot: the member set is read once, when collection starts. A manager (or group) added
+     * AFTER a collection has begun is NOT picked up by that already-running collection — re-collect this
+     * flow to observe a newly-registered manager.
+     *
+     * @return a flow of the app-wide aggregate activity state.
+     */
+    fun isActive(): Flow<Boolean> = aggregate(statuses = statusByKey(), predicate = LBSyncProcessStatus::isActive)
+
+    /**
+     * [isActive] restricted to the groups registered under [groupNames], resolved as [statusByKey]
+     * resolves them. This is the flow to await a sync request targeting a known set of groups: it covers
+     * the request from the moment it is enqueued until the last of those groups finishes.
+     *
+     * @param groupNames the [groups] keys to observe.
+     * @return a flow of the resolved groups' aggregate activity state.
+     */
+    fun isActive(groupNames: Collection<String>): Flow<Boolean> =
+        aggregate(statuses = statusByKey(groupNames = groupNames), predicate = LBSyncProcessStatus::isActive)
+
+    private fun aggregate(
+        statuses: Flow<Map<SyncKey, LBSyncProcessStatus>>,
+        predicate: (LBSyncProcessStatus) -> Boolean,
+    ): Flow<Boolean> = statuses
+        .map { statusByKey -> statusByKey.values.any(predicate) }
         .distinctUntilChanged()
 }
 

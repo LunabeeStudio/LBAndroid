@@ -218,6 +218,111 @@ class CombinedStatusFlowTest {
 
     // endregion
 
+    // region activity: PendingSync counts, unlike isSyncing
+
+    @Test
+    fun group_isActive_covers_pending_sync_unlike_isSyncing() = runFlowTest { store, scope ->
+        val m1 = FakeStatusManager(store = store, scope = scope, key = "m1")
+        val group = LBSyncGroup(syncManagers = linkedSetOf(m1))
+
+        val active = group.isActive().record(scope, testScheduler)
+        val syncing = group.isSyncing().record(scope, testScheduler)
+        advanceUntilIdle()
+
+        m1.setStatusInternal(LBSyncProcessStatus.PendingSync)
+        advanceUntilIdle()
+        assertTrue(active().last(), "a queued run counts as active")
+        assertFalse(syncing().last(), "a queued run is not syncing yet")
+
+        m1.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        advanceUntilIdle()
+        assertTrue(active().last(), "a running member is active")
+        assertTrue(syncing().last(), "a running member is syncing")
+
+        m1.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(now()))
+        advanceUntilIdle()
+        assertFalse(active().last(), "a terminal member is neither active nor syncing")
+    }
+
+    @Test
+    fun operator_isActive_covers_pending_sync_across_groups() = runFlowTest { store, scope ->
+        val a = FakeStatusManager(store = store, scope = scope, key = "a")
+        val b = FakeStatusManager(store = store, scope = scope, key = "b")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(a))
+        LBSyncOperator.groups["g2"] = LBSyncGroup(syncManagers = linkedSetOf(b))
+
+        val active = LBSyncOperator.isActive().record(scope, testScheduler)
+        advanceUntilIdle()
+
+        b.setStatusInternal(LBSyncProcessStatus.PendingSync)
+        advanceUntilIdle()
+        assertTrue(active().last(), "a manager queued in any group makes the app-wide view active")
+
+        b.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(now()))
+        advanceUntilIdle()
+        assertFalse(active().last(), "every manager terminal → not active")
+
+        assertEquals(
+            expected = listOf(false, true, false),
+            actual = active(),
+            "distinctUntilChanged drops repeated consecutive aggregate values",
+        )
+    }
+
+    // endregion
+
+    // region operator: group-name subset
+
+    @Test
+    fun operator_statusByKey_with_group_names_spans_only_those_groups() = runFlowTest { store, scope ->
+        val a = FakeStatusManager(store = store, scope = scope, key = "a")
+        val b = FakeStatusManager(store = store, scope = scope, key = "b")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(a))
+        LBSyncOperator.groups["g2"] = LBSyncGroup(syncManagers = linkedSetOf(b))
+
+        val maps = LBSyncOperator.statusByKey(groupNames = listOf("g1")).record(scope, testScheduler)
+        advanceUntilIdle()
+
+        a.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        b.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        advanceUntilIdle()
+
+        assertTrue(maps().all { SyncKey("b") !in it.keys }, "a group left out of groupNames is never observed")
+        assertEquals(expected = setOf(SyncKey("a")), actual = maps().last().keys, "only the named group is observed")
+    }
+
+    @Test
+    fun operator_isActive_with_group_names_ignores_the_other_groups() = runFlowTest { store, scope ->
+        val a = FakeStatusManager(store = store, scope = scope, key = "a")
+        val b = FakeStatusManager(store = store, scope = scope, key = "b")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(a))
+        LBSyncOperator.groups["g2"] = LBSyncGroup(syncManagers = linkedSetOf(b))
+
+        val active = LBSyncOperator.isActive(groupNames = listOf("g1")).record(scope, testScheduler)
+        advanceUntilIdle()
+
+        b.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        advanceUntilIdle()
+        assertFalse(active().last(), "activity in an unnamed group does not count")
+
+        a.setStatusInternal(LBSyncProcessStatus.PendingSync)
+        advanceUntilIdle()
+        assertTrue(active().last(), "activity in a named group counts")
+    }
+
+    @Test
+    fun operator_statusByKey_with_unknown_group_names_emits_empty_map() = runFlowTest { store, scope ->
+        val a = FakeStatusManager(store = store, scope = scope, key = "a")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(a))
+
+        val maps = LBSyncOperator.statusByKey(groupNames = listOf("nope")).record(scope, testScheduler)
+        advanceUntilIdle()
+
+        assertEquals(expected = listOf(emptyMap()), actual = maps(), "an unknown group name resolves to nothing")
+    }
+
+    // endregion
+
     // region test infrastructure
 
     private fun runFlowTest(body: suspend TestScope.(store: SyncTimestampLocalDataSource, scope: CoroutineScope) -> Unit) = runTest {

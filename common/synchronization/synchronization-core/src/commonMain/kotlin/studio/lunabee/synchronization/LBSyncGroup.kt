@@ -214,4 +214,44 @@ class LBSyncGroup(
     fun isSyncing(): Flow<Boolean> = statusByKey()
         .map { statuses -> statuses.values.any { it.isProcessing() } }
         .distinctUntilChanged()
+
+    /**
+     * Derived from [statusByKey]: `true` while ANY member status [LBSyncProcessStatus.isActive], and
+     * `false` once every member is idle. Consecutive duplicate values are dropped via
+     * [distinctUntilChanged].
+     *
+     * Wider than [isSyncing] by [LBSyncProcessStatus.PendingSync]: a group whose sync request waits
+     * behind the run currently held by [LBSyncOperator] is already active here, and only turns
+     * [isSyncing] once its own run starts. Await this one to cover a request from the moment it is
+     * enqueued.
+     *
+     * Registry snapshot: the member set is read once, when collection starts. A manager added to
+     * [syncManagers] AFTER a collection has begun is NOT picked up by that already-running collection —
+     * re-collect this flow to observe a newly-registered manager.
+     *
+     * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the
+     * underlying map (last one wins), so duplicate keys silently drop members from the combined view.
+     *
+     * @return a flow of the group's aggregate activity state.
+     */
+    fun isActive(): Flow<Boolean> = statusByKey()
+        .map { statuses -> statuses.values.any { it.isActive() } }
+        .distinctUntilChanged()
+
+    /**
+     * The group's persisted sync date, combining every member's
+     * [LBGenericSyncManager.lastSuccessfulSyncDate]. Unlike the status flows it reads the store, so it
+     * survives a process restart before [LBSyncOperator.loadAllStatuses] has run.
+     *
+     * @return the oldest member date, or `null` when the group has no manager or at least one member has
+     * never synchronized successfully — i.e. the group has never fully synchronized.
+     */
+    suspend fun lastSuccessfulSyncDate(): Instant? {
+        val dates: List<Instant?> = syncManagers.map { manager -> manager.lastSuccessfulSyncDate() }
+        return if (dates.isEmpty() || dates.any { date -> date == null }) {
+            null
+        } else {
+            dates.filterNotNull().min()
+        }
+    }
 }

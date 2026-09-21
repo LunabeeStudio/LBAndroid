@@ -31,6 +31,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.testfixture.freshStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -235,6 +236,44 @@ class LBSyncGroupTest {
 
         assertTrue(result.let { it is LBResult.Failure && it.throwable is LBSyncClosureException }, "the gate still fails the group")
         assertEquals(expected = 0, actual = manager.fetchCalls, "a disabled sequential group does not run its managers")
+    }
+
+    // endregion
+
+    // region lastSuccessfulSyncDate
+
+    @Test
+    fun last_successful_sync_date_is_the_oldest_member_date() = runGroupTest { store, scope ->
+        val older = Instant.fromEpochMilliseconds(1_000)
+        val newer = Instant.fromEpochMilliseconds(2_000)
+        store.saveSyncDates(syncKey = SyncKey("ok1"), serverDate = null, localDate = older)
+        store.saveSyncDates(syncKey = SyncKey("ok2"), serverDate = null, localDate = newer)
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeGroupManager(store = store, scope = scope, syncKey = "ok1"),
+                FakeGroupManager(store = store, scope = scope, syncKey = "ok2"),
+            ),
+        )
+
+        assertEquals(expected = older, actual = group.lastSuccessfulSyncDate(), "the group is only as fresh as its oldest member")
+    }
+
+    @Test
+    fun last_successful_sync_date_is_null_when_a_member_never_synced() = runGroupTest { store, scope ->
+        store.saveSyncDates(syncKey = SyncKey("ok1"), serverDate = null, localDate = Instant.fromEpochMilliseconds(1_000))
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeGroupManager(store = store, scope = scope, syncKey = "ok1"),
+                FakeGroupManager(store = store, scope = scope, syncKey = "never"),
+            ),
+        )
+
+        assertNull(group.lastSuccessfulSyncDate(), "one member without a stored date means the group never fully synchronized")
+    }
+
+    @Test
+    fun last_successful_sync_date_is_null_when_the_group_has_no_manager() = runGroupTest { _, _ ->
+        assertNull(LBSyncGroup().lastSuccessfulSyncDate(), "an empty group has never synchronized")
     }
 
     // endregion

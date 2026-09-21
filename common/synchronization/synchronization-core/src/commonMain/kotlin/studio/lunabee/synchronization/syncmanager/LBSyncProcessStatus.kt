@@ -108,6 +108,15 @@ sealed class LBSyncProcessStatus {
     }
 
     /**
+     * @return whether the sync manager owner of the status has a run queued or in progress:
+     * [PendingSync] on top of everything [isProcessing] covers. Requests are serialized by
+     * [studio.lunabee.synchronization.LBSyncOperator], so a run that was requested while another one is
+     * in progress sits in [PendingSync] until its turn comes — wait on this rather than on
+     * [isProcessing] to cover that queueing window.
+     */
+    fun isActive(): Boolean = this is PendingSync || isProcessing()
+
+    /**
      * @return the status error if it contains one, null otherwise
      */
     fun currentError(): Exception? {
