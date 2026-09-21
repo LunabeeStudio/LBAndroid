@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-21
+
+```
+Synchronization Core 2.1.0-alpha02
+Synchronization Events 2.1.0-alpha02
+Synchronization Core-Datastore 2.1.0-alpha02
+Synchronization Core-Room 2.1.0-alpha02
+Synchronization Parse-Room 2.1.0-alpha02
+bom 4.16.0-alpha02
+```
+
+- Added `LBSyncProcessStatus.isActive()`: `PendingSync` on top of what `isProcessing()` covers, i.e. a run
+  queued behind the one the operator is currently running.
+- Added `LBSyncGroup.isActive()` and `LBSyncOperator.isActive()`, the `isActive()` counterparts of
+  `isSyncing()`. Await those to cover a sync request from the moment it is enqueued, since the operator
+  serializes requests and a queued group only leaves `PendingSync` when its turn comes.
+- Added `LBSyncOperator.statusByKey(groupNames)`, `LBSyncOperator.isSyncing(groupNames)` and
+  `LBSyncOperator.isActive(groupNames)`, which observe the groups registered under the given names
+  instead of the whole registry. An unknown name is ignored; no name resolving behaves as an empty
+  registry.
+- Added `LBSyncGroup.lastSuccessfulSyncDate()`: the oldest member date read from the store, or `null`
+  when the group is empty or a member has never synchronized successfully.
+
 ## 2026-09-16
 
 ```

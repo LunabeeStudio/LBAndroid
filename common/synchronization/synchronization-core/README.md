@@ -270,6 +270,15 @@ sequenceDiagram
 - `isSyncing(): Flow<Boolean>` — `true` while any member status `isProcessing()`. Mind the quirk:
   the mid-pipeline `UploadFinishSuccessfully` / `DownloadFinishSuccessfully` steps count as processing;
   only `Sync*` / `NeverSync` / `Disabled` / `*WithError` are terminal.
+- `isActive(): Flow<Boolean>` — `isSyncing()` plus `PendingSync`. Requests are serialized, so a group
+  whose sync waits behind the run in progress is already active here and only turns `isSyncing()` when
+  its turn comes. Await a request you just enqueued (or one another trigger enqueued) on this one.
+- `LBSyncOperator.statusByKey(groupNames)` / `isSyncing(groupNames)` / `isActive(groupNames)` — the same
+  three views restricted to the groups registered under those names, for a consumer watching a part of
+  the registry. An unknown name is ignored; no name resolving behaves as an empty registry.
+- `LBSyncGroup.lastSuccessfulSyncDate()` — the group's oldest member date, read from the store rather
+  than from the statuses (so it holds before `loadAllStatuses()`), or `null` when the group is empty or a
+  member has never synchronized successfully.
 
 ## Setup
 
