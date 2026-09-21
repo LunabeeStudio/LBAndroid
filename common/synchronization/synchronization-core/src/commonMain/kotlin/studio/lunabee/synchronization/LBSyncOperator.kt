@@ -38,6 +38,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 import studio.lunabee.synchronization.syncmanager.defaultSyncScope
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
 
 /**
@@ -123,9 +124,10 @@ object LBSyncOperator {
      */
     suspend fun syncAllManagers(): LBResult<Unit> {
         reentrantCallFailure(target = "syncAllManagers()")?.let { return it }
-        markPending(managers = syncManagers())
-        groups.values.forEach { it.cancelPendingRetries() }
-        return syncMutex.withLock { runGroupsSequentially(groups.values) }
+        return pending(managers = syncManagers()) {
+            groups.values.forEach { it.cancelPendingRetries() }
+            syncMutex.withLock { runGroupsSequentially(groups.values) }
+        }
     }
 
     /**
@@ -140,9 +142,10 @@ object LBSyncOperator {
      */
     suspend fun sync(group: LBSyncGroup): LBResult<Unit> {
         reentrantCallFailure(target = "sync(group)")?.let { return it }
-        markPending(managers = group.syncManagers)
-        group.cancelPendingRetries()
-        return syncMutex.withLock { group.syncManagers() }
+        return pending(managers = group.syncManagers) {
+            group.cancelPendingRetries()
+            syncMutex.withLock { group.syncManagers() }
+        }
     }
 
     /**
@@ -157,18 +160,51 @@ object LBSyncOperator {
      */
     suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
         reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
-        markPending(managers = listOf(manager))
-        manager.cancelPendingRetry()
-        return syncMutex.withLock { manager.synchronize() }
+        return pending(managers = listOf(manager)) {
+            manager.cancelPendingRetry()
+            syncMutex.withLock { manager.synchronize() }
+        }
     }
 
     /**
-     * Publishes [LBSyncProcessStatus.PendingSync] on the managers a request targets, before it queues on
-     * [syncMutex], so [isActive] covers the request from the moment it is enqueued rather than from the
-     * moment its pipeline starts. The pipeline overwrites the status as soon as it runs.
+     * Runs [request] with [LBSyncProcessStatus.PendingSync] published on the managers it targets, so
+     * [isActive] covers the request from the moment it is enqueued rather than from the moment its
+     * pipeline starts. The pipeline overwrites the status as soon as it runs.
+     *
+     * A manager the in-flight run is already processing keeps its status: the request is queued behind
+     * that run, and resetting a `DownloadStarted` to `PendingSync` would make [isSyncing] report an idle
+     * engine while a download is running.
+     *
+     * A cancelled caller (a `withTimeout`, a cancelled scope) would otherwise leave its targets pending
+     * forever — nothing else clears a status set outside the pipeline — so the previous status is
+     * restored on cancellation, unless the pipeline has already moved it on.
      */
-    private fun markPending(managers: Collection<LBGenericSyncManager>) {
-        managers.forEach { manager -> manager.setStatusInternal(LBSyncProcessStatus.PendingSync) }
+    private suspend fun <T> pending(managers: Collection<LBGenericSyncManager>, request: suspend () -> T): T {
+        val previousStatuses = markPending(managers = managers)
+        try {
+            return request()
+        } catch (cancellation: CancellationException) {
+            previousStatuses.forEach { (manager, previous) ->
+                if (manager.currentSyncStatus == LBSyncProcessStatus.PendingSync) {
+                    manager.setStatusInternal(previous)
+                }
+            }
+            throw cancellation
+        }
+    }
+
+    /**
+     * Publishes [LBSyncProcessStatus.PendingSync] on [managers], skipping the ones the run in progress
+     * is already processing.
+     *
+     * @return the status each marked manager held, so a cancelled caller can put it back.
+     */
+    private fun markPending(managers: Collection<LBGenericSyncManager>): Map<LBGenericSyncManager, LBSyncProcessStatus> {
+        val marked: Map<LBGenericSyncManager, LBSyncProcessStatus> = managers
+            .filterNot { manager -> manager.currentSyncStatus.isProcessing() }
+            .associateWith { manager -> manager.currentSyncStatus }
+        marked.keys.forEach { manager -> manager.setStatusInternal(LBSyncProcessStatus.PendingSync) }
+        return marked
     }
 
     /**
@@ -229,10 +265,11 @@ object LBSyncOperator {
         }
     }
 
-    internal fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
+    internal suspend fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
         groups.values.filter { group ->
+            val lastSuccessfulSync = group.lastSuccessfulSyncDate()
             group.refreshEvents.any { event ->
-                event::class == eventType && event.isDelayElapsed(group.lastSuccessfulSync)
+                event::class == eventType && event.isDelayElapsed(lastSuccessfulSync)
             }
         }
 
@@ -241,6 +278,8 @@ object LBSyncOperator {
     ) {
         if (shouldRefresh(data = data)) {
             val availableGroups = groupsForEvent(data.type)
+            // Marked before the launch, so a status observer sees the pending run at event time rather
+            // than one dispatch later. Nothing restores it: this run is detached, it outlives no caller.
             markPending(managers = availableGroups.flatMap { it.syncManagers })
             defaultSyncScope.launch {
                 availableGroups.forEach { it.cancelPendingRetries() }

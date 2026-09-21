@@ -57,18 +57,6 @@ class LBSyncGroup(
     var isEnabled: suspend () -> Boolean = { true }
 
     /**
-     * The lastSuccessfulSync of the oldest successfully synchronized sync manager or
-     * [Instant.fromEpochMilliseconds] of 0 if one of the sync manager was not synchronized successfully.
-     */
-    internal val lastSuccessfulSync: Instant
-        get() {
-            return syncManagers.minOfOrNull {
-                (it.currentSyncStatus as? LBSyncProcessStatus.SyncSuccessfully)?.lastSuccessfulSync
-                    ?: Instant.fromEpochMilliseconds(0)
-            } ?: Instant.fromEpochMilliseconds(0)
-        }
-
-    /**
      * Synchronize all the managers of the group, in parallel or one after another as [executionMode] says.
      *
      * Engine-internal: call [LBSyncOperator.sync] with this group instead, so the operator serializes the
@@ -231,9 +219,9 @@ class LBSyncGroup(
 
     /**
      * The group's persisted sync date, combining every member's
-     * [LBGenericSyncManager.lastSuccessfulSyncDate]. Unlike the status-derived [lastSuccessfulSync] it
-     * reads the store, so it holds before [LBSyncOperator.loadAllStatuses] has run and reports "never
-     * synchronized" as `null` rather than as epoch 0. Coerced to now, as
+     * [LBGenericSyncManager.lastSuccessfulSyncDate]. It reads the store rather than the statuses, so it
+     * holds before [LBSyncOperator.loadAllStatuses] has run — which is why the per-event debounce
+     * ([LBSyncRefreshEvent]) is gated on it. Coerced to now, as
      * [LBSyncProcessStatus.SyncSuccessfully.lastSuccessfulSync] is, so a clock-skewed future date never
      * leaks.
      *
