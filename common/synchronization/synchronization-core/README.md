@@ -270,15 +270,20 @@ sequenceDiagram
 - `isSyncing(): Flow<Boolean>` — `true` while any member status `isProcessing()`. Mind the quirk:
   the mid-pipeline `UploadFinishSuccessfully` / `DownloadFinishSuccessfully` steps count as processing;
   only `Sync*` / `NeverSync` / `Disabled` / `*WithError` are terminal.
-- `isActive(): Flow<Boolean>` — `isSyncing()` plus `PendingSync`. Requests are serialized, so a group
-  whose sync waits behind the run in progress is already active here and only turns `isSyncing()` when
-  its turn comes. Await a request you just enqueued (or one another trigger enqueued) on this one.
+- `isActive(): Flow<Boolean>` — `isSyncing()` plus `PendingSync`. Every sync request marks its target
+  managers `PendingSync` before queueing on the operator, so a group whose run waits behind the run in
+  progress is already active here and only turns `isSyncing()` when its turn comes. Await a request you
+  just enqueued (or one a refresh event enqueued) on this one. It does not see the retry `SyncRunner`
+  parks after a failure, nor a follow-up run collapsed into the one in progress.
 - `LBSyncOperator.statusByKey(groupNames)` / `isSyncing(groupNames)` / `isActive(groupNames)` — the same
   three views restricted to the groups registered under those names, for a consumer watching a part of
-  the registry. An unknown name is ignored; no name resolving behaves as an empty registry.
+  the registry. Managers reachable twice are observed once; a name with no registered group is logged
+  and skipped (an observation cannot fail its caller the way `syncGroup(name)` does). An empty snapshot
+  emits `emptyMap()` / `false` once and then suspends, so `first { … }` waits instead of throwing.
 - `LBSyncGroup.lastSuccessfulSyncDate()` — the group's oldest member date, read from the store rather
-  than from the statuses (so it holds before `loadAllStatuses()`), or `null` when the group is empty or a
-  member has never synchronized successfully.
+  than from the statuses (so it holds before `loadAllStatuses()`), coerced to now like
+  `SyncSuccessfully.lastSuccessfulSync`, or `null` when the group is empty or a member has never
+  synchronized successfully.
 
 ## Setup
 

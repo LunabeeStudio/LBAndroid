@@ -18,15 +18,22 @@ bom 4.16.0-alpha02
 
 - Added `LBSyncProcessStatus.isActive()`: `PendingSync` on top of what `isProcessing()` covers, i.e. a run
   queued behind the one the operator is currently running.
+- **Changed:** every `LBSyncOperator` sync request (`syncAllManagers`, `sync(group)`, `sync(manager)`,
+  `syncGroup(name)`) now marks its target managers `PendingSync` before queueing on the operator lock,
+  as the event-triggered path already did. A consumer observing statuses therefore sees
+  "Waiting for synchronization" during the queueing window instead of the previous terminal status.
 - Added `LBSyncGroup.isActive()` and `LBSyncOperator.isActive()`, the `isActive()` counterparts of
   `isSyncing()`. Await those to cover a sync request from the moment it is enqueued, since the operator
   serializes requests and a queued group only leaves `PendingSync` when its turn comes.
 - Added `LBSyncOperator.statusByKey(groupNames)`, `LBSyncOperator.isSyncing(groupNames)` and
   `LBSyncOperator.isActive(groupNames)`, which observe the groups registered under the given names
-  instead of the whole registry. An unknown name is ignored; no name resolving behaves as an empty
-  registry.
-- Added `LBSyncGroup.lastSuccessfulSyncDate()`: the oldest member date read from the store, or `null`
-  when the group is empty or a member has never synchronized successfully.
+  instead of the whole registry. Duplicate members are observed once; an unresolved name is logged and
+  skipped.
+- **Fixed:** the combined status flows of `LBSyncGroup` / `LBSyncOperator` no longer complete when the
+  registry snapshot is empty — they emit `emptyMap()` (`false` for the derived flows) once and then
+  suspend, so a `first { … }` on an empty registry waits instead of throwing `NoSuchElementException`.
+- Added `LBSyncGroup.lastSuccessfulSyncDate()`: the oldest member date read from the store and coerced to
+  now, or `null` when the group is empty or a member has never synchronized successfully.
 
 ## 2026-09-16
 
