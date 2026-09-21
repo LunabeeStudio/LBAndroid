@@ -21,7 +21,15 @@ bom 4.16.0-alpha02
 - **Changed:** every `LBSyncOperator` sync request (`syncAllManagers`, `sync(group)`, `sync(manager)`,
   `syncGroup(name)`) now marks its target managers `PendingSync` before queueing on the operator lock,
   as the event-triggered path already did. A consumer observing statuses therefore sees
-  "Waiting for synchronization" during the queueing window instead of the previous terminal status.
+  "Waiting for synchronization" during the queueing window instead of the previous terminal status. A
+  manager the run in progress is already processing keeps its status, and a cancelled caller (a
+  `withTimeout`, a cancelled scope) restores the status it published instead of leaving the manager
+  pending forever.
+- **Fixed:** the per-event refresh debounce (`LBSyncRefreshEvent.minimumDelay`) reads the persisted sync
+  cursor instead of the status-derived date. That date fell back to epoch 0 until
+  `LBSyncOperator.loadAllStatuses()` had run, so on every cold start the first `AppForeground` event
+  re-synchronized every group regardless of its configured delay. The internal
+  `LBSyncGroup.lastSuccessfulSync` is gone, replaced by `LBSyncGroup.lastSuccessfulSyncDate()`.
 - Added `LBSyncGroup.isActive()` and `LBSyncOperator.isActive()`, the `isActive()` counterparts of
   `isSyncing()`. Await those to cover a sync request from the moment it is enqueued, since the operator
   serializes requests and a queued group only leaves `PendingSync` when its turn comes.

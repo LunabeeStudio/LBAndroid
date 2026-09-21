@@ -160,7 +160,7 @@ Three layers, top to bottom:
   **operator runs groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
   single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
   evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
-  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).
+  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`), measured from the group's persisted cursor (`lastSuccessfulSyncDate()`), so it holds on a cold start before `loadAllStatuses()` has run.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine. Pipeline is
   download → upload (then re-download unless `supportChangeNotificationFromServer()`). The subclass SPI
   is **suspend + throw-based**: `fetchRequest(...)` returns a `FetchPage`, `pushObjectsToServer(...)`,
@@ -178,8 +178,9 @@ read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combin
 `statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>>`, `isSyncing(): Flow<Boolean>` (any member
 `isProcessing()`) and `isActive(): Flow<Boolean>` (`isSyncing()` + `PendingSync`, i.e. also the requests
 queued behind the run in progress — every operator entry point marks its targets `PendingSync` before
-taking the lock, so this is the flow to await a request from the moment it is enqueued; it does not see
-the retry `SyncRunner` parks after a failure). All three are a snapshot of the registry at collection
+taking the lock, skipping whatever the run in progress is already processing and restoring the previous
+status if the caller is cancelled, so this is the flow to await a request from the moment it is
+enqueued; it does not see the retry `SyncRunner` parks after a failure). All three are a snapshot of the registry at collection
 time; KDoc spells out the snapshot + `syncKey`-collision caveats, and an empty snapshot emits
 `emptyMap()`/`false` once and then suspends rather than completing. On the operator the three come with
 a `(groupNames: Collection<String>)` overload restricted to the groups registered under those names

@@ -271,8 +271,9 @@ sequenceDiagram
   the mid-pipeline `UploadFinishSuccessfully` / `DownloadFinishSuccessfully` steps count as processing;
   only `Sync*` / `NeverSync` / `Disabled` / `*WithError` are terminal.
 - `isActive(): Flow<Boolean>` — `isSyncing()` plus `PendingSync`. Every sync request marks its target
-  managers `PendingSync` before queueing on the operator, so a group whose run waits behind the run in
-  progress is already active here and only turns `isSyncing()` when its turn comes. Await a request you
+  managers `PendingSync` before queueing on the operator (skipping the ones the run in progress is
+  processing, and restoring them if the caller is cancelled), so a group whose run waits behind the run
+  in progress is already active here and only turns `isSyncing()` when its turn comes. Await a request you
   just enqueued (or one a refresh event enqueued) on this one. It does not see the retry `SyncRunner`
   parks after a failure, nor a follow-up run collapsed into the one in progress.
 - `LBSyncOperator.statusByKey(groupNames)` / `isSyncing(groupNames)` / `isActive(groupNames)` — the same
