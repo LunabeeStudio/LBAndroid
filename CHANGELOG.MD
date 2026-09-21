@@ -8,9 +8,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-09-16
 
 ```
-Lbcpresenter 3.0.0
-LbcpresenterHilt 3.0.0
-LbcpresenterKoin 3.0.0
+Lbcpresenter 2.1.0
+LbcpresenterHilt 2.1.0
+LbcpresenterKoin 2.1.0
 LbcpresenterHiltKsp 2.0.0-rc05
 LbcpresenterKsp 2.0.0-rc05
 LbcpresenterKoinKsp 2.0.0-rc05
