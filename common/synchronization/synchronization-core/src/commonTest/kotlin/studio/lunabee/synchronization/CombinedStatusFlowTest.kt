@@ -17,8 +17,10 @@
 package studio.lunabee.synchronization
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -241,7 +243,8 @@ class CombinedStatusFlowTest {
 
         m1.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(now()))
         advanceUntilIdle()
-        assertFalse(active().last(), "a terminal member is neither active nor syncing")
+        assertFalse(active().last(), "a terminal member is not active")
+        assertFalse(syncing().last(), "a terminal member is not syncing")
     }
 
     @Test
@@ -308,6 +311,51 @@ class CombinedStatusFlowTest {
         a.setStatusInternal(LBSyncProcessStatus.PendingSync)
         advanceUntilIdle()
         assertTrue(active().last(), "activity in a named group counts")
+    }
+
+    @Test
+    fun operator_isSyncing_with_group_names_ignores_pending_sync() = runFlowTest { store, scope ->
+        val a = FakeStatusManager(store = store, scope = scope, key = "a")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(a))
+
+        val syncing = LBSyncOperator.isSyncing(groupNames = listOf("g1")).record(scope, testScheduler)
+        advanceUntilIdle()
+
+        a.setStatusInternal(LBSyncProcessStatus.PendingSync)
+        advanceUntilIdle()
+        assertFalse(syncing().last(), "a queued run is not syncing, unlike isActive")
+
+        a.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        advanceUntilIdle()
+        assertTrue(syncing().last(), "a running member in a named group is syncing")
+    }
+
+    @Test
+    fun operator_statusByKey_with_group_names_observes_a_shared_manager_once() = runFlowTest { store, scope ->
+        val shared = FakeStatusManager(store = store, scope = scope, key = "shared")
+        LBSyncOperator.groups["g1"] = LBSyncGroup(syncManagers = linkedSetOf(shared))
+        LBSyncOperator.groups["g2"] = LBSyncGroup(syncManagers = linkedSetOf(shared))
+
+        val maps = LBSyncOperator.statusByKey(groupNames = listOf("g1", "g2", "g1")).record(scope, testScheduler)
+        advanceUntilIdle()
+
+        shared.setStatusInternal(LBSyncProcessStatus.DownloadStarted(now()))
+        advanceUntilIdle()
+
+        assertEquals(
+            expected = 2,
+            actual = maps().size,
+            "the duplicated manager is collected once, so its transition yields one emission",
+        )
+    }
+
+    @Test
+    fun operator_isActive_with_unknown_group_names_suspends_instead_of_completing() = runFlowTest { _, scope ->
+        val awaited = scope.async { LBSyncOperator.isActive(groupNames = listOf("nope")).first { active -> active } }
+        advanceUntilIdle()
+
+        assertTrue(awaited.isActive, "an empty snapshot keeps the consumer waiting instead of throwing on first { }")
+        awaited.cancel()
     }
 
     @Test

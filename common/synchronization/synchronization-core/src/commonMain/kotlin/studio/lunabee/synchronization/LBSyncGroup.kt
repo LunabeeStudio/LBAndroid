@@ -18,19 +18,19 @@ package studio.lunabee.synchronization
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -177,13 +177,16 @@ class LBSyncGroup(
      * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the map
      * (last one wins), so duplicate keys silently drop members from the combined view.
      *
-     * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once when the group has no
-     * managers (a `combine` over an empty set of flows would otherwise never emit).
+     * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once, then nothing, when
+     * the group has no manager (a `combine` over an empty set of flows would otherwise never emit).
      */
     fun statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>> = flow {
         val managers = syncManagers.toList()
         if (managers.isEmpty()) {
-            emitAll(flowOf(emptyMap()))
+            // Emit once and suspend rather than complete: a completing flow makes `first { … }` throw on
+            // the consumer side, and the combine below never completes either.
+            emit(emptyMap())
+            awaitCancellation()
         } else {
             emitAll(
                 combine(managers.map { manager -> manager.status.map { manager.syncKey to it } }) {
@@ -211,47 +214,34 @@ class LBSyncGroup(
      *
      * @return a flow of the group's aggregate syncing state.
      */
-    fun isSyncing(): Flow<Boolean> = statusByKey()
-        .map { statuses -> statuses.values.any { it.isProcessing() } }
-        .distinctUntilChanged()
+    fun isSyncing(): Flow<Boolean> = statusByKey().anyStatus(predicate = LBSyncProcessStatus::isProcessing)
 
     /**
-     * Derived from [statusByKey]: `true` while ANY member status [LBSyncProcessStatus.isActive], and
-     * `false` once every member is idle. Consecutive duplicate values are dropped via
-     * [distinctUntilChanged].
-     *
-     * Wider than [isSyncing] by [LBSyncProcessStatus.PendingSync]: a group whose sync request waits
-     * behind the run currently held by [LBSyncOperator] is already active here, and only turns
-     * [isSyncing] once its own run starts. Await this one to cover a request from the moment it is
-     * enqueued.
-     *
-     * Registry snapshot: the member set is read once, when collection starts. A manager added to
-     * [syncManagers] AFTER a collection has begun is NOT picked up by that already-running collection —
-     * re-collect this flow to observe a newly-registered manager.
-     *
-     * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the
-     * underlying map (last one wins), so duplicate keys silently drop members from the combined view.
+     * Derived from [statusByKey] as [isSyncing] is, and carrying the same snapshot and syncKey-collision
+     * caveats, but over [LBSyncProcessStatus.isActive]: wider than [isSyncing] by
+     * [LBSyncProcessStatus.PendingSync], which every sync request publishes on its target managers
+     * before queueing on [LBSyncOperator]. A group whose run waits behind the run in progress is
+     * therefore already active here, so await this one to cover a request from the moment it is
+     * enqueued. It does not see the retry [studio.lunabee.synchronization.runner.SyncRunner] parks after
+     * a failure.
      *
      * @return a flow of the group's aggregate activity state.
      */
-    fun isActive(): Flow<Boolean> = statusByKey()
-        .map { statuses -> statuses.values.any { it.isActive() } }
-        .distinctUntilChanged()
+    fun isActive(): Flow<Boolean> = statusByKey().anyStatus(predicate = LBSyncProcessStatus::isActive)
 
     /**
      * The group's persisted sync date, combining every member's
-     * [LBGenericSyncManager.lastSuccessfulSyncDate]. Unlike the status flows it reads the store, so it
-     * survives a process restart before [LBSyncOperator.loadAllStatuses] has run.
+     * [LBGenericSyncManager.lastSuccessfulSyncDate]. Unlike the status-derived [lastSuccessfulSync] it
+     * reads the store, so it holds before [LBSyncOperator.loadAllStatuses] has run and reports "never
+     * synchronized" as `null` rather than as epoch 0. Coerced to now, as
+     * [LBSyncProcessStatus.SyncSuccessfully.lastSuccessfulSync] is, so a clock-skewed future date never
+     * leaks.
      *
      * @return the oldest member date, or `null` when the group has no manager or at least one member has
      * never synchronized successfully — i.e. the group has never fully synchronized.
      */
     suspend fun lastSuccessfulSyncDate(): Instant? {
-        val dates: List<Instant?> = syncManagers.map { manager -> manager.lastSuccessfulSyncDate() }
-        return if (dates.isEmpty() || dates.any { date -> date == null }) {
-            null
-        } else {
-            dates.filterNotNull().min()
-        }
+        val dates: List<Instant> = syncManagers.map { manager -> manager.lastSuccessfulSyncDate() ?: return null }
+        return dates.minOrNull()?.let { oldest -> minOf(oldest, Clock.System.now()) }
     }
 }

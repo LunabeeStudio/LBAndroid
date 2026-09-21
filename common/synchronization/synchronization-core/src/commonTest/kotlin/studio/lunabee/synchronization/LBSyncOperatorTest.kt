@@ -110,6 +110,40 @@ class LBSyncOperatorTest {
     }
 
     @Test
+    fun a_queued_request_marks_its_targets_pending_before_it_gets_the_lock() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        register("blocking", LBSyncGroup(syncManagers = linkedSetOf(blocking)))
+        val queuedManager = FakeOperatorManager(store = store, scope = scope, syncKey = "queued", runOrder = order, runId = "queued")
+        val queuedGroup = LBSyncGroup(syncManagers = linkedSetOf(queuedManager))
+        register("queued", queuedGroup)
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val queuedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = queuedGroup) }
+        runCurrent()
+
+        assertEquals(
+            expected = LBSyncProcessStatus.PendingSync,
+            actual = queuedManager.currentSyncStatus,
+            "a request waiting for the lock already publishes PendingSync, so isActive covers it",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        assertTrue(queuedRun.await() is LBResult.Success, "the queued request succeeds")
+        assertTrue(queuedManager.currentSyncStatus is LBSyncProcessStatus.SyncSuccessfully, "the pipeline overwrites PendingSync")
+    }
+
+    @Test
     fun a_request_queued_behind_the_operator_pre_empts_the_pending_retry() = runOperatorTest { store, scope ->
         val order = mutableListOf<String>()
         val fetchGate = CompletableDeferred<Unit>()
