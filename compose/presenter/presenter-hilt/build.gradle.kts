@@ -14,18 +14,25 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.demo.presenter.timer
+plugins {
+    id("lunabee.android-compose-library-conventions")
+    id("lunabee.library-publish-conventions")
+}
 
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import studio.lunabee.compose.presenter.hilt.PresentScreen
+android {
+    resourcePrefix = "lbc_presenter_"
+    namespace = "studio.lunabee.compose.presenter.hilt"
+}
 
-data object TimerHiltDestination {
-    val route = TimerHiltDestination.javaClass.simpleName
+description = "Hilt integration for LBPresenter"
+version = AndroidConfig.LBCPRESENTER_HILT_VERSION
 
-    fun composable(navGraphBuilder: NavGraphBuilder, navScope: TimerNavScope) {
-        navGraphBuilder.composable(route) {
-            PresentScreen<TimerNavScope, TimerHiltPresenter>(navScope)
-        }
-    }
+dependencies {
+    implementation(platform(libs.composeBom))
+
+    api(libs.androidxHiltLifecycleViewmodelCompose)
+    api(libs.androidxLifecycleViewmodelCompose)
+    implementation(libs.composeUi)
+
+    api(projects.compose.presenter)
 }

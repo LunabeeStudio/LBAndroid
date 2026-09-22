@@ -31,9 +31,8 @@ import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class TimerHiltPresenter @Inject constructor(
-    injectedParam: TimerInjectedParam,
+    private val reducerFactory: TimerReducerFactory,
 ) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>(verbose = true) {
-    private val reducerFactory: TimerReducerFactory = TimerReducerFactory(injectedParam)
     private val currentTime = Clock.System.now()
 
     override fun createReducer(context: LBPresenterContext<TimerAction>): LBSingleReducer<TimerUiState, TimerNavScope, TimerAction> =

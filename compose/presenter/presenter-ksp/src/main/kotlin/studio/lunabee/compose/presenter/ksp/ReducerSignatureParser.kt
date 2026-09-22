@@ -26,6 +26,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.ksp.toAnnotationSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import studio.lunabee.compose.presenter.FactoryArg
@@ -142,11 +143,15 @@ class ReducerSignatureParser {
             return resolveNamedQualifier(
                 value = stringArgumentValue(),
                 type = classArgumentValue(argumentName = "type"),
+                annotationClassName = annotationDeclaration.toClassName(),
             )
         }
 
         return if (annotationDeclaration.isQualifierAnnotation()) {
-            DiQualifier.Typed(annotationDeclaration.toClassName())
+            DiQualifier.Typed(
+                annotationClassName = annotationDeclaration.toClassName(),
+                annotationSpec = toAnnotationSpec(),
+            )
         } else {
             null
         }
@@ -187,9 +192,10 @@ class ReducerSignatureParser {
 internal fun resolveNamedQualifier(
     value: String?,
     type: ClassName?,
+    annotationClassName: ClassName,
 ): DiQualifier {
     value?.takeIf { it.isNotEmpty() }?.let { qualifierName ->
-        return DiQualifier.Named(qualifierName)
+        return DiQualifier.Named(value = qualifierName, annotationClassName = annotationClassName)
     }
     type?.takeUnless { it == kotlinUnitClassName }?.let { qualifierType ->
         return DiQualifier.Typed(qualifierType)

@@ -43,6 +43,14 @@ interface GeneratedFactoryDecorator {
     fun classAnnotations(signature: ValidReducerSignature): List<AnnotationSpec>
 
     /**
+     * Annotations to add on the generated factory primary constructor for [signature].
+     *
+     * Returning a non-empty list forces the generator to emit a primary constructor even when the reducer declares no
+     * injected dependency, which constructor-injection frameworks such as Dagger/Hilt need to bind the factory.
+     */
+    fun constructorAnnotations(signature: ValidReducerSignature): List<AnnotationSpec> = emptyList()
+
+    /**
      * Annotations to add on the generated factory constructor [parameter].
      */
     fun parameterAnnotations(parameter: ValidatedReducerParameter): List<AnnotationSpec>
@@ -101,6 +109,8 @@ class ReducerFactoryFileGenerator(
         decorator?.classAnnotations(signature)?.forEach { annotation -> typeBuilder.addAnnotation(annotation) }
         signature.generatedVisibility.toKModifier()?.let { modifier -> typeBuilder.addModifiers(modifier) }
         val constructorBuilder = FunSpec.constructorBuilder()
+        val constructorAnnotations = decorator?.constructorAnnotations(signature).orEmpty()
+        constructorAnnotations.forEach { annotation -> constructorBuilder.addAnnotation(annotation) }
 
         signature.injectedParameters.forEach { parameter ->
             val parameterBuilder = ParameterSpec.builder(parameter.name, parameter.typeName)
@@ -113,7 +123,7 @@ class ReducerFactoryFileGenerator(
                     .build(),
             )
         }
-        if (signature.injectedParameters.isNotEmpty()) {
+        if (signature.injectedParameters.isNotEmpty() || constructorAnnotations.isNotEmpty()) {
             typeBuilder.primaryConstructor(constructorBuilder.build())
         }
 

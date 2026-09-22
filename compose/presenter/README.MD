@@ -72,6 +72,55 @@ The template already shows the expected presenter shape with:
 - `getInitialState`
 - `content`
 
+## Hilt integration
+
+If your project uses Hilt, `presenter-hilt` provides `PresentScreen` to resolve the presenter as a ViewModel (via
+`hiltViewModel()`) and invoke it with the screen navigation scope.
+
+For generated reducer factories, apply the `presenter-hilt-ksp` processor instead of `presenter-ksp` (it pulls
+`presenter-ksp` transitively). It generates the factory with a `@javax.inject.Inject` primary constructor, so Hilt binds
+it through constructor injection with no module to write and no KSP option to set. Qualifiers declared on injected
+reducer constructor parameters (`@Named`, or a custom `@Qualifier` annotation) are propagated onto the generated factory
+constructor parameters.
+
+A presenter is then a plain `@HiltViewModel` injecting the generated factory:
+
+```kotlin
+@HiltViewModel
+class TimerPresenter @Inject constructor(
+    private val reducerFactory: TimerReducerFactory,
+) : LBSinglePresenter<TimerUiState, TimerNavScope, TimerAction>() {
+    private val currentTime = Clock.System.now()
+
+    override fun createReducer(context: LBPresenterContext<TimerAction>): TimerReducer =
+        reducerFactory.create(context = context, currentTime = currentTime)
+}
+```
+
+When the reducer declares no `@FactoryArg`, the generated factory implements `LBSingleReducerFactory` and the presenter
+can extend `LBFactorySinglePresenter` instead:
+
+```kotlin
+@HiltViewModel
+class SimplePresenter @Inject constructor(
+    reducerFactory: SimpleReducerFactory,
+) : LBFactorySinglePresenter<SimpleUiState, SimpleNavScope, SimpleAction>(reducerFactory = reducerFactory)
+```
+
+KSP options:
+- `studio.lunabee.presenter.annotateFactory`: leave it unset. `presenter-hilt-ksp` takes factory generation over from
+  `presenter-ksp` by default; setting it to `false` generates the factories without the `@javax.inject.Inject`
+  constructor, so Hilt can no longer bind them without a hand-written `@Provides`. The option only accepts `true` or
+  `false`, any other value fails the compilation
+
+Prefer a single DI processor on the KSP classpath. When `presenter-koin-ksp` is also applied, the two must not own
+factory generation together:
+- `annotateFactory` unset: `presenter-hilt-ksp` owns generation and the factories carry `@Inject` only, so Koin has to
+  bind them through `generatedReducerFactoryModule` rather than `@ComponentScan`. The processor warns about it at
+  compile time. The `demo-compose` module runs that setup
+- `annotateFactory` set to `true`: both processors own generation, no processor can pick a winner and the compilation
+  fails. Drop one of the two processors from the KSP classpath, or leave the option unset
+
 ## Koin integration
 
 If your project uses Koin, `presenter-koin` provides `PresentScreen` to resolve the presenter as a ViewModel and invoke it with the screen navigation scope.

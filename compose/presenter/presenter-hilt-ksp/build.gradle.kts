@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package studio.lunabee.compose.demo.presenter.timer
+plugins {
+    kotlin("jvm")
+    id("lunabee.java-library-conventions")
+    id("lunabee.library-publish-conventions")
+}
 
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import studio.lunabee.compose.presenter.hilt.PresentScreen
+description = "Hilt KSP integration for LBPresenter"
+version = AndroidConfig.LBCPRESENTER_HILT_KSP_VERSION
 
-data object TimerHiltDestination {
-    val route = TimerHiltDestination.javaClass.simpleName
+dependencies {
+    api(projects.compose.presenterKsp)
 
-    fun composable(navGraphBuilder: NavGraphBuilder, navScope: TimerNavScope) {
-        navGraphBuilder.composable(route) {
-            PresentScreen<TimerNavScope, TimerHiltPresenter>(navScope)
-        }
-    }
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlinTest)
 }
