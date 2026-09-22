@@ -64,11 +64,11 @@ object AndroidConfig {
     const val LBCUIFIELD_FORM_VERSION: String = "0.9.0"
     const val LBCIMAGE_VERSION: String = "1.9.2"
     const val LBCGLANCE_VERSION: String = "1.6.0"
-    const val LBCPRESENTER_VERSION: String = "2.1.0"
+    const val LBCPRESENTER_VERSION: String = "2.1.0-rc01"
     const val LBCPRESENTER_ANNOTATIONS_VERSION: String = "2.0.0"
-    const val LBCPRESENTER_HILT_VERSION: String = "2.1.0"
-    const val LBCPRESENTER_KOIN_VERSION: String = "2.1.0"
-    const val LBCPRESENTER_KSP_VERSION: String = "2.0.0-rc05"
+    const val LBCPRESENTER_HILT_VERSION: String = "2.1.0-rc01"
+    const val LBCPRESENTER_KOIN_VERSION: String = "2.1.0-rc01"
+    const val LBCPRESENTER_KSP_VERSION: String = "2.1.0-rc01"
     const val LBCPRESENTER_KOIN_KSP_VERSION: String = LBCPRESENTER_KSP_VERSION
     const val LBCPRESENTER_HILT_KSP_VERSION: String = LBCPRESENTER_KSP_VERSION
     const val LBCNAVIGATION_VERSION: String = "1.1.0"

@@ -8,12 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 2026-09-16
 
 ```
-Lbcpresenter 2.1.0
-LbcpresenterHilt 2.1.0
-LbcpresenterKoin 2.1.0
-LbcpresenterHiltKsp 2.0.0-rc05
-LbcpresenterKsp 2.0.0-rc05
-LbcpresenterKoinKsp 2.0.0-rc05
+Lbcpresenter 2.1.0-rc01
+LbcpresenterHilt 2.1.0-rc01
+LbcpresenterKoin 2.1.0-rc01
+LbcpresenterHiltKsp 2.1.0-rc01
+LbcpresenterKsp 2.1.0-rc01
+LbcpresenterKoinKsp 2.1.0-rc01
 ```
 
 - Add `lbcpresenter-hilt` with the Hilt flavour of `PresentScreen`, resolving the presenter through `hiltViewModel()`, plus an
