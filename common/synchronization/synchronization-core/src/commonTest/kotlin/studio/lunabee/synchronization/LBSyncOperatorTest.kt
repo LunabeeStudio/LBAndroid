@@ -110,6 +110,117 @@ class LBSyncOperatorTest {
     }
 
     @Test
+    fun a_queued_request_marks_its_targets_pending_before_it_gets_the_lock() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        register("blocking", LBSyncGroup(syncManagers = linkedSetOf(blocking)))
+        val queuedManager = FakeOperatorManager(store = store, scope = scope, syncKey = "queued", runOrder = order, runId = "queued")
+        val queuedGroup = LBSyncGroup(syncManagers = linkedSetOf(queuedManager))
+        register("queued", queuedGroup)
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val queuedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = queuedGroup) }
+        runCurrent()
+
+        assertEquals(
+            expected = LBSyncProcessStatus.PendingSync,
+            actual = queuedManager.currentSyncStatus,
+            "a request waiting for the lock already publishes PendingSync, so isActive covers it",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        assertTrue(queuedRun.await() is LBResult.Success, "the queued request succeeds")
+        assertTrue(queuedManager.currentSyncStatus is LBSyncProcessStatus.SyncSuccessfully, "the pipeline overwrites PendingSync")
+    }
+
+    @Test
+    fun a_queued_request_leaves_a_running_target_alone() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val running = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "running",
+            runOrder = order,
+            runId = "running",
+            fetchGate = fetchGate,
+        )
+        val runningGroup = LBSyncGroup(syncManagers = linkedSetOf(running))
+        register("running", runningGroup)
+
+        val inFlight: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = runningGroup) }
+        runCurrent()
+        val statusWhileRunning = running.currentSyncStatus
+        val queuedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+
+        assertTrue(statusWhileRunning.isProcessing(), "the in-flight run is mid-pipeline")
+        assertEquals(
+            expected = statusWhileRunning,
+            actual = running.currentSyncStatus,
+            "a queued request does not reset a manager the in-flight run is processing",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(inFlight.await() is LBResult.Success, "the in-flight run succeeds")
+        assertTrue(queuedRun.await() is LBResult.Success, "the queued request succeeds")
+    }
+
+    @Test
+    fun a_cancelled_request_does_not_leave_its_targets_pending() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        val blockingGroup = LBSyncGroup(syncManagers = linkedSetOf(blocking))
+        register("blocking", blockingGroup)
+        val abandonedManager = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "abandoned",
+            runOrder = order,
+            runId = "abandoned",
+        )
+        val abandonedGroup = LBSyncGroup(syncManagers = linkedSetOf(abandonedManager))
+        register("abandoned", abandonedGroup)
+        val statusBefore = abandonedManager.currentSyncStatus
+
+        val blockingRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = blockingGroup) }
+        runCurrent()
+        val abandonedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = abandonedGroup) }
+        runCurrent()
+        assertEquals(expected = LBSyncProcessStatus.PendingSync, actual = abandonedManager.currentSyncStatus, "the request is queued")
+
+        abandonedRun.cancel()
+        runCurrent()
+
+        assertEquals(
+            expected = statusBefore,
+            actual = abandonedManager.currentSyncStatus,
+            "a cancelled caller restores the status it published, instead of latching PendingSync forever",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(blockingRun.await() is LBResult.Success, "the blocking run succeeds")
+    }
+
+    @Test
     fun a_request_queued_behind_the_operator_pre_empts_the_pending_retry() = runOperatorTest { store, scope ->
         val order = mutableListOf<String>()
         val fetchGate = CompletableDeferred<Unit>()
@@ -252,14 +363,14 @@ class LBSyncOperatorTest {
     fun groups_for_event_excludes_a_group_whose_delay_has_not_elapsed_and_includes_one_whose_delay_has() =
         runOperatorTest { store, scope ->
             val fresh = FakeOperatorManager(store = store, scope = scope, syncKey = "fresh")
-            fresh.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
+            store.saveSyncDates(syncKey = SyncKey("fresh"), serverDate = null, localDate = Clock.System.now())
             val freshGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(fresh),
                 refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
             )
 
             val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
-            stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
+            store.saveSyncDates(syncKey = SyncKey("stale"), serverDate = null, localDate = Instant.fromEpochMilliseconds(0L))
             val staleGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(stale),
                 refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
@@ -274,9 +385,45 @@ class LBSyncOperatorTest {
         }
 
     @Test
+    fun groups_for_event_reads_the_persisted_cursor_so_the_debounce_holds_before_statuses_are_loaded() =
+        runOperatorTest { store, scope ->
+            // Statuses stay NeverSync: this is a cold start, before loadAllStatuses() has run.
+            val synced = FakeOperatorManager(store = store, scope = scope, syncKey = "synced")
+            store.saveSyncDates(syncKey = SyncKey("synced"), serverDate = null, localDate = Clock.System.now())
+            register(
+                "synced",
+                LBSyncGroup(
+                    syncManagers = linkedSetOf(synced),
+                    refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
+                ),
+            )
+
+            val matched = LBSyncOperator.groupsForEvent(LBSyncRefreshEvent.AppForeground::class)
+
+            assertTrue(
+                matched.isEmpty(),
+                "the persisted cursor debounces the event even though the status is still NeverSync",
+            )
+        }
+
+    @Test
+    fun groups_for_event_matches_a_group_that_never_synchronized() = runOperatorTest { store, scope ->
+        val never = FakeOperatorManager(store = store, scope = scope, syncKey = "never")
+        val neverGroup = LBSyncGroup(
+            syncManagers = linkedSetOf(never),
+            refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
+        )
+        register("never", neverGroup)
+
+        val matched = LBSyncOperator.groupsForEvent(LBSyncRefreshEvent.AppForeground::class)
+
+        assertEquals(expected = listOf(neverGroup), actual = matched, "a group with no cursor always matches")
+    }
+
+    @Test
     fun groups_for_event_ignores_groups_carrying_a_different_event_type() = runOperatorTest { store, scope ->
         val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
-        stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
+        store.saveSyncDates(syncKey = SyncKey("stale"), serverDate = null, localDate = Instant.fromEpochMilliseconds(0L))
         val internetGroup = LBSyncGroup(
             syncManagers = linkedSetOf(stale),
             refreshEvents = listOf(LBSyncRefreshEvent.InternetIsBack(minimumDelay = 1.hours)),

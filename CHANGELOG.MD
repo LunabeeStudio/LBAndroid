@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-21
+
+```
+Synchronization Core 2.1.0-alpha02
+Synchronization Events 2.1.0-alpha02
+Synchronization Core-Datastore 2.1.0-alpha02
+Synchronization Core-Room 2.1.0-alpha02
+Synchronization Parse-Room 2.1.0-alpha02
+bom 4.16.0-alpha02
+```
+
+- Added `LBSyncProcessStatus.isActive()`: `PendingSync` on top of what `isProcessing()` covers, i.e. a run
+  queued behind the one the operator is currently running.
+- **Changed:** every `LBSyncOperator` sync request (`syncAllManagers`, `sync(group)`, `sync(manager)`,
+  `syncGroup(name)`) now marks its target managers `PendingSync` before queueing on the operator lock,
+  as the event-triggered path already did. A consumer observing statuses therefore sees
+  "Waiting for synchronization" during the queueing window instead of the previous terminal status. A
+  manager the run in progress is already processing keeps its status, and a cancelled caller (a
+  `withTimeout`, a cancelled scope) restores the status it published instead of leaving the manager
+  pending forever.
+- **Fixed:** the per-event refresh debounce (`LBSyncRefreshEvent.minimumDelay`) reads the persisted sync
+  cursor instead of the status-derived date. That date fell back to epoch 0 until
+  `LBSyncOperator.loadAllStatuses()` had run, so on every cold start the first `AppForeground` event
+  re-synchronized every group regardless of its configured delay. The internal
+  `LBSyncGroup.lastSuccessfulSync` is gone, replaced by `LBSyncGroup.lastSuccessfulSyncDate()`.
+- Added `LBSyncGroup.isActive()` and `LBSyncOperator.isActive()`, the `isActive()` counterparts of
+  `isSyncing()`. Await those to cover a sync request from the moment it is enqueued, since the operator
+  serializes requests and a queued group only leaves `PendingSync` when its turn comes.
+- Added `LBSyncOperator.statusByKey(groupNames)`, `LBSyncOperator.isSyncing(groupNames)` and
+  `LBSyncOperator.isActive(groupNames)`, which observe the groups registered under the given names
+  instead of the whole registry. Duplicate members are observed once; an unresolved name is logged and
+  skipped.
+- **Fixed:** the combined status flows of `LBSyncGroup` / `LBSyncOperator` no longer complete when the
+  registry snapshot is empty — they emit `emptyMap()` (`false` for the derived flows) once and then
+  suspend, so a `first { … }` on an empty registry waits instead of throwing `NoSuchElementException`.
+- Added `LBSyncGroup.lastSuccessfulSyncDate()`: the oldest member date read from the store and coerced to
+  now, or `null` when the group is empty or a member has never synchronized successfully.
+
 ## 2026-09-16
 
 ```

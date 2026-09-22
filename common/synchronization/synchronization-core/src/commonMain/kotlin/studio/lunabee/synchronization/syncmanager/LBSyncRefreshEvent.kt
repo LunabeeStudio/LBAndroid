@@ -29,8 +29,8 @@ import kotlin.time.Instant
  */
 sealed class LBSyncRefreshEvent(private val minimumDelay: Duration) {
 
-    internal fun isDelayElapsed(lastSuccessfulSync: Instant): Boolean =
-        lastSuccessfulSync + minimumDelay < Clock.System.now()
+    internal fun isDelayElapsed(lastSuccessfulSync: Instant?): Boolean =
+        lastSuccessfulSync == null || lastSuccessfulSync + minimumDelay < Clock.System.now()
 
     class AppForeground(minimumDelay: Duration = Duration.ZERO) : LBSyncRefreshEvent(minimumDelay)
 
