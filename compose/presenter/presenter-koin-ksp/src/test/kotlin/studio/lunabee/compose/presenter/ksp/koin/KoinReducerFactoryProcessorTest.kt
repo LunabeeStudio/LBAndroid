@@ -114,6 +114,15 @@ class KoinReducerFactoryProcessorTest {
             ),
         )
     }
+
+    @Test
+    fun own_factory_generation_only_when_the_option_is_enabled_test() {
+        val provider = KoinReducerFactoryProcessorProvider()
+
+        assertTrue(provider.ownsFactoryGeneration(annotateFactoryOption = true))
+        assertFalse(provider.ownsFactoryGeneration(annotateFactoryOption = null))
+        assertFalse(provider.ownsFactoryGeneration(annotateFactoryOption = false))
+    }
 }
 
 private data class FakePlatformInfo(
