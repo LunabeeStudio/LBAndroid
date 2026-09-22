@@ -18,13 +18,13 @@ package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -38,6 +38,7 @@ import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEvent
 import studio.lunabee.synchronization.syncmanager.LBSyncRefreshEventData
 import studio.lunabee.synchronization.syncmanager.defaultSyncScope
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
 
 /**
@@ -123,8 +124,10 @@ object LBSyncOperator {
      */
     suspend fun syncAllManagers(): LBResult<Unit> {
         reentrantCallFailure(target = "syncAllManagers()")?.let { return it }
-        groups.values.forEach { it.cancelPendingRetries() }
-        return syncMutex.withLock { runGroupsSequentially(groups.values) }
+        return pending(managers = syncManagers()) {
+            groups.values.forEach { it.cancelPendingRetries() }
+            syncMutex.withLock { runGroupsSequentially(groups.values) }
+        }
     }
 
     /**
@@ -139,8 +142,10 @@ object LBSyncOperator {
      */
     suspend fun sync(group: LBSyncGroup): LBResult<Unit> {
         reentrantCallFailure(target = "sync(group)")?.let { return it }
-        group.cancelPendingRetries()
-        return syncMutex.withLock { group.syncManagers() }
+        return pending(managers = group.syncManagers) {
+            group.cancelPendingRetries()
+            syncMutex.withLock { group.syncManagers() }
+        }
     }
 
     /**
@@ -155,8 +160,51 @@ object LBSyncOperator {
      */
     suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
         reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
-        manager.cancelPendingRetry()
-        return syncMutex.withLock { manager.synchronize() }
+        return pending(managers = listOf(manager)) {
+            manager.cancelPendingRetry()
+            syncMutex.withLock { manager.synchronize() }
+        }
+    }
+
+    /**
+     * Runs [request] with [LBSyncProcessStatus.PendingSync] published on the managers it targets, so
+     * [isActive] covers the request from the moment it is enqueued rather than from the moment its
+     * pipeline starts. The pipeline overwrites the status as soon as it runs.
+     *
+     * A manager the in-flight run is already processing keeps its status: the request is queued behind
+     * that run, and resetting a `DownloadStarted` to `PendingSync` would make [isSyncing] report an idle
+     * engine while a download is running.
+     *
+     * A cancelled caller (a `withTimeout`, a cancelled scope) would otherwise leave its targets pending
+     * forever — nothing else clears a status set outside the pipeline — so the previous status is
+     * restored on cancellation, unless the pipeline has already moved it on.
+     */
+    private suspend fun <T> pending(managers: Collection<LBGenericSyncManager>, request: suspend () -> T): T {
+        val previousStatuses = markPending(managers = managers)
+        try {
+            return request()
+        } catch (cancellation: CancellationException) {
+            previousStatuses.forEach { (manager, previous) ->
+                if (manager.currentSyncStatus == LBSyncProcessStatus.PendingSync) {
+                    manager.setStatusInternal(previous)
+                }
+            }
+            throw cancellation
+        }
+    }
+
+    /**
+     * Publishes [LBSyncProcessStatus.PendingSync] on [managers], skipping the ones the run in progress
+     * is already processing.
+     *
+     * @return the status each marked manager held, so a cancelled caller can put it back.
+     */
+    private fun markPending(managers: Collection<LBGenericSyncManager>): Map<LBGenericSyncManager, LBSyncProcessStatus> {
+        val marked: Map<LBGenericSyncManager, LBSyncProcessStatus> = managers
+            .filterNot { manager -> manager.currentSyncStatus.isProcessing() }
+            .associateWith { manager -> manager.currentSyncStatus }
+        marked.keys.forEach { manager -> manager.setStatusInternal(LBSyncProcessStatus.PendingSync) }
+        return marked
     }
 
     /**
@@ -217,10 +265,11 @@ object LBSyncOperator {
         }
     }
 
-    internal fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
+    internal suspend fun groupsForEvent(eventType: KClass<out LBSyncRefreshEvent>): List<LBSyncGroup> =
         groups.values.filter { group ->
+            val lastSuccessfulSync = group.lastSuccessfulSyncDate()
             group.refreshEvents.any { event ->
-                event::class == eventType && event.isDelayElapsed(group.lastSuccessfulSync)
+                event::class == eventType && event.isDelayElapsed(lastSuccessfulSync)
             }
         }
 
@@ -229,9 +278,9 @@ object LBSyncOperator {
     ) {
         if (shouldRefresh(data = data)) {
             val availableGroups = groupsForEvent(data.type)
-            availableGroups.flatMap { it.syncManagers }.forEach {
-                it.setStatusInternal(LBSyncProcessStatus.PendingSync)
-            }
+            // Marked before the launch, so a status observer sees the pending run at event time rather
+            // than one dispatch later. Nothing restores it: this run is detached, it outlives no caller.
+            markPending(managers = availableGroups.flatMap { it.syncManagers })
             defaultSyncScope.launch {
                 availableGroups.forEach { it.cancelPendingRetries() }
                 syncMutex.withLock { runGroupsSequentially(availableGroups) }
@@ -330,13 +379,54 @@ object LBSyncOperator {
      * syncKey collision: two managers sharing the same [LBGenericSyncManager.syncKey] collide in the map
      * (last one wins), so duplicate keys silently drop members from the combined view.
      *
-     * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once when no manager is
-     * registered (a `combine` over an empty set of flows would otherwise never emit).
+     * @return a flow of member statuses keyed by `syncKey`; emits [emptyMap] once, then nothing, when
+     * no manager is registered (a `combine` over an empty set of flows would otherwise never emit).
      */
-    fun statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>> = flow {
-        val managers = groups.values.flatMap { it.syncManagers }
+    fun statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>> = combineStatusByKey(snapshot = ::syncManagers)
+
+    /**
+     * [statusByKey] restricted to the groups registered under [groupNames], for a consumer that watches
+     * a part of the registry (e.g. the groups feeding one screen) instead of the whole app.
+     *
+     * A name with no registered group is logged and skipped — unlike [syncGroup], an observation cannot
+     * fail its caller — so a typo or a collection started before registration yields an empty view, and
+     * the flow then reports "nothing is syncing" for as long as it is collected. When no name resolves,
+     * the flow behaves as an empty registry: [emptyMap] once, then nothing.
+     *
+     * Registry snapshot: the group lookup AND the member sets are read once, when collection starts. A
+     * group registered under one of [groupNames] AFTER a collection has begun is NOT picked up by that
+     * already-running collection — re-collect this flow to observe it.
+     *
+     * @param groupNames the [groups] keys to observe. A manager reachable through several names is
+     * observed once.
+     * @return a flow of member statuses keyed by `syncKey`, spanning the resolved groups.
+     */
+    fun statusByKey(groupNames: Collection<String>): Flow<Map<SyncKey, LBSyncProcessStatus>> =
+        combineStatusByKey { resolve(groupNames = groupNames).flatMap { group -> group.syncManagers } }
+
+    private fun resolve(groupNames: Collection<String>): List<LBSyncGroup> {
+        val (known, unknown) = groupNames.distinct().partition { name -> groups.containsKey(name) }
+        if (unknown.isNotEmpty()) {
+            logger.e("No LBSyncGroup registered under ${unknown.joinToString { name -> "\"$name\"" }}, observing the rest")
+        }
+        return known.mapNotNull { name -> groups[name] }
+    }
+
+    /**
+     * Snapshots the managers to observe and combines their [LBGenericSyncManager.status].
+     *
+     * An empty snapshot emits [emptyMap] and then suspends instead of completing: a completing flow
+     * would make `first { … }` throw on the consumer side, while the non-empty branch (a `combine` over
+     * [kotlinx.coroutines.flow.StateFlow]s) never completes either.
+     *
+     * The snapshot is deduplicated: a manager reachable twice (a name repeated, two groups sharing a
+     * member) would otherwise be collected twice for a result the `toMap()` collapses anyway.
+     */
+    private fun combineStatusByKey(snapshot: () -> List<LBGenericSyncManager>): Flow<Map<SyncKey, LBSyncProcessStatus>> = flow {
+        val managers = snapshot().distinct()
         if (managers.isEmpty()) {
-            emitAll(flowOf(emptyMap()))
+            emit(emptyMap())
+            awaitCancellation()
         } else {
             emitAll(
                 combine(managers.map { manager -> manager.status.map { manager.syncKey to it } }) {
@@ -364,9 +454,51 @@ object LBSyncOperator {
      *
      * @return a flow of the app-wide aggregate syncing state.
      */
-    fun isSyncing(): Flow<Boolean> = statusByKey()
-        .map { statuses -> statuses.values.any { it.isProcessing() } }
-        .distinctUntilChanged()
+    fun isSyncing(): Flow<Boolean> = statusByKey().anyStatus(predicate = LBSyncProcessStatus::isProcessing)
+
+    /**
+     * [isSyncing] restricted to the groups registered under [groupNames], resolved as
+     * [statusByKey] resolves them.
+     *
+     * @param groupNames the [groups] keys to observe.
+     * @return a flow of the resolved groups' aggregate syncing state.
+     */
+    fun isSyncing(groupNames: Collection<String>): Flow<Boolean> =
+        statusByKey(groupNames = groupNames).anyStatus(predicate = LBSyncProcessStatus::isProcessing)
+
+    /**
+     * Derived from [statusByKey]: `true` while ANY managed manager status
+     * [LBSyncProcessStatus.isActive], and `false` once every manager is idle. Consecutive duplicate
+     * values are dropped via [distinctUntilChanged].
+     *
+     * Wider than [isSyncing] by [LBSyncProcessStatus.PendingSync]: every sync request marks its target
+     * managers pending before queueing on the operator, so a request waiting behind the run in progress
+     * is already active here and only turns [isSyncing] once it starts. Await this one to cover a
+     * request from the moment it is enqueued.
+     *
+     * What it does NOT cover: the two queues [studio.lunabee.synchronization.runner.SyncRunner] owns —
+     * the automatic retry of a failed run (parked for `retryTempo`) and a follow-up run collapsed into
+     * the one in progress — are invisible in the statuses, so the aggregate dips to `false` between the
+     * failure and its retry.
+     *
+     * Registry snapshot: the member set is read once, when collection starts. A manager (or group) added
+     * AFTER a collection has begun is NOT picked up by that already-running collection — re-collect this
+     * flow to observe a newly-registered manager.
+     *
+     * @return a flow of the app-wide aggregate activity state.
+     */
+    fun isActive(): Flow<Boolean> = statusByKey().anyStatus(predicate = LBSyncProcessStatus::isActive)
+
+    /**
+     * [isActive] restricted to the groups registered under [groupNames], resolved as [statusByKey]
+     * resolves them. This is the flow to await a sync request targeting a known set of groups: it covers
+     * the request from the moment it is enqueued until the last of those groups finishes.
+     *
+     * @param groupNames the [groups] keys to observe.
+     * @return a flow of the resolved groups' aggregate activity state.
+     */
+    fun isActive(groupNames: Collection<String>): Flow<Boolean> =
+        statusByKey(groupNames = groupNames).anyStatus(predicate = LBSyncProcessStatus::isActive)
 }
 
 private val logger: Logger = LBLogger.get("$LogTag ${LBSyncOperator::class.simpleName}")

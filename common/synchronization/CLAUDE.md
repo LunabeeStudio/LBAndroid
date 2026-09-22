@@ -160,7 +160,7 @@ Three layers, top to bottom:
   **operator runs groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
   single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
   evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
-  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).
+  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`), measured from the group's persisted cursor (`lastSuccessfulSyncDate()`), so it holds on a cold start before `loadAllStatuses()` has run.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine. Pipeline is
   download → upload (then re-download unless `supportChangeNotificationFromServer()`). The subclass SPI
   is **suspend + throw-based**: `fetchRequest(...)` returns a `FetchPage`, `pushObjectsToServer(...)`,
@@ -175,8 +175,19 @@ Three layers, top to bottom:
 Status & observation: `LBSyncProcessStatus` (sealed, immutable, `kotlin.time.Instant`-based) is exposed
 as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentSyncStatus` is a
 read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combined
-`statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and `isSyncing(): Flow<Boolean>` (snapshot of
-the registry at collection time; KDoc spells out the snapshot + `syncKey`-collision caveats). Multiple
+`statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>>`, `isSyncing(): Flow<Boolean>` (any member
+`isProcessing()`) and `isActive(): Flow<Boolean>` (`isSyncing()` + `PendingSync`, i.e. also the requests
+queued behind the run in progress — every operator entry point marks its targets `PendingSync` before
+taking the lock, skipping whatever the run in progress is already processing and restoring the previous
+status if the caller is cancelled, so this is the flow to await a request from the moment it is
+enqueued; it does not see the retry `SyncRunner` parks after a failure). All three are a snapshot of the registry at collection
+time; KDoc spells out the snapshot + `syncKey`-collision caveats, and an empty snapshot emits
+`emptyMap()`/`false` once and then suspends rather than completing. On the operator the three come with
+a `(groupNames: Collection<String>)` overload restricted to the groups registered under those names
+(deduplicated; unresolved names are logged and skipped, unlike `syncGroup`, which fails). `LBSyncGroup`
+also exposes `suspend lastSuccessfulSyncDate(): Instant?` — the oldest member date read from the store
+(coerced to now), `null` when the group is empty or a member never synced; distinct from the
+status-derived `internal lastSuccessfulSync`, which falls back to epoch 0. Multiple
 failures aggregate into `LBSyncAggregateException`. App foreground/background is observed by
 `:synchronization-events`' `LBAppForegroundEventListener` (no custom `Application` needed).
 
