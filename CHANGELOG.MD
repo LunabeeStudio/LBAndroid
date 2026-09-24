@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-24
+
+```
+LbcpresenterHilt 2.1.0-rc02
+```
+
+- **Fixed:** every `PresentScreen` overload renders nothing once the composition's `LocalLifecycleOwner` is destroyed. A
+  navigation-compose `NavHost` can still recompose a `NavBackStackEntry` that has just been destroyed while it leaves the
+  composition, and resolving the presenter then threw `IllegalStateException: You cannot access the NavBackStackEntry's
+  ViewModels after the NavBackStackEntry is destroyed.`
+- `lbcpresenter-hilt` now exposes `lifecycle-runtime-compose` as an `api` dependency, since the inlined `PresentScreen`
+  reads `LocalLifecycleOwner` in the consumer's code
+
 ## 2026-09-21
 
 ```
