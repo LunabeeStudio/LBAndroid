@@ -31,6 +31,7 @@ dependencies {
     implementation(platform(libs.composeBom))
 
     api(libs.androidxHiltLifecycleViewmodelCompose)
+    api(libs.androidxLifecycleRuntimeCompose)
     api(libs.androidxLifecycleViewmodelCompose)
     implementation(libs.composeUi)
 
