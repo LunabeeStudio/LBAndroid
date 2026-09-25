@@ -19,6 +19,8 @@ bom 4.16.0-alpha03
 
 - Added `FetchPage.maxUpdatedAt`: a page-level `updatedAt` folded into the incremental cursor together with the
   per-object dates, for pages holding records left out of `objects` that must still move the cursor.
+- Added `LBSyncManager.uploadBeforeDownload()`: `true` runs upload → download, so an upload failure fails the run
+  before anything is downloaded. Defaults to `false` (download → upload → re-download, unchanged).
 
 ## 2026-09-24
 

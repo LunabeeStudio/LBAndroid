@@ -204,6 +204,17 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     protected open fun supportIncrementalSync(): Boolean = false
 
     /**
+     * Whether a run uploads the local changes before downloading, instead of the default download → upload →
+     * re-download. When `true`, a run is upload → download: an upload failure fails the run before anything is
+     * downloaded, and a single download follows a successful upload (so [supportChangeNotificationFromServer]
+     * no longer decides a re-download).
+     *
+     * Defaults to `false`.
+     */
+    @SyncEngineCallback
+    protected open fun uploadBeforeDownload(): Boolean = false
+
+    /**
      * Whether the server pushes change notifications to this client (e.g. Parse LiveQuery), so the
      * engine can trust the server instead of polling.
      *
@@ -306,10 +317,15 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     private suspend fun runPipeline(): LBResult<Unit> {
         return try {
-            download()
-            val uploaded = upload()
-            if (uploaded && !supportChangeNotificationFromServer()) {
+            if (uploadBeforeDownload()) {
+                upload()
                 download()
+            } else {
+                download()
+                val uploaded = upload()
+                if (uploaded && !supportChangeNotificationFromServer()) {
+                    download()
+                }
             }
             setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
             LBResult.Success(Unit)
