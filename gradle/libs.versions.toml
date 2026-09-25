@@ -77,7 +77,7 @@ parse = "4.4.0"
 parseLiveQuery = "1.2.2"
 robolectric = "4.17"
 touchlabKermit = "2.2.0"
-touchlabSkie = "0.10.14"
+touchlabSkie = "0.10.15"
 zoomable = "2.14.0"
 
 [libraries]
