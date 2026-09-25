@@ -566,6 +566,128 @@ class LBSyncOperatorTest {
 
     // endregion
 
+    // region join and lock
+
+    @Test
+    fun concurrent_sync_or_join_requests_of_a_group_share_one_run() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeOperatorManager(
+                    store = store,
+                    scope = scope,
+                    syncKey = "joined",
+                    runOrder = order,
+                    runId = "joined",
+                    fetchGate = fetchGate,
+                ),
+            ),
+        )
+
+        val first: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncOrJoin(group = group) }
+        runCurrent()
+        val joined: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncOrJoin(group = group) }
+        runCurrent()
+        fetchGate.complete(Unit)
+
+        assertTrue(first.await() is LBResult.Success, "the first request succeeds")
+        assertTrue(joined.await() is LBResult.Success, "the joining request receives the same success")
+        assertEquals(expected = listOf("joined"), actual = order, "the joining request started no run of its own")
+    }
+
+    @Test
+    fun a_sync_or_join_request_after_the_run_ended_runs_again() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val group = group(store, scope, "again", order = order, id = "again")
+
+        LBSyncOperator.syncOrJoin(group = group)
+        LBSyncOperator.syncOrJoin(group = group)
+
+        assertEquals(
+            expected = listOf("again", "again"),
+            actual = order,
+            "a request made once the run ended starts a new one",
+        )
+    }
+
+    @Test
+    fun with_sync_lock_waits_for_the_sync_in_progress() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        register(
+            "grouped",
+            LBSyncGroup(
+                syncManagers = linkedSetOf(
+                    FakeOperatorManager(
+                        store = store,
+                        scope = scope,
+                        syncKey = "grouped",
+                        runOrder = order,
+                        runId = "grouped",
+                        fetchGate = fetchGate,
+                    ),
+                ),
+            ),
+        )
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val locked: Deferred<Unit> = async { LBSyncOperator.withSyncLock { order += "locked" } }
+        runCurrent()
+        assertEquals(expected = listOf("grouped"), actual = order, "the block waits for the run in progress")
+
+        fetchGate.complete(Unit)
+        fullRun.await()
+        locked.await()
+
+        assertEquals(expected = listOf("grouped", "locked"), actual = order, "the block ran once the run had ended")
+    }
+
+    @Test
+    fun a_sync_requested_while_the_lock_is_held_runs_after_the_block() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val lockGate = CompletableDeferred<Unit>()
+        val group = group(store, scope, "queued", order = order, id = "queued")
+
+        val locked: Deferred<Unit> = async {
+            LBSyncOperator.withSyncLock {
+                order += "lock start"
+                lockGate.await()
+                order += "lock end"
+            }
+        }
+        runCurrent()
+        val queued: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = group) }
+        runCurrent()
+        lockGate.complete(Unit)
+        locked.await()
+        queued.await()
+
+        assertEquals(
+            expected = listOf("lock start", "lock end", "queued"),
+            actual = order,
+            "the sync waited for the block",
+        )
+    }
+
+    @Test
+    fun with_sync_lock_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        var refusal: Throwable? = null
+        val manager = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "reentrant",
+            duringFetch = { refusal = runCatching { LBSyncOperator.withSyncLock { } }.exceptionOrNull() },
+        )
+
+        LBSyncOperator.sync(manager = manager)
+
+        assertTrue(refusal is LBSyncReentrantCallException, "the nested lock request is refused instead of deadlocking")
+    }
+
+    // endregion
+
     // region test infrastructure
 
     private fun register(key: String, group: LBSyncGroup) {

@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.runner.SingleFlight
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
@@ -84,6 +85,9 @@ object LBSyncOperator {
      * [sync]), never while starting/stopping the server-notification listeners.
      */
     private val syncMutex: Mutex = Mutex()
+
+    /** Joins the concurrent [syncOrJoin] requests of a group onto the one already in flight. */
+    private val joinableGroupRequests: SingleFlight<LBSyncGroup> = SingleFlight()
 
     /**
      * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
@@ -146,6 +150,45 @@ object LBSyncOperator {
             group.cancelPendingRetries()
             syncMutex.withLock { group.syncManagers() }
         }
+    }
+
+    /**
+     * Synchronize [group] as [sync] does, unless a [syncOrJoin] request for the same group is already queued or
+     * running: the caller then awaits that request and receives its result instead of queueing another run.
+     *
+     * Use it for triggers that only need "a sync that has not ended yet" (a periodic tick, a pull-to-refresh, a
+     * sync after a local write), so a burst of requests costs one run instead of one run each. A request that
+     * joins does not re-read anything: a local change made after the joined run has read its uploads waits for
+     * the next request. Only [syncOrJoin] requests are joined; a [sync] or [syncAllManagers] request in flight is
+     * queued behind as usual.
+     *
+     * @param group the group to synchronize. It does not have to be registered in [groups].
+     * @return the combined synchronization result of the run this caller started or joined.
+     */
+    suspend fun syncOrJoin(group: LBSyncGroup): LBResult<Unit> {
+        reentrantCallFailure(target = "syncOrJoin(group)")?.let { return it }
+        return joinableGroupRequests.run(key = group) { sync(group = group) }
+    }
+
+    /**
+     * Runs [block] while holding the operator sync lock: it starts once the sync in progress, if any, has
+     * ended, and every sync request made meanwhile queues until it returns. Use it for work that must not
+     * interleave with a run, such as clearing the synchronized data at logout.
+     *
+     * Automatic retries escape the lock (see the class documentation): set [LBGenericSyncManager.retryTempo] to
+     * `null` on the managers whose retry must not overlap [block].
+     *
+     * @param block the work to run under the lock. It must not request a sync itself, which would wait for the
+     * lock it holds.
+     * @return the value returned by [block].
+     * @throws LBSyncReentrantCallException when called from inside a sync manager callback, whose run already
+     * holds the lock.
+     */
+    suspend fun <T> withSyncLock(block: suspend () -> T): T {
+        if (currentCoroutineContext()[SyncEngineMarker] != null) {
+            throw LBSyncReentrantCallException(target = "withSyncLock(block)")
+        }
+        return syncMutex.withLock { block() }
     }
 
     /**

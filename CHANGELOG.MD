@@ -21,6 +21,10 @@ bom 4.16.0-alpha03
   per-object dates, for pages holding records left out of `objects` that must still move the cursor.
 - Added `LBSyncManager.uploadBeforeDownload()`: `true` runs upload → download, so an upload failure fails the run
   before anything is downloaded. Defaults to `false` (download → upload → re-download, unchanged).
+- Added `LBSyncOperator.syncOrJoin(group)`: synchronizes a group, or joins the `syncOrJoin` request already in flight
+  for that group and receives its result, instead of queueing another run.
+- Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
+  and before any sync requested meanwhile (e.g. to clear the synchronized data at logout).
 
 ## 2026-09-24
 
