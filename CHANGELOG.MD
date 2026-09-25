@@ -27,6 +27,9 @@ bom 4.16.0-alpha03
   and before any sync requested meanwhile (e.g. to clear the synchronized data at logout).
 - `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
   over their own `DataStore<Preferences>`.
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic `LBRemotePullSyncManager` and
+  `LBRemoteSyncManager` over a remote data source (paged pull since a cursor, find by id then create or update)
+  and a local data source (whole-download write, conditional mark-pushed), with no Ktor, Parse or Room dependency.
 
 ## 2026-09-24
 
