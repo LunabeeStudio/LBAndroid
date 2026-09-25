@@ -16,6 +16,8 @@
 
 package studio.lunabee.synchronization.syncmanager
 
+import kotlin.time.Instant
+
 /**
  * One page of server objects returned by [LBSyncManager.fetchRequest].
  *
@@ -27,9 +29,13 @@ package studio.lunabee.synchronization.syncmanager
  * @property pageInfo optional pagination metadata consumed by `hasNextPage(pageInfo)`; `null` falls back
  * to the object-count heuristic against `queryPageSize()`.
  * @property nextCursor optional opaque cursor forwarded to the next [LBSyncManager.fetchRequest] call.
+ * @property maxUpdatedAt optional newest server `updatedAt` of the page, folded into the incremental cursor
+ * together with [LBSyncManager]'s per-object `updatedAt`. Set it when the page read from the server holds
+ * records left out of [objects] (e.g. filtered out for lacking a usable id) that must still move the cursor.
  */
 data class FetchPage<ServerData, PageInfo>(
     val objects: List<ServerData>,
     val pageInfo: PageInfo? = null,
     val nextCursor: String? = null,
+    val maxUpdatedAt: Instant? = null,
 )

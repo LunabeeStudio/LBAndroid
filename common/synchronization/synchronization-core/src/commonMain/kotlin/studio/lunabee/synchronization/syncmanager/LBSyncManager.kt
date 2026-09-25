@@ -378,7 +378,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
                 val fetchPage = fetchRequest(page = page, cursor = cursor, sinceLastDate = lastUpdatedDate)
                 val objects = fetchPage.objects
 
-                progress = progress.advance(objects.mapNotNull(::updatedAt))
+                progress = progress.advance(objects.mapNotNull(::updatedAt) + listOfNotNull(fetchPage.maxUpdatedAt))
 
                 updateData(objects)
                 val hasNext = hasNextPage(objects.size, fetchPage.pageInfo)

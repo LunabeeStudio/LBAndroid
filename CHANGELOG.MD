@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-25
+
+```
+Synchronization Core 2.1.0-alpha03
+Synchronization Events 2.1.0-alpha03
+Synchronization Core-Datastore 2.1.0-alpha03
+Synchronization Core-Room 2.1.0-alpha03
+Synchronization Parse-Room 2.1.0-alpha03
+Synchronization Remote 2.1.0-alpha03
+bom 4.16.0-alpha03
+```
+
+- Added `FetchPage.maxUpdatedAt`: a page-level `updatedAt` folded into the incremental cursor together with the
+  per-object dates, for pages holding records left out of `objects` that must still move the cursor.
+
 ## 2026-09-24
 
 ```
