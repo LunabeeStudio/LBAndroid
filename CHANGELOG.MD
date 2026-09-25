@@ -25,6 +25,8 @@ bom 4.16.0-alpha03
   for that group and receives its result, instead of queueing another run.
 - Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
   and before any sync requested meanwhile (e.g. to clear the synchronized data at logout).
+- `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
+  over their own `DataStore<Preferences>`.
 
 ## 2026-09-24
 
