@@ -22,7 +22,8 @@ Ktor, Parse or Room dependency.
   `update(serverId, obj)` or `create(obj)`.
 - `LBRemotePage<T>` — the page objects, the `nextCursor` of the following page (`null` on the last page), and a
   page-level `maxUpdatedAt` that also counts the records left out of `objects` (they still move the cursor, through
-  `FetchPage.maxUpdatedAt`).
+  `FetchPage.maxUpdatedAt`). `maxUpdatedAt` is the only source of the cursor, so a page holding objects must set it
+  (the constructor throws otherwise).
 - `LBPullLocalDataSource<T>` / `LBSyncLocalDataSource<T>` — the local store: `savePulled` (a whole download in one
   call, leaving out the objects still to upload), `clear`, and for two-way managers `objectsToPush` and
   `markPushed` (conditional: a change made during the upload stays to upload).

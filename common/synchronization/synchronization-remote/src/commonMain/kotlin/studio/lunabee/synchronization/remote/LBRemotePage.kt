@@ -25,9 +25,11 @@ import kotlin.time.Instant
  * @property objects the page objects, mapped to the local model. Records the backend returned but that cannot be
  * stored (e.g. without a usable id) are left out.
  * @property maxUpdatedAt newest `updatedAt` among every record the backend returned for the page, the left-out ones
- * included, so they still move the incremental cursor. `null` when the page is empty.
+ * included, so they still move the incremental cursor. Required when [objects] is not empty, `null` when the page is
+ * empty.
  * @property nextCursor the keyset position of the last record the backend returned for the page, passed to
  * [LBPullRemoteDataSource.fetchPage] to read the next page, or `null` when no further page holds objects.
+ * @throws IllegalArgumentException when [objects] is not empty and [maxUpdatedAt] is `null`.
  */
 data class LBRemotePage<T>(
     val objects: List<T>,
@@ -36,4 +38,10 @@ data class LBRemotePage<T>(
 ) {
     /** `true` when a further page holds objects, i.e. [nextCursor] is set. */
     val hasNextPage: Boolean get() = nextCursor != null
+
+    init {
+        require(objects.isEmpty() || maxUpdatedAt != null) {
+            "A page holding objects must set maxUpdatedAt: it is the only source of the incremental cursor"
+        }
+    }
 }
