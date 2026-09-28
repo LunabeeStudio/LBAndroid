@@ -43,6 +43,24 @@ LBSyncOperator.sync(group = myGroup)          // one group, its managers per its
 LBSyncOperator.syncGroup(name = "main")       // same, by registration key
 LBSyncOperator.sync(manager = myManager)      // one manager
 LBSyncOperator.sync<UserSyncManager>()        // same, by type — first registered manager of that type
+LBSyncOperator.syncOrJoin(group = myGroup)    // one group, or join the syncOrJoin request of that group in flight
+```
+
+`syncOrJoin(group)` serves a burst of requests with one run: a `syncOrJoin` for a group whose `syncOrJoin`
+request is still queued or running awaits that request and receives its `LBResult` instead of queueing another
+run. A joiner re-reads nothing, so a local change made after the joined run read its uploads waits for the next
+request. If the caller that started the request is cancelled, one of its joiners runs the group itself.
+
+`withSyncLock(block)` runs non-sync work (clearing the synchronized data at logout, for instance) under the
+operator lock: it starts once the sync in progress has ended, and every request made meanwhile queues behind it.
+A sync requested from inside `block` fails with `LBSyncReentrantCallException` instead of waiting for the lock
+`block` holds, and automatic retries still escape the lock (set `retryTempo = null` where that matters).
+
+```kotlin
+LBSyncOperator.withSyncLock {
+    logoutFromServer()
+    LBSyncOperator.resetAllData()
+}
 ```
 
 `syncGroup(name)` and `sync<T>()` return an `LBResult.Failure` carrying an `IllegalArgumentException` when
@@ -63,7 +81,9 @@ from **inside** a manager's own SPI, which deadlocks on the operator lock — ne
 
 One `suspend` entry point, `internal synchronize(): LBResult<Unit>`, reached through
 `LBSyncOperator.sync(manager)`. The pipeline downloads every page, uploads
-pending local objects, then re-downloads (unless the server pushes change notifications). Status is
+pending local objects, then re-downloads (unless the server pushes change notifications). A manager
+overriding `uploadBeforeDownload()` to `true` uploads first, then downloads once, so an upload failure fails the
+run before anything is downloaded. Status is
 exposed as `status: StateFlow<LBSyncProcessStatus>`; only the engine mutates it.
 
 ```mermaid
@@ -78,6 +98,10 @@ sequenceDiagram
     M->>R: run { runPipeline() }
     activate R
     Note over R: launched in the injected scope,<br/>detached from the caller
+
+    opt uploadBeforeDownload()
+        M->>M: upload() first, then a single download(), skipping the steps below
+    end
 
     rect rgb(235, 244, 255)
         Note over M,Store: download()

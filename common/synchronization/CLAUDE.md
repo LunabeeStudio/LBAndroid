@@ -8,7 +8,7 @@ modules.
 |---|---|---|---|---|---|
 | `:synchronization-core` | `synchronization-core/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_CORE_VERSION` | yes — flow/sequence diagrams; sharp edges documented below |
 | `:synchronization-events` | `synchronization-events/` | KMP android-library (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.events` | `SYNCHRONIZATION_EVENTS_VERSION` | no — documented below |
-| `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
+| `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`, plus a JVM target) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
 | `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
 | `:synchronization-remote` | `synchronization-remote/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_REMOTE_VERSION` | yes — backend-agnostic remote↔local managers |
@@ -83,9 +83,17 @@ server-notification listeners (`handleEventData`), and `triggerRefresh` takes it
 group loop.
 
 Two operator entry points build on the lock: `syncOrJoin(group)` joins the `syncOrJoin` request already in
-flight for the same group (internal `runner/SingleFlight`) instead of queueing a second run, and
-`withSyncLock(block)` runs non-sync work (e.g. a logout clear) under the lock, refused from inside a manager
-callback like the sync entry points.
+flight for the same group (internal `runner/SingleFlight`) instead of queueing a second run; when the caller
+that started the request is cancelled, one of its joiners runs the group itself. `withSyncLock(block)` runs
+non-sync work (e.g. a logout clear) under the lock and inside a `SyncEngineMarker`, so a sync requested from
+inside the block is refused with `LBSyncReentrantCallException` instead of deadlocking, and a `withSyncLock`
+called from a manager callback or another block throws one.
+
+A caller cancelled while it holds the lock does not release it at once: the pipelines are detached from their
+callers (`SyncRunner` launches them in the manager scope), so the operator's `withRunLock` catches the
+cancellation and waits, `NonCancellable`, for the targeted managers' runs to end (`LBSyncManager.awaitRunEnd()`
+→ `SyncRunner.awaitIdle()`) before rethrowing. Otherwise a `withSyncLock` block (a logout clear) could start
+while the cancelled run still writes.
 
 Two paths deliberately escape the lock:
 - **automatic retry** — `SyncRunner` re-runs the pipeline block directly, detached. It cannot take the
@@ -98,8 +106,9 @@ Two paths deliberately escape the lock:
   collapses onto a follow-up behind it. A retry scheduled *after* the enqueue (a run failing while the
   request waits) is still pre-empted by `run()` itself.
 - **re-entrancy** — the `Mutex` is not reentrant, so calling an operator sync API from inside a manager's
-  SPI (`fetchRequest`, `pushObjectsToServer`, …) would deadlock. It is **refused instead**: the engine runs
-  `runPipeline()` under a `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
+  SPI (`fetchRequest`, `pushObjectsToServer`, …) or from a `withSyncLock` block would deadlock. It is **refused
+  instead**: the engine runs `runPipeline()`, and the operator every `withSyncLock` block, under a
+  `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
   every lock-taking operator entry point checks `currentCoroutineContext()[SyncEngineMarker]` first,
   returning `Failure(LBSyncReentrantCallException)` — before `cancelPendingRetr*`, so a refused request
   leaves the in-flight run untouched. Context inheritance draws the line: the callback's own
@@ -266,7 +275,7 @@ update the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in th
 `CHANGELOG.MD`; bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference
 modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`.
+`projects.synchronizationParseRoom`, `projects.synchronizationRemote`.
 
 ## Build & verify
 
@@ -275,8 +284,9 @@ Standard repo flow (see root `AGENTS.MD`). Quick reference:
 ```bash
 ./gradlew :synchronization-core:assemble :synchronization-events:assemble \
   :synchronization-core-datastore:assemble :synchronization-core-room:assemble \
-  :synchronization-parse-room:assemble
+  :synchronization-parse-room:assemble :synchronization-remote:assemble
 ./gradlew :synchronization-core:jvmTest                       # engine tests (commonTest) on the JVM target
+./gradlew :synchronization-remote:jvmTest                     # remote managers over in-memory fakes (commonTest)
 ./gradlew :synchronization-core-datastore:testAndroidHostTest # DataStore round-trip tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed
 ```
