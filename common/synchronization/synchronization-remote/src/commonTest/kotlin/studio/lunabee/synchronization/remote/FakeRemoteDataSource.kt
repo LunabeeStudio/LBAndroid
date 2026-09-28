@@ -20,29 +20,33 @@ import kotlin.time.Instant
 
 internal data class Item(val id: String, val value: Int = 0)
 
-internal data class FetchCall(val page: Int, val updatedAfter: Instant?)
+internal data class FetchCall(val cursor: String?, val updatedAfter: Instant?)
 
 /**
- * In-memory backend serving [pages] in order and recording every call in [calls].
+ * In-memory backend serving [pages] in order, each page after the one whose [LBRemotePage.nextCursor] is asked for,
+ * and recording every call in [calls].
  *
  * @param serverIds backend id of each item the backend already holds, by item id.
- * @param failingPage page whose fetch throws.
+ * @param failingCursor cursor whose fetch throws.
  * @param failingPushId item whose create or update throws.
  */
 internal class FakeRemoteDataSource(
-    private val pages: List<LBRemotePage<Item>> = listOf(LBRemotePage(objects = emptyList(), maxUpdatedAt = null, isLastPage = true)),
+    private val pages: List<LBRemotePage<Item>> = listOf(LBRemotePage(objects = emptyList(), maxUpdatedAt = null, nextCursor = null)),
     private val serverIds: Map<String, String> = emptyMap(),
-    private val failingPage: Int? = null,
+    private val failingCursor: String? = null,
     private val failingPushId: String? = null,
 ) : LBSyncRemoteDataSource<Item> {
     val calls: MutableList<String> = mutableListOf()
     val fetchCalls: MutableList<FetchCall> = mutableListOf()
 
-    override suspend fun fetchPage(page: Int, updatedAfter: Instant?): LBRemotePage<Item> {
-        calls += "fetch $page"
-        fetchCalls += FetchCall(page = page, updatedAfter = updatedAfter)
-        if (page == failingPage) throw RemoteException(message = "fetch $page")
-        return pages[page]
+    override suspend fun fetchPage(cursor: String?, updatedAfter: Instant?): LBRemotePage<Item> {
+        calls += "fetch"
+        fetchCalls += FetchCall(cursor = cursor, updatedAfter = updatedAfter)
+        if (cursor != null && cursor == failingCursor) throw RemoteException(message = "fetch $cursor")
+        if (cursor == null) return pages.first()
+        val previous = pages.indexOfFirst { page -> page.nextCursor == cursor }
+        if (previous == -1) error("unknown cursor $cursor")
+        return pages[previous + 1]
     }
 
     override suspend fun findServerId(obj: Item): String? {

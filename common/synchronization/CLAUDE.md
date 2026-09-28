@@ -31,8 +31,8 @@ BaseDao `@Upsert` trick, why no KSP lives there, the `api`-vs-`implementation` l
 duplicate it here — read it before touching that module.
 
 `:synchronization-remote` is the backend-agnostic counterpart (commonMain only, no Ktor/Parse/Room): the consumer
-implements a remote data source (paged pull since a cursor, find-by-id then create or update) and a local data source
-(whole-download write, conditional mark-pushed), and gets `LBRemotePullSyncManager` / `LBRemoteSyncManager`. Its
+implements a remote data source (keyset-paged pull since a cursor, find-by-id then create or update) and a local data
+source (whole-download write, conditional mark-pushed), and gets `LBRemotePullSyncManager` / `LBRemoteSyncManager`. Its
 `README.md` documents the contract.
 
 Both modules were **moved from `LunabeeStudio/Libraries_Android`** (commits 17d6452, d165c26), so the

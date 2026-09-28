@@ -24,14 +24,18 @@ import kotlin.time.Instant
  */
 interface LBPullRemoteDataSource<T> {
     /**
-     * Reads one page of the objects updated after [updatedAfter].
+     * Reads one page of the objects updated after [updatedAfter], starting right after [cursor].
      *
-     * Pages must be ordered by ascending `updatedAt`, with a stable tie-breaker so that records sharing a date never
-     * move between pages, and the filter must be strict (`updatedAt > updatedAfter`).
+     * Pages must be ordered by ascending `updatedAt`, with a stable tie-breaker (e.g. the record id) so that records
+     * sharing a date never move between pages, and the filter must be strict (`updatedAt > updatedAfter`).
      *
-     * @param page the page index, starting at 0.
+     * [cursor] must be a keyset position, not an offset: the page resumes after the last record read (e.g.
+     * `(updatedAt, id) > (lastUpdatedAt, lastId)`). An offset skips a record whenever another one is updated during
+     * the download, since the update moves it behind the offset.
+     *
+     * @param cursor `null` for the first page, otherwise the [LBRemotePage.nextCursor] of the previous page.
      * @param updatedAfter the incremental cursor, or `null` to read every object.
      * @return the page, mapped to the local model.
      */
-    suspend fun fetchPage(page: Int, updatedAfter: Instant?): LBRemotePage<T>
+    suspend fun fetchPage(cursor: String?, updatedAfter: Instant?): LBRemotePage<T>
 }

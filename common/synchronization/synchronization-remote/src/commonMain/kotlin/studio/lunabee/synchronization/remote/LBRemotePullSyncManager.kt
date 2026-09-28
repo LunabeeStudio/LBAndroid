@@ -25,11 +25,12 @@ import kotlin.time.Instant
  * Download-only [LBSyncManager] mapping a remote backend, reached through [remoteDataSource], onto a local store,
  * reached through [localDataSource]. Neither side is tied to a backend or a database.
  *
- * A download reads every page from the incremental cursor, then hands all of them to
- * [LBPullLocalDataSource.savePulled] in a single call: the store sees the whole download at once (e.g. to dedupe
- * across pages), and a failure while paging writes nothing. The cursor then moves to the newest `updatedAt` read,
- * page-level [LBRemotePage.maxUpdatedAt] included, and stays put when nothing came back. Incremental checkpoints
- * while paging are therefore not supported: they would save a cursor before its objects are written.
+ * A download reads every page from the incremental cursor, each one from the keyset [LBRemotePage.nextCursor] of the
+ * previous one, then hands all of them to [LBPullLocalDataSource.savePulled] in a single call: the store sees the
+ * whole download at once (e.g. to dedupe across pages), and a failure while paging writes nothing. The cursor then
+ * moves to the newest `updatedAt` read, page-level [LBRemotePage.maxUpdatedAt] included, and stays put when nothing
+ * came back. Incremental checkpoints while paging are therefore not supported: they would save a cursor before its
+ * objects are written.
  *
  * Like every manager, it is run through [studio.lunabee.synchronization.LBSyncOperator], one run at a time.
  *
@@ -52,9 +53,14 @@ open class LBRemotePullSyncManager<T>(
 
     final override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> {
         if (page == 0) pulledObjects.clear()
-        val remotePage = remoteDataSource.fetchPage(page = page, updatedAfter = sinceLastDate)
-        isLastPageFetched = remotePage.isLastPage
-        return FetchPage(objects = remotePage.objects, pageInfo = remotePage, maxUpdatedAt = remotePage.maxUpdatedAt)
+        val remotePage = remoteDataSource.fetchPage(cursor = cursor, updatedAfter = sinceLastDate)
+        isLastPageFetched = !remotePage.hasNextPage
+        return FetchPage(
+            objects = remotePage.objects,
+            pageInfo = remotePage,
+            nextCursor = remotePage.nextCursor,
+            maxUpdatedAt = remotePage.maxUpdatedAt,
+        )
     }
 
     final override suspend fun updateData(data: List<T>) {
@@ -65,7 +71,7 @@ open class LBRemotePullSyncManager<T>(
         }
     }
 
-    final override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = !pageInfo.isLastPage
+    final override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = pageInfo.hasNextPage
 
     final override fun supportIncrementalSync(): Boolean = false
 

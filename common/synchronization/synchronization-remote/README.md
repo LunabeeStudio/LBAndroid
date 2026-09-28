@@ -12,13 +12,17 @@ Ktor, Parse or Room dependency.
 
 ## Contents
 
-- `LBPullRemoteDataSource<T>` — one page of objects since a cursor (`fetchPage(page, updatedAfter)` →
-  `LBRemotePage`): strict `updatedAt > cursor`, ascending `updatedAt` with a stable tie-breaker. The implementation
-  maps the remote records to the local model `T`.
+- `LBPullRemoteDataSource<T>` — one page of objects since a cursor (`fetchPage(cursor, updatedAfter)` →
+  `LBRemotePage`): strict `updatedAt > updatedAfter`, ascending `updatedAt` with a stable tie-breaker. `cursor` is
+  `null` for the first page, then the previous page's `nextCursor`, and must be a keyset position (resume after the
+  last record read, e.g. `(updatedAt, id) > (lastUpdatedAt, lastId)`), never an offset: a record updated during the
+  download moves to the end and shifts the later ones back one slot, so an offset skips the one on the page
+  boundary. The implementation maps the remote records to the local model `T`.
 - `LBSyncRemoteDataSource<T>` — adds the upload of one object: `findServerId(obj)` (e.g. by external id), then
   `update(serverId, obj)` or `create(obj)`.
-- `LBRemotePage<T>` — the page objects, `isLastPage`, and a page-level `maxUpdatedAt` that also counts the records
-  left out of `objects` (they still move the cursor, through `FetchPage.maxUpdatedAt`).
+- `LBRemotePage<T>` — the page objects, the `nextCursor` of the following page (`null` on the last page), and a
+  page-level `maxUpdatedAt` that also counts the records left out of `objects` (they still move the cursor, through
+  `FetchPage.maxUpdatedAt`).
 - `LBPullLocalDataSource<T>` / `LBSyncLocalDataSource<T>` — the local store: `savePulled` (a whole download in one
   call, leaving out the objects still to upload), `clear`, and for two-way managers `objectsToPush` and
   `markPushed` (conditional: a change made during the upload stays to upload).

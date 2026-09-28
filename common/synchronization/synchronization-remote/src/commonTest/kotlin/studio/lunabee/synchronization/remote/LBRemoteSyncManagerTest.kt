@@ -72,7 +72,7 @@ class LBRemoteSyncManagerTest {
             manager = manager(remote = remote, local = FakeLocalDataSource(toPush = listOf(Item("a"))), pushBeforePull = true),
         )
 
-        assertEquals(expected = listOf("find a", "create a", "fetch 0"), actual = remote.calls)
+        assertEquals(expected = listOf("find a", "create a", "fetch"), actual = remote.calls)
     }
 
     @Test
@@ -92,7 +92,7 @@ class LBRemoteSyncManagerTest {
 
         LBSyncOperator.sync(manager = manager(remote = remote, local = FakeLocalDataSource(toPush = listOf(Item("a")))))
 
-        assertEquals(expected = listOf("fetch 0", "find a", "create a", "fetch 0"), actual = remote.calls)
+        assertEquals(expected = listOf("fetch", "find a", "create a", "fetch"), actual = remote.calls)
     }
 
     private fun manager(
