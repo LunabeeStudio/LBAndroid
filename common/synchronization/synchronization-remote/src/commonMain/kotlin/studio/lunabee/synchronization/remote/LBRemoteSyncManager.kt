@@ -17,9 +17,13 @@
 package studio.lunabee.synchronization.remote
 
 import studio.lunabee.synchronization.store.SyncKey
+import studio.lunabee.synchronization.syncmanager.FetchPage
+import studio.lunabee.synchronization.syncmanager.LBSyncManager
+import kotlin.time.Instant
 
 /**
- * Two-way [LBRemotePullSyncManager]: on top of the download, it uploads the objects changed on the device.
+ * Two-way [LBSyncManager]: it downloads as [LBRemotePullSyncManager] does, and uploads the objects changed on the
+ * device.
  *
  * Objects are uploaded one by one, in [LBSyncLocalDataSource.objectsToPush] order: each one is looked up on the
  * backend ([LBSyncRemoteDataSource.findServerId]), then updated when found or created otherwise, then marked pushed
@@ -33,18 +37,35 @@ import studio.lunabee.synchronization.store.SyncKey
  * @param logging enables the manager logs.
  */
 class LBRemoteSyncManager<T>(
-    syncKey: SyncKey,
+    override val syncKey: SyncKey,
     private val remoteDataSource: LBSyncRemoteDataSource<T>,
     private val localDataSource: LBSyncLocalDataSource<T>,
     private val pushBeforePull: Boolean = false,
     logging: Boolean = true,
-) : LBRemotePullSyncManager<T>(
-    syncKey = syncKey,
-    remoteDataSource = remoteDataSource,
-    localDataSource = localDataSource,
-    logging = logging,
-) {
+) : LBSyncManager<T, T, LBRemotePage<T>>(logging = logging) {
+    private val pullBuffer: RemotePullBuffer<T> = RemotePullBuffer(
+        remoteDataSource = remoteDataSource,
+        localDataSource = localDataSource,
+    )
+
+    override suspend fun clearData() {
+        localDataSource.clear()
+    }
+
+    override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> =
+        pullBuffer.fetch(page = page, cursor = cursor, updatedAfter = sinceLastDate)
+
+    override suspend fun updateData(data: List<T>) {
+        pullBuffer.save(data)
+    }
+
+    override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = pageInfo.hasNextPage
+
+    override fun supportIncrementalSync(): Boolean = false
+
     override fun uploadBeforeDownload(): Boolean = pushBeforePull
+
+    override fun updatedAt(obj: T): Instant? = null
 
     override fun isInSync(obj: T): Boolean = false
 

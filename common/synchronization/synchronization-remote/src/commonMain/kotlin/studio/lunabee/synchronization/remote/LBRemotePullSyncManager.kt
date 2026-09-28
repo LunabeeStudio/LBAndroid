@@ -38,42 +38,31 @@ import kotlin.time.Instant
  * @param syncKey the persisted key of this manager cursor. Several instances of this class must each have their own.
  * @param logging enables the manager logs.
  */
-open class LBRemotePullSyncManager<T>(
-    final override val syncKey: SyncKey,
-    private val remoteDataSource: LBPullRemoteDataSource<T>,
+class LBRemotePullSyncManager<T>(
+    override val syncKey: SyncKey,
+    remoteDataSource: LBPullRemoteDataSource<T>,
     private val localDataSource: LBPullLocalDataSource<T>,
     logging: Boolean = true,
 ) : LBSyncManager<T, T, LBRemotePage<T>>(logging = logging) {
-    private val pulledObjects: MutableList<T> = mutableListOf()
-    private var isLastPageFetched: Boolean = false
+    private val pullBuffer: RemotePullBuffer<T> = RemotePullBuffer(
+        remoteDataSource = remoteDataSource,
+        localDataSource = localDataSource,
+    )
 
     override suspend fun clearData() {
         localDataSource.clear()
     }
 
-    final override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> {
-        if (page == 0) pulledObjects.clear()
-        val remotePage = remoteDataSource.fetchPage(cursor = cursor, updatedAfter = sinceLastDate)
-        isLastPageFetched = !remotePage.hasNextPage
-        return FetchPage(
-            objects = remotePage.objects,
-            pageInfo = remotePage,
-            nextCursor = remotePage.nextCursor,
-            maxUpdatedAt = remotePage.maxUpdatedAt,
-        )
+    override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> =
+        pullBuffer.fetch(page = page, cursor = cursor, updatedAfter = sinceLastDate)
+
+    override suspend fun updateData(data: List<T>) {
+        pullBuffer.save(data)
     }
 
-    final override suspend fun updateData(data: List<T>) {
-        pulledObjects += data
-        if (isLastPageFetched) {
-            if (pulledObjects.isNotEmpty()) localDataSource.savePulled(pulledObjects.toList())
-            pulledObjects.clear()
-        }
-    }
+    override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = pageInfo.hasNextPage
 
-    final override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = pageInfo.hasNextPage
-
-    final override fun supportIncrementalSync(): Boolean = false
+    override fun supportIncrementalSync(): Boolean = false
 
     override fun updatedAt(obj: T): Instant? = null
 

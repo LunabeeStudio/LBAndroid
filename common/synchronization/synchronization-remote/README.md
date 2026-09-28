@@ -28,11 +28,14 @@ Ktor, Parse or Room dependency.
   `markPushed` (conditional: a change made during the upload stays to upload).
 - `LBRemotePullSyncManager<T>` — download-only manager. Pages are buffered and saved once the last page is read, so a
   failure while paging writes nothing and the store can dedupe across pages; the cursor moves after that write, only
-  when something came back. `supportIncrementalSync()` is `final false`: a mid-paging checkpoint would save a cursor
+  when something came back. `supportIncrementalSync()` is `false`: a mid-paging checkpoint would save a cursor
   before its objects are written.
 - `LBRemoteSyncManager<T>` — two-way manager: uploads one object at a time and stops at the first failure.
   `pushBeforePull = true` runs upload → download (`LBSyncManager.uploadBeforeDownload`), so an upload failure skips
   the download.
+
+Both managers are final and extend `LBSyncManager` directly; they share the download buffering through an internal
+collaborator, so neither exposes engine hooks to override.
 
 Every instance takes its `syncKey` in the constructor: several instances of the same class would otherwise share
 the class-name default key, and so one cursor.

@@ -32,8 +32,9 @@ duplicate it here — read it before touching that module.
 
 `:synchronization-remote` is the backend-agnostic counterpart (commonMain only, no Ktor/Parse/Room): the consumer
 implements a remote data source (keyset-paged pull since a cursor, find-by-id then create or update) and a local data
-source (whole-download write, conditional mark-pushed), and gets `LBRemotePullSyncManager` / `LBRemoteSyncManager`. Its
-`README.md` documents the contract.
+source (whole-download write, conditional mark-pushed), and gets the final `LBRemotePullSyncManager` /
+`LBRemoteSyncManager` (both extend `LBSyncManager` directly and share the download buffering through the internal
+`RemotePullBuffer`). Its `README.md` documents the contract.
 
 Both modules were **moved from `LunabeeStudio/Libraries_Android`** (commits 17d6452, d165c26), so the
 code predates this repo's conventions and version lineage (the migration shim mentions "3.8.0" though
