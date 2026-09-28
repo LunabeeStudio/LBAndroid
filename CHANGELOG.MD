@@ -27,15 +27,19 @@ bom 4.16.0-alpha03
 - Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
   and before any sync requested meanwhile (e.g. to clear the synchronized data at logout). A sync requested from
   inside the block fails with `LBSyncReentrantCallException` instead of deadlocking.
-- **Fixed:** a sync caller cancelled mid-run no longer releases the operator lock while its detached pipeline keeps
-  running: the lock is held until the targeted managers' runs have ended, so a `withSyncLock` block never overlaps
-  them. Cancelling a `syncAllManagers()`, `sync(group)` or `sync(manager)` caller therefore completes only once the
-  targeted runs have ended.
+- **break:** a sync caller cancelled mid-run no longer releases the operator lock while its detached pipeline keeps
+  running: the lock is held, `NonCancellable`, until the targeted managers' runs have ended, so a `withSyncLock` block
+  never overlaps them. A cancelled `syncAllManagers()`, `sync(group)` or `sync(manager)` caller therefore returns only
+  once the targeted runs have ended: `withTimeout { LBSyncOperator.sync(…) }` or a cancelled scope no longer returns
+  at the deadline.
+- **Fixed:** a sync request or `withSyncLock` made from an `LBSyncGroup.isEnabled` gate fails with
+  `LBSyncReentrantCallException` instead of deadlocking the operator.
 - `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
   over their own `DataStore<Preferences>`.
-- New module `synchronization-remote` (JVM + iOS): backend-agnostic `LBRemotePullSyncManager` and
-  `LBRemoteSyncManager` over a remote data source (paged pull since a cursor, find by id then create or update)
-  and a local data source (whole-download write, conditional mark-pushed), with no Ktor, Parse or Room dependency.
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic, final `LBRemotePullSyncManager` and
+  `LBRemoteSyncManager` over a remote data source (keyset-paged pull since a cursor, `fetchPage(cursor, updatedAfter)`
+  → `LBRemotePage` with its `nextCursor`; find by id then create or update) and a local data source (whole-download
+  write, conditional mark-pushed), with no Ktor, Parse or Room dependency.
 
 ## 2026-09-24
 
