@@ -22,9 +22,15 @@ bom 4.16.0-alpha03
 - Added `LBSyncManager.uploadBeforeDownload()`: `true` runs upload → download, so an upload failure fails the run
   before anything is downloaded. Defaults to `false` (download → upload → re-download, unchanged).
 - Added `LBSyncOperator.syncOrJoin(group)`: synchronizes a group, or joins the `syncOrJoin` request already in flight
-  for that group and receives its result, instead of queueing another run.
+  for that group and receives its result, instead of queueing another run. When the caller that started the request
+  is cancelled, one of its joiners runs the group itself.
 - Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
-  and before any sync requested meanwhile (e.g. to clear the synchronized data at logout).
+  and before any sync requested meanwhile (e.g. to clear the synchronized data at logout). A sync requested from
+  inside the block fails with `LBSyncReentrantCallException` instead of deadlocking.
+- **Fixed:** a sync caller cancelled mid-run no longer releases the operator lock while its detached pipeline keeps
+  running: the lock is held until the targeted managers' runs have ended, so a `withSyncLock` block never overlaps
+  them. Cancelling a `syncAllManagers()`, `sync(group)` or `sync(manager)` caller therefore completes only once the
+  targeted runs have ended.
 - `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
   over their own `DataStore<Preferences>`.
 - New module `synchronization-remote` (JVM + iOS): backend-agnostic `LBRemotePullSyncManager` and

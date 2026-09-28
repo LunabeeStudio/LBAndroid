@@ -83,14 +83,53 @@ class SingleFlightTest {
     }
 
     @Test
-    fun a_cancelled_owner_resolves_its_joiners_with_a_failure() = runTest {
-        val first = async { singleFlight.run(key = "group") { CompletableDeferred<LBResult<Unit>>().await() } }
+    fun a_cancelled_owner_hands_the_request_to_a_joiner() = runTest {
+        var executions = 0
+        val first = async {
+            singleFlight.run(key = "group") {
+                executions += 1
+                CompletableDeferred<LBResult<Unit>>().await()
+            }
+        }
         runCurrent()
-        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit) } }
+        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
         runCurrent()
 
         first.cancel()
 
-        assertTrue(joined.await() is LBResult.Failure, "the joiner receives a failure instead of hanging")
+        assertTrue(joined.await() is LBResult.Success, "the joiner ran its own block")
+        assertEquals(expected = 2, actual = executions, "the cancelled owner block and the joiner block ran")
+    }
+
+    @Test
+    fun a_failing_owner_resolves_its_joiners_with_its_error() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val error = IllegalStateException("failed")
+        val first = async {
+            runCatching {
+                singleFlight.run(key = "group") {
+                    gate.await()
+                    throw error
+                }
+            }
+        }
+        runCurrent()
+        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit) } }
+        runCurrent()
+
+        gate.complete(Unit)
+
+        assertSame(expected = error, actual = first.await().exceptionOrNull(), "the owner receives its error")
+        assertSame(expected = error, actual = (joined.await() as? LBResult.Failure)?.throwable, "the joiner receives it too")
+    }
+
+    @Test
+    fun a_request_after_a_failing_owner_runs_again() = runTest {
+        runCatching { singleFlight.run(key = "group") { throw IllegalStateException("failed") } }
+        var executions = 0
+
+        singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } }
+
+        assertEquals(expected = 1, actual = executions, "the key was released by the failing owner")
     }
 }

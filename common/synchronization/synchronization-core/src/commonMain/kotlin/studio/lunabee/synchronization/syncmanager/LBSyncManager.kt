@@ -288,6 +288,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     }
 
     /**
+     * Suspend until the run in flight, if any, has ended. The run is detached from its callers, so the operator
+     * waits for it here before releasing its sync lock on behalf of a cancelled caller.
+     */
+    internal suspend fun awaitRunEnd() {
+        syncRunner.awaitIdle()
+    }
+
+    /**
      * Reset the sync manager
      * Clear the data, the sync status and dates timestamp
      */

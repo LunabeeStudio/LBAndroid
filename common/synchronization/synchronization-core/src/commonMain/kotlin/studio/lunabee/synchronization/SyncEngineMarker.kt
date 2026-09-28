@@ -20,9 +20,9 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Coroutine context element the engine installs around a manager's pipeline, so [LBSyncOperator] can
- * tell a request coming from inside a run (which would deadlock its non-reentrant lock) from a legit
- * external one.
+ * Coroutine context element the engine installs around a manager's pipeline and around a
+ * [LBSyncOperator.withSyncLock] block, so [LBSyncOperator] can tell a request coming from code that holds its
+ * lock (which would deadlock its non-reentrant lock) from a legit external one.
  *
  * Context inheritance draws exactly the right line: a manager callback runs in the marked coroutine, and
  * so does anything it `withContext`s or structurally launches — all deadlocking, all refused. A

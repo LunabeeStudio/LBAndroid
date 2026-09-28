@@ -645,6 +645,37 @@ class LBSyncOperatorTest {
     }
 
     @Test
+    fun a_cancelled_sync_caller_keeps_the_lock_until_its_run_has_ended() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeOperatorManager(
+                    store = store,
+                    scope = scope,
+                    syncKey = "cancelled",
+                    runOrder = order,
+                    runId = "fetch start",
+                    fetchGate = fetchGate,
+                    duringFetch = { order += "fetch end" },
+                ),
+            ),
+        )
+        val caller: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = group) }
+        runCurrent()
+        caller.cancel()
+        runCurrent()
+
+        val locked: Deferred<Unit> = async { LBSyncOperator.withSyncLock { order += "locked" } }
+        runCurrent()
+        assertEquals(expected = listOf("fetch start"), actual = order, "the lock is still held while the run fetches")
+        fetchGate.complete(Unit)
+        locked.await()
+
+        assertEquals(expected = listOf("fetch start", "fetch end", "locked"), actual = order, "the block ran after the run")
+    }
+
+    @Test
     fun a_sync_requested_while_the_lock_is_held_runs_after_the_block() = runOperatorTest { store, scope ->
         val order = mutableListOf<String>()
         val lockGate = CompletableDeferred<Unit>()
@@ -669,6 +700,17 @@ class LBSyncOperatorTest {
             actual = order,
             "the sync waited for the block",
         )
+    }
+
+    @Test
+    fun a_sync_requested_inside_a_with_sync_lock_block_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val group = group(store, scope, "nested", order = order, id = "nested")
+
+        val result = LBSyncOperator.withSyncLock { LBSyncOperator.sync(group = group) }
+
+        assertTrue((result as? LBResult.Failure)?.throwable is LBSyncReentrantCallException, "the nested request is refused")
+        assertTrue(order.isEmpty(), "the nested request ran nothing")
     }
 
     @Test
