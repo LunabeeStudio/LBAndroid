@@ -53,6 +53,8 @@ class LBSyncGroup(
      * Use this to gate the whole group's synchronization (e.g. gate the sync on a session call).
      * Evaluated exactly once per [syncManagers] attempt; when it returns false every manager is marked
      * [LBSyncProcessStatus.Disabled] and the attempt fails with [LBSyncClosureException].
+     * It runs while [LBSyncOperator] holds its sync lock: a sync request or [LBSyncOperator.withSyncLock] made from
+     * it is refused with an [LBSyncReentrantCallException].
      */
     var isEnabled: suspend () -> Boolean = { true }
 

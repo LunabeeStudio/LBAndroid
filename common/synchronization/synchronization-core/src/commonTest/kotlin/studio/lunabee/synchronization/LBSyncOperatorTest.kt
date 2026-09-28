@@ -564,6 +564,40 @@ class LBSyncOperatorTest {
         )
     }
 
+    @Test
+    fun a_request_made_from_a_group_gate_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val gated = group(store, scope, "gated", order = order, id = "gated").apply {
+            isEnabled = {
+                nested = LBSyncOperator.sync(manager = target)
+                true
+            }
+        }
+
+        val result = LBSyncOperator.sync(group = gated)
+
+        assertTrue(result is LBResult.Success, "the gated run still completes")
+        assertTrue((nested as? LBResult.Failure)?.throwable is LBSyncReentrantCallException, "the gate request is refused")
+        assertEquals(expected = listOf("gated"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun with_sync_lock_from_a_group_gate_is_refused() = runOperatorTest { store, scope ->
+        var refusal: Throwable? = null
+        val gated = group(store, scope, "gated", order = mutableListOf(), id = "gated").apply {
+            isEnabled = {
+                refusal = runCatching { LBSyncOperator.withSyncLock { } }.exceptionOrNull()
+                true
+            }
+        }
+
+        LBSyncOperator.sync(group = gated)
+
+        assertTrue(refusal is LBSyncReentrantCallException, "the nested lock request is refused instead of deadlocking")
+    }
+
     // endregion
 
     // region join and lock

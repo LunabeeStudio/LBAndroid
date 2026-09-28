@@ -219,17 +219,20 @@ object LBSyncOperator {
     }
 
     /**
-     * Runs [run] under [syncMutex]. The pipelines [run] awaits are detached from it, so a caller cancelled mid-run
-     * would otherwise release the lock while they keep writing: on cancellation, the lock is kept until every run of
-     * [managers] has ended, then the cancellation is rethrown.
+     * Runs [run] under [syncMutex] and a [SyncEngineMarker], so a sync request made while the lock is held (e.g. from
+     * the [LBSyncGroup.isEnabled] gate) is refused instead of deadlocking. The pipelines [run] awaits are detached from
+     * it, so a caller cancelled mid-run would otherwise release the lock while they keep writing: on cancellation, the
+     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown.
      */
     private suspend fun <T> withRunLock(managers: Collection<LBGenericSyncManager>, run: suspend () -> T): T =
         syncMutex.withLock {
-            try {
-                run()
-            } catch (cancellation: CancellationException) {
-                withContext(NonCancellable) { managers.forEach { manager -> manager.awaitRunEnd() } }
-                throw cancellation
+            withContext(SyncEngineMarker()) {
+                try {
+                    run()
+                } catch (cancellation: CancellationException) {
+                    withContext(NonCancellable) { managers.forEach { manager -> manager.awaitRunEnd() } }
+                    throw cancellation
+                }
             }
         }
 

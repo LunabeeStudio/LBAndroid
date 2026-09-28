@@ -107,8 +107,9 @@ Two paths deliberately escape the lock:
   collapses onto a follow-up behind it. A retry scheduled *after* the enqueue (a run failing while the
   request waits) is still pre-empted by `run()` itself.
 - **re-entrancy** — the `Mutex` is not reentrant, so calling an operator sync API from inside a manager's
-  SPI (`fetchRequest`, `pushObjectsToServer`, …) or from a `withSyncLock` block would deadlock. It is **refused
-  instead**: the engine runs `runPipeline()`, and the operator every `withSyncLock` block, under a
+  SPI (`fetchRequest`, `pushObjectsToServer`, …), from an `LBSyncGroup.isEnabled` gate or from a `withSyncLock` block
+  would deadlock. It is **refused instead**: the engine runs `runPipeline()`, and the operator everything it runs
+  under its lock (`withRunLock`, so the `isEnabled` gates too, and every `withSyncLock` block), under a
   `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
   every lock-taking operator entry point checks `currentCoroutineContext()[SyncEngineMarker]` first,
   returning `Failure(LBSyncReentrantCallException)` — before `cancelPendingRetr*`, so a refused request
