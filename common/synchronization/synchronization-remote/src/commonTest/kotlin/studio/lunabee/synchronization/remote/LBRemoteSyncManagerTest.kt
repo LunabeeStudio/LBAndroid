@@ -19,14 +19,17 @@ package studio.lunabee.synchronization.remote
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.LBSyncOperator
+import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LBRemoteSyncManagerTest {
-    init {
-        FakeSyncTimestampLocalDataSource()
+    @BeforeTest
+    fun installCursorStore() {
+        LBSyncStorage.install(store = FakeSyncTimestampLocalDataSource())
     }
 
     @Test

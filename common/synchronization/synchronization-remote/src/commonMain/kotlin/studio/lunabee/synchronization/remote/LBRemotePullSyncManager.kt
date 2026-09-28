@@ -50,14 +50,14 @@ open class LBRemotePullSyncManager<T>(
         localDataSource.clear()
     }
 
-    override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> {
+    final override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<T, LBRemotePage<T>> {
         if (page == 0) pulledObjects.clear()
         val remotePage = remoteDataSource.fetchPage(page = page, updatedAfter = sinceLastDate)
         isLastPageFetched = remotePage.isLastPage
         return FetchPage(objects = remotePage.objects, pageInfo = remotePage, maxUpdatedAt = remotePage.maxUpdatedAt)
     }
 
-    override suspend fun updateData(data: List<T>) {
+    final override suspend fun updateData(data: List<T>) {
         pulledObjects += data
         if (isLastPageFetched) {
             if (pulledObjects.isNotEmpty()) localDataSource.savePulled(pulledObjects.toList())
@@ -65,7 +65,7 @@ open class LBRemotePullSyncManager<T>(
         }
     }
 
-    override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = !pageInfo.isLastPage
+    final override fun hasNextPage(pageInfo: LBRemotePage<T>): Boolean = !pageInfo.isLastPage
 
     final override fun supportIncrementalSync(): Boolean = false
 
