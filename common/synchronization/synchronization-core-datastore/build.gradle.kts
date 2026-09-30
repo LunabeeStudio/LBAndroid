@@ -23,6 +23,8 @@ description = "DataStore-backed cursor storage for the Lunabee synchronization e
 version = AndroidConfig.SYNCHRONIZATION_CORE_DATASTORE_VERSION
 
 kotlin {
+    jvm()
+
     android {
         namespace = "studio.lunabee.synchronization.datastore"
         minSdk = AndroidConfig.SynchronizationMinSdk

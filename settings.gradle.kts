@@ -144,6 +144,7 @@ addCommonModule(
     "synchronization/synchronization-core-room",
     "synchronization/synchronization-parse-room",
     "synchronization/synchronization-events",
+    "synchronization/synchronization-remote",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")
 addModule(":synchronization-checks", File("common/synchronization/checks"), "synchronization-checks")

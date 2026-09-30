@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-25
+
+```
+Synchronization Core 2.1.0-alpha03
+Synchronization Events 2.1.0-alpha03
+Synchronization Core-Datastore 2.1.0-alpha03
+Synchronization Core-Room 2.1.0-alpha03
+Synchronization Parse-Room 2.1.0-alpha03
+Synchronization Remote 2.1.0-alpha03
+bom 4.16.0-alpha03
+```
+
+- Added `FetchPage.maxUpdatedAt`: a page-level `updatedAt` folded into the incremental cursor together with the
+  per-object dates, for pages holding records left out of `objects` that must still move the cursor.
+- Added `LBSyncManager.uploadBeforeDownload()`: `true` runs upload → download, so an upload failure fails the run
+  before anything is downloaded. Defaults to `false` (download → upload → re-download, unchanged).
+- Added `LBSyncOperator.syncOrJoin(group)`: synchronizes a group, or joins the `syncOrJoin` request already in flight
+  for that group and receives its result, instead of queueing another run. When the caller that started the request
+  is cancelled, one of its joiners runs the group itself.
+- Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
+  and before any sync requested meanwhile (e.g. to clear the synchronized data at logout). A sync requested from
+  inside the block fails with `LBSyncReentrantCallException` instead of deadlocking.
+- **break:** a sync caller cancelled mid-run no longer releases the operator lock while its detached pipeline keeps
+  running: the lock is held, `NonCancellable`, until the targeted managers' runs have ended, so a `withSyncLock` block
+  never overlaps them. A cancelled `syncAllManagers()`, `sync(group)` or `sync(manager)` caller therefore returns only
+  once the targeted runs have ended: `withTimeout { LBSyncOperator.sync(…) }` or a cancelled scope no longer returns
+  at the deadline.
+- **Fixed:** a sync request or `withSyncLock` made from an `LBSyncGroup.isEnabled` gate fails with
+  `LBSyncReentrantCallException` instead of deadlocking the operator.
+- `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
+  over their own `DataStore<Preferences>`.
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic, final `LBRemotePullSyncManager` and
+  `LBRemoteSyncManager` over a remote data source (keyset-paged pull since a cursor, `fetchPage(cursor, updatedAfter)`
+  → `LBRemotePage` with its `nextCursor`; find by id then create or update) and a local data source (whole-download
+  write, conditional mark-pushed), with no Ktor, Parse or Room dependency.
+
 ## 2026-09-24
 
 ```

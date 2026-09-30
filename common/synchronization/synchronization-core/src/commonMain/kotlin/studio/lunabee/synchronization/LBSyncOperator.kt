@@ -18,6 +18,7 @@ package studio.lunabee.synchronization
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -29,8 +30,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
+import studio.lunabee.synchronization.runner.SingleFlight
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
@@ -85,6 +88,9 @@ object LBSyncOperator {
      */
     private val syncMutex: Mutex = Mutex()
 
+    /** Joins the concurrent [syncOrJoin] requests of a group onto the one already in flight. */
+    private val joinableGroupRequests: SingleFlight<LBSyncGroup> = SingleFlight()
+
     /**
      * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
      * (see [LBSyncGroup.refreshEvents]). Replaces any previously registered listeners (their jobs are cancelled).
@@ -118,7 +124,9 @@ object LBSyncOperator {
      * - exactly one failure → [LBResult.Failure] carrying that group's error;
      * - several failures → [LBResult.Failure] carrying an [LBSyncAggregateException] exposing all errors.
      *
-     * Suspends until any sync already running through the operator has finished.
+     * Suspends until any sync already running through the operator has finished. Cancelling the caller
+     * completes only once the targeted runs have ended: the pipelines are detached, and the operator keeps its
+     * lock until they stop writing.
      *
      * @return the combined synchronization result across all groups.
      */
@@ -126,7 +134,7 @@ object LBSyncOperator {
         reentrantCallFailure(target = "syncAllManagers()")?.let { return it }
         return pending(managers = syncManagers()) {
             groups.values.forEach { it.cancelPendingRetries() }
-            syncMutex.withLock { runGroupsSequentially(groups.values) }
+            withRunLock(managers = syncManagers()) { runGroupsSequentially(groups.values) }
         }
     }
 
@@ -135,7 +143,8 @@ object LBSyncOperator {
      * running the other groups.
      *
      * Suspends until any sync already running through the operator has finished, so the group never
-     * overlaps a [syncAllManagers] run.
+     * overlaps a [syncAllManagers] run. Cancelling the caller completes only once the targeted runs have
+     * ended: the pipelines are detached, and the operator keeps its lock until they stop writing.
      *
      * @param group the group to synchronize. It does not have to be registered in [groups].
      * @return the group's combined synchronization result.
@@ -144,8 +153,50 @@ object LBSyncOperator {
         reentrantCallFailure(target = "sync(group)")?.let { return it }
         return pending(managers = group.syncManagers) {
             group.cancelPendingRetries()
-            syncMutex.withLock { group.syncManagers() }
+            withRunLock(managers = group.syncManagers) { group.syncManagers() }
         }
+    }
+
+    /**
+     * Synchronize [group] as [sync] does, unless a [syncOrJoin] request for the same group is already queued or
+     * running: the caller then awaits that request and receives its result instead of queueing another run.
+     *
+     * Use it for triggers that only need "a sync that has not ended yet" (a periodic tick, a pull-to-refresh, a
+     * sync after a local write), so a burst of requests costs one run instead of one run each. A request that
+     * joins does not re-read anything: a local change made after the joined run has read its uploads waits for
+     * the next request. Only [syncOrJoin] requests are joined; a [sync] or [syncAllManagers] request in flight is
+     * queued behind as usual.
+     *
+     * @param group the group to synchronize. It does not have to be registered in [groups].
+     * @return the combined synchronization result of the run this caller started or joined.
+     */
+    suspend fun syncOrJoin(group: LBSyncGroup): LBResult<Unit> {
+        reentrantCallFailure(target = "syncOrJoin(group)")?.let { return it }
+        return joinableGroupRequests.run(key = group) { sync(group = group) }
+    }
+
+    /**
+     * Runs [block] while holding the operator sync lock: it starts once the sync in progress, if any, has
+     * ended, and every sync request made meanwhile queues until it returns. Use it for work that must not
+     * interleave with a run, such as clearing the synchronized data at logout.
+     *
+     * Automatic retries escape the lock (see the class documentation): set [LBGenericSyncManager.retryTempo] to
+     * `null` on the managers whose retry must not overlap [block].
+     *
+     * [block] runs under the same [SyncEngineMarker] as a manager pipeline: a sync request made from inside it
+     * would wait for the lock the block holds, so it fails with an [LBSyncReentrantCallException] instead, and a
+     * nested [withSyncLock] throws one.
+     *
+     * @param block the work to run under the lock.
+     * @return the value returned by [block].
+     * @throws LBSyncReentrantCallException when called from inside a sync manager callback or another
+     * [withSyncLock] block, which already hold the lock.
+     */
+    suspend fun <T> withSyncLock(block: suspend () -> T): T {
+        if (currentCoroutineContext()[SyncEngineMarker] != null) {
+            throw LBSyncReentrantCallException(target = "withSyncLock(block)")
+        }
+        return syncMutex.withLock { withContext(SyncEngineMarker()) { block() } }
     }
 
     /**
@@ -153,7 +204,8 @@ object LBSyncOperator {
      *
      * This is the public route to a manager's pipeline ([LBGenericSyncManager.synchronize] itself is
      * `internal`). Suspends until any sync already running through the operator has finished, so the
-     * manager never overlaps a group or full run.
+     * manager never overlaps a group or full run. Cancelling the caller completes only once the targeted run has
+     * ended: the pipeline is detached, and the operator keeps its lock until it stops writing.
      *
      * @param manager the manager to synchronize. It does not have to be registered in [groups].
      * @return the manager's synchronization result.
@@ -162,9 +214,27 @@ object LBSyncOperator {
         reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
         return pending(managers = listOf(manager)) {
             manager.cancelPendingRetry()
-            syncMutex.withLock { manager.synchronize() }
+            withRunLock(managers = listOf(manager)) { manager.synchronize() }
         }
     }
+
+    /**
+     * Runs [run] under [syncMutex] and a [SyncEngineMarker], so a sync request made while the lock is held (e.g. from
+     * the [LBSyncGroup.isEnabled] gate) is refused instead of deadlocking. The pipelines [run] awaits are detached from
+     * it, so a caller cancelled mid-run would otherwise release the lock while they keep writing: on cancellation, the
+     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown.
+     */
+    private suspend fun <T> withRunLock(managers: Collection<LBGenericSyncManager>, run: suspend () -> T): T =
+        syncMutex.withLock {
+            withContext(SyncEngineMarker()) {
+                try {
+                    run()
+                } catch (cancellation: CancellationException) {
+                    withContext(NonCancellable) { managers.forEach { manager -> manager.awaitRunEnd() } }
+                    throw cancellation
+                }
+            }
+        }
 
     /**
      * Runs [request] with [LBSyncProcessStatus.PendingSync] published on the managers it targets, so
@@ -283,7 +353,7 @@ object LBSyncOperator {
             markPending(managers = availableGroups.flatMap { it.syncManagers })
             defaultSyncScope.launch {
                 availableGroups.forEach { it.cancelPendingRetries() }
-                syncMutex.withLock { runGroupsSequentially(availableGroups) }
+                withRunLock(managers = availableGroups.flatMap { it.syncManagers }) { runGroupsSequentially(availableGroups) }
             }
         }
         handleEventData(data = data)

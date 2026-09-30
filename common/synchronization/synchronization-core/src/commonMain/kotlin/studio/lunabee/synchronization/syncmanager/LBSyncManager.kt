@@ -204,6 +204,17 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     protected open fun supportIncrementalSync(): Boolean = false
 
     /**
+     * Whether a run uploads the local changes before downloading, instead of the default download → upload →
+     * re-download. When `true`, a run is upload → download: an upload failure fails the run before anything is
+     * downloaded, and a single download follows a successful upload (so [supportChangeNotificationFromServer]
+     * no longer decides a re-download).
+     *
+     * Defaults to `false`.
+     */
+    @SyncEngineCallback
+    protected open fun uploadBeforeDownload(): Boolean = false
+
+    /**
      * Whether the server pushes change notifications to this client (e.g. Parse LiveQuery), so the
      * engine can trust the server instead of polling.
      *
@@ -277,6 +288,14 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     }
 
     /**
+     * Suspend until the run in flight, if any, has ended. The run is detached from its callers, so the operator
+     * waits for it here before releasing its sync lock on behalf of a cancelled caller.
+     */
+    internal suspend fun awaitRunEnd() {
+        syncRunner.awaitIdle()
+    }
+
+    /**
      * Reset the sync manager
      * Clear the data, the sync status and dates timestamp
      */
@@ -306,10 +325,15 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     private suspend fun runPipeline(): LBResult<Unit> {
         return try {
-            download()
-            val uploaded = upload()
-            if (uploaded && !supportChangeNotificationFromServer()) {
+            if (uploadBeforeDownload()) {
+                upload()
                 download()
+            } else {
+                download()
+                val uploaded = upload()
+                if (uploaded && !supportChangeNotificationFromServer()) {
+                    download()
+                }
             }
             setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
             LBResult.Success(Unit)
@@ -378,7 +402,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
                 val fetchPage = fetchRequest(page = page, cursor = cursor, sinceLastDate = lastUpdatedDate)
                 val objects = fetchPage.objects
 
-                progress = progress.advance(objects.mapNotNull(::updatedAt))
+                progress = progress.advance(objects.mapNotNull(::updatedAt) + listOfNotNull(fetchPage.maxUpdatedAt))
 
                 updateData(objects)
                 val hasNext = hasNextPage(objects.size, fetchPage.pageInfo)
