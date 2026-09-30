@@ -324,6 +324,52 @@ class SyncRunnerTest {
      * internal launches and delays are governed by the [TestScope]'s virtual time. The scope is cancelled
      * once [body] returns so [runTest] does not flag the runner's parked/queued coroutines as leaked.
      */
+    @Test
+    fun await_idle_waits_for_a_follow_up_promoted_during_the_wait() = runRunnerTest { runner ->
+        val order = mutableListOf<String>()
+        val firstGate = CompletableDeferred<Unit>()
+        val followUpGate = CompletableDeferred<Unit>()
+        val first: Deferred<LBResult<Unit>> = async {
+            runner.run {
+                order += "first"
+                firstGate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        runCurrent()
+        val followUp: Deferred<LBResult<Unit>> = async {
+            runner.run {
+                order += "follow-up"
+                followUpGate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        runCurrent()
+        val idle: Deferred<Unit> = async {
+            runner.awaitIdle()
+            order += "idle"
+        }
+        runCurrent()
+
+        firstGate.complete(Unit)
+        runCurrent()
+        assertEquals(expected = listOf("first", "follow-up"), actual = order, "the promoted follow-up is still waited for")
+        followUpGate.complete(Unit)
+        listOf(first, followUp, idle).forEach { it.await() }
+
+        assertEquals(expected = listOf("first", "follow-up", "idle"), actual = order, "idle once the follow-up ended")
+    }
+
+    @Test
+    fun await_idle_does_not_wait_for_a_parked_retry() = runRunnerTest(retryDelay = { 30.seconds }) { runner ->
+        runDirect(runner) { LBResult.Failure() }
+
+        val idle: Deferred<Unit> = async { runner.awaitIdle() }
+        runCurrent()
+
+        assertTrue(idle.isCompleted, "the retry parked for 30 seconds is not a run in flight")
+    }
+
     private fun runRunnerTest(
         retryDelay: () -> Duration? = { 30.seconds },
         body: suspend TestScope.(SyncRunner) -> Unit,

@@ -15,24 +15,14 @@
  */
 
 plugins {
-    id("lunabee.kmp-android-library-conventions")
+    id("lunabee.kmp-jvm-library-conventions")
     id("lunabee.library-publish-conventions")
 }
 
-description = "DataStore-backed cursor storage for the Lunabee synchronization engine"
-version = AndroidConfig.SYNCHRONIZATION_CORE_DATASTORE_VERSION
+description = "Backend-agnostic remote synchronization managers for the Lunabee synchronization engine"
+version = AndroidConfig.SYNCHRONIZATION_REMOTE_VERSION
 
 kotlin {
-    jvm()
-
-    android {
-        namespace = "studio.lunabee.synchronization.datastore"
-        minSdk = AndroidConfig.SynchronizationMinSdk
-
-        withHostTest {
-        }
-    }
-
     sourceSets {
         all {
             languageSettings.optIn("kotlin.time.ExperimentalTime")
@@ -41,7 +31,6 @@ kotlin {
         commonMain.dependencies {
             implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
 
-            api(libs.androidxDatastorePreferencesCore)
             implementation(libs.kotlinxCoroutinesCore)
 
             api(projects.synchronizationCore)
@@ -50,12 +39,5 @@ kotlin {
             implementation(libs.kotlinTest)
             implementation(libs.kotlinxCoroutinesTest)
         }
-        androidMain.dependencies {
-            implementation(libs.androidxDatastorePreferences)
-        }
     }
-}
-
-dependencies {
-    lintPublish(projects.synchronizationChecks)
 }

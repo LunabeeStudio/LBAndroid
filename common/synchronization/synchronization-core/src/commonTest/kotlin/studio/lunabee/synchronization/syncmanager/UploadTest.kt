@@ -16,10 +16,12 @@
 
 package studio.lunabee.synchronization.syncmanager
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import studio.lunabee.core.model.LBResult
+import studio.lunabee.synchronization.store.SyncTimestampLocalDataSource
 import studio.lunabee.synchronization.testfixture.FakeSyncManager
 import studio.lunabee.synchronization.testfixture.LocalObj
 import studio.lunabee.synchronization.testfixture.runManagerTest
@@ -198,4 +200,42 @@ class UploadTest {
     }
 
     // endregion
+
+    // region upload before download
+
+    @Test
+    fun upload_before_download_pushes_first_then_downloads_once() = runManagerTest { store, scope ->
+        val manager = UploadFirstSyncManager(store = store, scope = scope, uploadObjects = listOf(LocalObj("a")))
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Success, "the upload-first run succeeds")
+        assertEquals(expected = listOf("push", "fetch", "update"), actual = manager.callLog, "upload, then a single download")
+    }
+
+    @Test
+    fun upload_before_download_failure_skips_the_download() = runManagerTest { store, scope ->
+        val manager = UploadFirstSyncManager(
+            store = store,
+            scope = scope,
+            uploadObjects = listOf(LocalObj("a")),
+            pushError = IllegalStateException("push failed"),
+        )
+
+        val result = manager.synchronize()
+
+        assertTrue(result is LBResult.Failure, "the push failure fails the run")
+        assertEquals(expected = listOf("push"), actual = manager.callLog, "nothing is downloaded after a failed upload")
+    }
+
+    // endregion
+}
+
+private class UploadFirstSyncManager(
+    store: SyncTimestampLocalDataSource,
+    scope: CoroutineScope,
+    uploadObjects: List<LocalObj>,
+    pushError: Exception? = null,
+) : FakeSyncManager(store = store, scope = scope, uploadObjects = uploadObjects, pushError = pushError) {
+    override fun uploadBeforeDownload(): Boolean = true
 }

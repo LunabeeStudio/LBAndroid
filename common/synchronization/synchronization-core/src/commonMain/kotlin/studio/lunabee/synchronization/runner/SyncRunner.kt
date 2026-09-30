@@ -119,6 +119,17 @@ class SyncRunner(
     }
 
     /**
+     * Suspends until no run is in flight, the follow-up runs promoted meanwhile included. A pending retry is not
+     * waited for: it is not running yet.
+     */
+    internal suspend fun awaitIdle() {
+        while (true) {
+            val runningJob = mutex.withLock { inFlight?.job } ?: return
+            runningJob.join()
+        }
+    }
+
+    /**
      * Cancels the in-flight run (if any), the queued follow-up run (if any) and any pending retry.
      * Callers currently awaiting a cancelled run — including collapsed callers whose follow-up never
      * started — observe a completed [LBResult.Failure] carrying the cancellation cause rather than
