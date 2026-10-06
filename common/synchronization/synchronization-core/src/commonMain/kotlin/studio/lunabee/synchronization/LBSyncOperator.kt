@@ -88,8 +88,9 @@ object LBSyncOperator {
      */
     private val syncMutex: Mutex = Mutex()
 
-    /** Coalesces the [syncOrJoin] requests of a group or manager waiting for the lock into one request. */
-    private val joinableRequests: RequestCoalescer<Any> = RequestCoalescer()
+    private val joinableGroupRequests: RequestCoalescer<LBSyncGroup> = RequestCoalescer()
+
+    private val joinableManagerRequests: RequestCoalescer<LBGenericSyncManager> = RequestCoalescer()
 
     /**
      * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
@@ -169,7 +170,7 @@ object LBSyncOperator {
      */
     suspend fun syncOrJoin(group: LBSyncGroup): LBResult<Unit> {
         reentrantCallFailure(target = "syncOrJoin(group)")?.let { return it }
-        return joinableRequests.run(key = group) { markStarted -> runGroup(group = group, onLocked = markStarted) }
+        return joinableGroupRequests.run(key = group) { markStarted -> runGroup(group = group, onLocked = markStarted) }
     }
 
     /**
@@ -184,7 +185,21 @@ object LBSyncOperator {
      */
     suspend fun syncOrJoin(manager: LBGenericSyncManager): LBResult<Unit> {
         reentrantCallFailure(target = "syncOrJoin(manager = ${manager.syncKey.value})")?.let { return it }
-        return joinableRequests.run(key = manager) { markStarted -> runManager(manager = manager, onLocked = markStarted) }
+        return joinableManagerRequests.run(key = manager) { markStarted -> runManager(manager = manager, onLocked = markStarted) }
+    }
+
+    /**
+     * Synchronize the first registered manager of type [T], as [syncOrJoin] does.
+     *
+     * @param T the manager type to synchronize.
+     * @return the manager's synchronization result, or [LBResult.Failure] carrying an
+     * [IllegalArgumentException] when no manager of that type is registered.
+     */
+    suspend inline fun <reified T : LBGenericSyncManager> syncOrJoin(): LBResult<Unit> {
+        val manager: T? = syncManager<T>()
+        return manager
+            ?.let { syncOrJoin(manager = it) }
+            ?: noManagerRegistered(type = T::class)
     }
 
     /**
@@ -227,24 +242,11 @@ object LBSyncOperator {
         return runManager(manager = manager)
     }
 
-    private suspend fun runGroup(group: LBSyncGroup, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
-        pending(managers = group.syncManagers) {
-            group.cancelPendingRetries()
-            withRunLock(managers = group.syncManagers, onLocked = onLocked) { group.syncManagers() }
-        }
-
-    private suspend fun runManager(manager: LBGenericSyncManager, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
-        pending(managers = listOf(manager)) {
-            manager.cancelPendingRetry()
-            withRunLock(managers = listOf(manager), onLocked = onLocked) { manager.synchronize() }
-        }
-
     /**
      * Runs [run] under [syncMutex] and a [SyncEngineMarker], so a sync request made while the lock is held (e.g. from
      * the [LBSyncGroup.isEnabled] gate) is refused instead of deadlocking. The pipelines [run] awaits are detached from
      * it, so a caller cancelled mid-run would otherwise release the lock while they keep writing: on cancellation, the
-     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown. [onLocked] runs first
-     * once the lock is acquired.
+     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown.
      */
     private suspend fun <T> withRunLock(
         managers: Collection<LBGenericSyncManager>,
@@ -317,21 +319,7 @@ object LBSyncOperator {
         val manager: T? = syncManager<T>()
         return manager
             ?.let { sync(manager = it) }
-            ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
-    }
-
-    /**
-     * Synchronize the first registered manager of type [T], as [syncOrJoin] does.
-     *
-     * @param T the manager type to synchronize.
-     * @return the manager's synchronization result, or [LBResult.Failure] carrying an
-     * [IllegalArgumentException] when no manager of that type is registered.
-     */
-    suspend inline fun <reified T : LBGenericSyncManager> syncOrJoin(): LBResult<Unit> {
-        val manager: T? = syncManager<T>()
-        return manager
-            ?.let { syncOrJoin(manager = it) }
-            ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
+            ?: noManagerRegistered(type = T::class)
     }
 
     /**
@@ -363,6 +351,22 @@ object LBSyncOperator {
         } else {
             null
         }
+
+    private suspend fun runGroup(group: LBSyncGroup, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
+        pending(managers = group.syncManagers) {
+            group.cancelPendingRetries()
+            withRunLock(managers = group.syncManagers, onLocked = onLocked) { group.syncManagers() }
+        }
+
+    private suspend fun runManager(manager: LBGenericSyncManager, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
+        pending(managers = listOf(manager)) {
+            manager.cancelPendingRetry()
+            withRunLock(managers = listOf(manager), onLocked = onLocked) { manager.synchronize() }
+        }
+
+    @PublishedApi
+    internal fun noManagerRegistered(type: KClass<*>): LBResult.Failure<Unit> =
+        LBResult.Failure(IllegalArgumentException("No ${type.simpleName} registered in LBSyncOperator.groups"))
 
     private suspend fun runGroupsSequentially(groups: Collection<LBSyncGroup>): LBResult<Unit> {
         val errors: MutableList<Throwable> = mutableListOf()
