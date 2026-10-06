@@ -33,7 +33,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
-import studio.lunabee.synchronization.runner.SingleFlight
+import studio.lunabee.synchronization.runner.RequestCoalescer
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
 import studio.lunabee.synchronization.syncmanager.LBGenericSyncManager
@@ -88,8 +88,8 @@ object LBSyncOperator {
      */
     private val syncMutex: Mutex = Mutex()
 
-    /** Joins the concurrent [syncOrJoin] requests of a group onto the one already in flight. */
-    private val joinableGroupRequests: SingleFlight<LBSyncGroup> = SingleFlight()
+    /** Coalesces the [syncOrJoin] requests of a group or manager waiting for the lock into one request. */
+    private val joinableRequests: RequestCoalescer<Any> = RequestCoalescer()
 
     /**
      * Registers listeners that will be used to trigger refreshes of groups related to the emitted events
@@ -151,20 +151,17 @@ object LBSyncOperator {
      */
     suspend fun sync(group: LBSyncGroup): LBResult<Unit> {
         reentrantCallFailure(target = "sync(group)")?.let { return it }
-        return pending(managers = group.syncManagers) {
-            group.cancelPendingRetries()
-            withRunLock(managers = group.syncManagers) { group.syncManagers() }
-        }
+        return runGroup(group = group)
     }
 
     /**
-     * Synchronize [group] as [sync] does, unless a [syncOrJoin] request for the same group is already queued or
-     * running: the caller then awaits that request and receives its result instead of queueing another run.
+     * Synchronize [group] as [sync] does, unless a [syncOrJoin] request for the same group is still waiting for
+     * the lock: the caller then awaits that request and receives its result instead of queueing another run.
      *
-     * Use it for triggers that only need "a sync that has not ended yet" (a periodic tick, a pull-to-refresh, a
-     * sync after a local write), so a burst of requests costs one run instead of one run each. A request that
-     * joins does not re-read anything: a local change made after the joined run has read its uploads waits for
-     * the next request. Only [syncOrJoin] requests are joined; a [sync] or [syncAllManagers] request in flight is
+     * Use it for triggers that only need "a sync that starts from now on" (a periodic tick, a pull-to-refresh, a
+     * sync after a local write), so a burst of requests costs at most one run behind the one in progress. A
+     * request never joins a run that has started, so a change made before the call is always read by the run the
+     * caller awaits. Only [syncOrJoin] requests are joined; a [sync] or [syncAllManagers] request in flight is
      * queued behind as usual.
      *
      * @param group the group to synchronize. It does not have to be registered in [groups].
@@ -172,7 +169,22 @@ object LBSyncOperator {
      */
     suspend fun syncOrJoin(group: LBSyncGroup): LBResult<Unit> {
         reentrantCallFailure(target = "syncOrJoin(group)")?.let { return it }
-        return joinableGroupRequests.run(key = group) { sync(group = group) }
+        return joinableRequests.run(key = group) { markStarted -> runGroup(group = group, onLocked = markStarted) }
+    }
+
+    /**
+     * Synchronize [manager] as [sync] does, unless a [syncOrJoin] request for the same manager is still waiting
+     * for the lock: the caller then awaits that request and receives its result instead of queueing another run.
+     *
+     * Same contract as the group overload, for triggers aimed at one manager (a server change notification, a
+     * push handler). A [syncOrJoin] of a group holding [manager] is a different request and is not joined.
+     *
+     * @param manager the manager to synchronize. It does not have to be registered in [groups].
+     * @return the manager's synchronization result of the run this caller started or joined.
+     */
+    suspend fun syncOrJoin(manager: LBGenericSyncManager): LBResult<Unit> {
+        reentrantCallFailure(target = "syncOrJoin(manager = ${manager.syncKey.value})")?.let { return it }
+        return joinableRequests.run(key = manager) { markStarted -> runManager(manager = manager, onLocked = markStarted) }
     }
 
     /**
@@ -212,22 +224,37 @@ object LBSyncOperator {
      */
     suspend fun sync(manager: LBGenericSyncManager): LBResult<Unit> {
         reentrantCallFailure(target = "sync(manager = ${manager.syncKey.value})")?.let { return it }
-        return pending(managers = listOf(manager)) {
-            manager.cancelPendingRetry()
-            withRunLock(managers = listOf(manager)) { manager.synchronize() }
-        }
+        return runManager(manager = manager)
     }
+
+    private suspend fun runGroup(group: LBSyncGroup, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
+        pending(managers = group.syncManagers) {
+            group.cancelPendingRetries()
+            withRunLock(managers = group.syncManagers, onLocked = onLocked) { group.syncManagers() }
+        }
+
+    private suspend fun runManager(manager: LBGenericSyncManager, onLocked: suspend () -> Unit = {}): LBResult<Unit> =
+        pending(managers = listOf(manager)) {
+            manager.cancelPendingRetry()
+            withRunLock(managers = listOf(manager), onLocked = onLocked) { manager.synchronize() }
+        }
 
     /**
      * Runs [run] under [syncMutex] and a [SyncEngineMarker], so a sync request made while the lock is held (e.g. from
      * the [LBSyncGroup.isEnabled] gate) is refused instead of deadlocking. The pipelines [run] awaits are detached from
      * it, so a caller cancelled mid-run would otherwise release the lock while they keep writing: on cancellation, the
-     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown.
+     * lock is kept until every run of [managers] has ended, then the cancellation is rethrown. [onLocked] runs first
+     * once the lock is acquired.
      */
-    private suspend fun <T> withRunLock(managers: Collection<LBGenericSyncManager>, run: suspend () -> T): T =
+    private suspend fun <T> withRunLock(
+        managers: Collection<LBGenericSyncManager>,
+        onLocked: suspend () -> Unit = {},
+        run: suspend () -> T,
+    ): T =
         syncMutex.withLock {
             withContext(SyncEngineMarker()) {
                 try {
+                    onLocked()
                     run()
                 } catch (cancellation: CancellationException) {
                     withContext(NonCancellable) { managers.forEach { manager -> manager.awaitRunEnd() } }
@@ -290,6 +317,20 @@ object LBSyncOperator {
         val manager: T? = syncManager<T>()
         return manager
             ?.let { sync(manager = it) }
+            ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
+    }
+
+    /**
+     * Synchronize the first registered manager of type [T], as [syncOrJoin] does.
+     *
+     * @param T the manager type to synchronize.
+     * @return the manager's synchronization result, or [LBResult.Failure] carrying an
+     * [IllegalArgumentException] when no manager of that type is registered.
+     */
+    suspend inline fun <reified T : LBGenericSyncManager> syncOrJoin(): LBResult<Unit> {
+        val manager: T? = syncManager<T>()
+        return manager
+            ?.let { syncOrJoin(manager = it) }
             ?: LBResult.Failure(IllegalArgumentException("No ${T::class.simpleName} registered in LBSyncOperator.groups"))
     }
 

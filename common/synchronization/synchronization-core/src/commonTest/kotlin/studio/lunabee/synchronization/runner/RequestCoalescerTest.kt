@@ -26,24 +26,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-class SingleFlightTest {
+class RequestCoalescerTest {
 
-    private val singleFlight: SingleFlight<String> = SingleFlight()
+    private val coalescer: RequestCoalescer<String> = RequestCoalescer()
 
     @Test
-    fun a_request_arriving_while_one_is_in_flight_joins_it() = runTest {
+    fun a_request_arriving_before_the_pending_one_started_joins_it() = runTest {
         val gate = CompletableDeferred<Unit>()
         var executions = 0
         val failure = LBResult.Failure<Unit>(throwable = IllegalStateException("failed"))
         val first = async {
-            singleFlight.run(key = "group") {
+            coalescer.run(key = "group") { markStarted ->
                 executions += 1
                 gate.await()
+                markStarted()
                 failure
             }
         }
         runCurrent()
-        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
+        val joined = async { coalescer.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
         runCurrent()
 
         gate.complete(Unit)
@@ -54,10 +55,44 @@ class SingleFlightTest {
     }
 
     @Test
-    fun a_request_after_the_in_flight_one_ended_runs_again() = runTest {
+    fun requests_arriving_after_the_run_started_coalesce_into_one_follow_up() = runTest {
+        val runGate = CompletableDeferred<Unit>()
+        val followUpGate = CompletableDeferred<Unit>()
+        var executions = 0
+        val running = async {
+            coalescer.run(key = "group") { markStarted ->
+                markStarted()
+                executions += 1
+                runGate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        runCurrent()
+        val followUps = List(size = 3) {
+            async {
+                coalescer.run(key = "group") {
+                    executions += 1
+                    followUpGate.await()
+                    LBResult.Success(Unit)
+                }
+            }
+        }
+        runCurrent()
+
+        assertEquals(expected = 2, actual = executions, "a request arriving after the start does not join the run")
+
+        runGate.complete(Unit)
+        followUpGate.complete(Unit)
+        running.await()
+        followUps.forEach { assertTrue(it.await() is LBResult.Success, "every follow-up caller gets the follow-up result") }
+        assertEquals(expected = 2, actual = executions, "the burst behind the run cost one follow-up")
+    }
+
+    @Test
+    fun a_request_after_the_previous_one_ended_runs_again() = runTest {
         var executions = 0
 
-        repeat(times = 2) { singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
+        repeat(times = 2) { coalescer.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
 
         assertEquals(expected = 2, actual = executions, "each request ran once the previous one had ended")
     }
@@ -67,7 +102,7 @@ class SingleFlightTest {
         val gate = CompletableDeferred<Unit>()
         var executions = 0
         val first = async {
-            singleFlight.run(key = "first") {
+            coalescer.run(key = "first") {
                 executions += 1
                 gate.await()
                 LBResult.Success(Unit)
@@ -75,7 +110,7 @@ class SingleFlightTest {
         }
         runCurrent()
 
-        singleFlight.run(key = "second") { LBResult.Success(Unit).also { executions += 1 } }
+        coalescer.run(key = "second") { LBResult.Success(Unit).also { executions += 1 } }
         gate.complete(Unit)
         first.await()
 
@@ -86,13 +121,13 @@ class SingleFlightTest {
     fun a_cancelled_owner_hands_the_request_to_a_joiner() = runTest {
         var executions = 0
         val first = async {
-            singleFlight.run(key = "group") {
+            coalescer.run(key = "group") {
                 executions += 1
                 CompletableDeferred<LBResult<Unit>>().await()
             }
         }
         runCurrent()
-        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
+        val joined = async { coalescer.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } } }
         runCurrent()
 
         first.cancel()
@@ -107,14 +142,14 @@ class SingleFlightTest {
         val error = IllegalStateException("failed")
         val first = async {
             runCatching {
-                singleFlight.run(key = "group") {
+                coalescer.run(key = "group") {
                     gate.await()
                     throw error
                 }
             }
         }
         runCurrent()
-        val joined = async { singleFlight.run(key = "group") { LBResult.Success(Unit) } }
+        val joined = async { coalescer.run(key = "group") { LBResult.Success(Unit) } }
         runCurrent()
 
         gate.complete(Unit)
@@ -125,10 +160,10 @@ class SingleFlightTest {
 
     @Test
     fun a_request_after_a_failing_owner_runs_again() = runTest {
-        runCatching { singleFlight.run(key = "group") { throw IllegalStateException("failed") } }
+        runCatching { coalescer.run(key = "group") { throw IllegalStateException("failed") } }
         var executions = 0
 
-        singleFlight.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } }
+        coalescer.run(key = "group") { LBResult.Success(Unit).also { executions += 1 } }
 
         assertEquals(expected = 1, actual = executions, "the key was released by the failing owner")
     }

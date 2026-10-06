@@ -603,7 +603,7 @@ class LBSyncOperatorTest {
     // region join and lock
 
     @Test
-    fun concurrent_sync_or_join_requests_of_a_group_share_one_run() = runOperatorTest { store, scope ->
+    fun sync_or_join_requests_of_a_group_arriving_during_its_run_share_one_follow_up() = runOperatorTest { store, scope ->
         val order = mutableListOf<String>()
         val fetchGate = CompletableDeferred<Unit>()
         val group = LBSyncGroup(
@@ -621,13 +621,63 @@ class LBSyncOperatorTest {
 
         val first: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncOrJoin(group = group) }
         runCurrent()
-        val joined: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncOrJoin(group = group) }
+        val burst: List<Deferred<LBResult<Unit>>> = List(size = 3) { async { LBSyncOperator.syncOrJoin(group = group) } }
         runCurrent()
         fetchGate.complete(Unit)
 
         assertTrue(first.await() is LBResult.Success, "the first request succeeds")
-        assertTrue(joined.await() is LBResult.Success, "the joining request receives the same success")
-        assertEquals(expected = listOf("joined"), actual = order, "the joining request started no run of its own")
+        burst.forEach { assertTrue(it.await() is LBResult.Success, "every request of the burst receives the follow-up success") }
+        assertEquals(
+            expected = listOf("joined", "joined"),
+            actual = order,
+            "the burst did not join the started run and cost a single follow-up",
+        )
+    }
+
+    @Test
+    fun sync_or_join_requests_of_a_manager_waiting_for_the_lock_share_one_run() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        register(
+            "blocking",
+            LBSyncGroup(
+                syncManagers = linkedSetOf(
+                    FakeOperatorManager(
+                        store = store,
+                        scope = scope,
+                        syncKey = "blocking",
+                        runOrder = order,
+                        runId = "blocking",
+                        fetchGate = fetchGate,
+                    ),
+                ),
+            ),
+        )
+        val manager = FakeOperatorManager(store = store, scope = scope, syncKey = "notified", runOrder = order, runId = "notified")
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val burst: List<Deferred<LBResult<Unit>>> = List(size = 50) { async { LBSyncOperator.syncOrJoin(manager = manager) } }
+        runCurrent()
+        fetchGate.complete(Unit)
+
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        burst.forEach { assertTrue(it.await() is LBResult.Success, "every request of the burst receives the run success") }
+        assertEquals(
+            expected = listOf("blocking", "notified"),
+            actual = order,
+            "the burst queued behind the full run cost a single manager run",
+        )
+    }
+
+    @Test
+    fun sync_or_join_of_an_unregistered_manager_type_fails() = runOperatorTest { _, _ ->
+        val result = LBSyncOperator.syncOrJoin<FakeOperatorManager>()
+
+        assertTrue(
+            (result as? LBResult.Failure)?.throwable is IllegalArgumentException,
+            "a lookup miss fails with IllegalArgumentException",
+        )
     }
 
     @Test
