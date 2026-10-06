@@ -167,4 +167,69 @@ class RequestCoalescerTest {
 
         assertEquals(expected = 1, actual = executions, "the key was released by the failing owner")
     }
+
+    @Test
+    fun a_request_arriving_after_the_started_run_ended_joins_the_pending_follow_up() = runTest {
+        val runGate = CompletableDeferred<Unit>()
+        val followUpGate = CompletableDeferred<Unit>()
+        val executed = mutableListOf<String>()
+        val running = async {
+            coalescer.run(key = "group") { markStarted ->
+                markStarted()
+                executed += "running"
+                runGate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        runCurrent()
+        val followUpResult = LBResult.Failure<Unit>(throwable = IllegalStateException("follow-up"))
+        val followUp = async {
+            coalescer.run(key = "group") { markStarted ->
+                executed += "follow-up"
+                followUpGate.await()
+                markStarted()
+                followUpResult
+            }
+        }
+        runCurrent()
+        runGate.complete(Unit)
+        running.await()
+        val late = async { coalescer.run(key = "group") { LBResult.Success(Unit).also { executed += "late" } } }
+        runCurrent()
+
+        followUpGate.complete(Unit)
+
+        assertSame(expected = followUpResult, actual = followUp.await(), "the follow-up receives its block result")
+        assertSame(expected = followUpResult, actual = late.await(), "the late request joined the follow-up")
+        assertEquals(expected = listOf("running", "follow-up"), actual = executed, "the late request ran no block of its own")
+    }
+
+    @Test
+    fun a_cancelled_owner_that_already_started_hands_the_request_to_its_pre_start_joiners() = runTest {
+        val startGate = CompletableDeferred<Unit>()
+        val runGate = CompletableDeferred<Unit>()
+        var joinerExecutions = 0
+        val owner = async {
+            coalescer.run(key = "group") { markStarted ->
+                startGate.await()
+                markStarted()
+                runGate.await()
+                LBResult.Success(Unit)
+            }
+        }
+        val joiner = async {
+            coalescer.run(key = "group") {
+                joinerExecutions += 1
+                LBResult.Success(Unit)
+            }
+        }
+
+        runCurrent()
+        startGate.complete(Unit)
+        runCurrent()
+        owner.cancel()
+
+        assertTrue(joiner.await() is LBResult.Success, "the joiner received a result")
+        assertEquals(expected = 1, actual = joinerExecutions, "the joiner re-ran its own block")
+    }
 }

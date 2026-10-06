@@ -639,8 +639,8 @@ class LBSyncOperatorTest {
         val order = mutableListOf<String>()
         val fetchGate = CompletableDeferred<Unit>()
         register(
-            "blocking",
-            LBSyncGroup(
+            key = "blocking",
+            group = LBSyncGroup(
                 syncManagers = linkedSetOf(
                     FakeOperatorManager(
                         store = store,
