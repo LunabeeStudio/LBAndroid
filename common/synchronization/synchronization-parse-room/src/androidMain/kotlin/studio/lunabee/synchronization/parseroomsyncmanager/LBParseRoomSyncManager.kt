@@ -108,9 +108,8 @@ abstract class LBParseRoomSyncManager<RoomData : LBParseRoomModel>(
     /**
      * Override this if you want to do specific work on live query notification.
      *
-     * The triggered sync goes through [LBSyncOperator.syncOrJoin] like every other sync request, so a LiveQuery
-     * notification never starts a run overlapping one already in progress, and a burst of notifications (the echo
-     * of an upload) costs at most one run behind it.
+     * The triggered sync goes through [LBSyncOperator] like every other request, via `syncOrJoin` so a burst of
+     * notifications (the echo of an upload) costs at most one run behind the one in progress.
      *
      * @param event the live query event, can be used to know if it is a creation or an update
      */
