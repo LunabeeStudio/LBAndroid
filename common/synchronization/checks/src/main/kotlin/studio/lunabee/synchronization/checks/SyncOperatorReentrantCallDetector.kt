@@ -43,7 +43,7 @@ import org.jetbrains.uast.getParentOfType
  */
 class SyncOperatorReentrantCallDetector : Detector(), SourceCodeScanner {
 
-    override fun getApplicableMethodNames(): List<String> = listOf("sync", "syncAllManagers", "syncGroup")
+    override fun getApplicableMethodNames(): List<String> = listOf("sync", "syncAllManagers", "syncGroup", "syncOrJoin", "withSyncLock")
 
     override fun visitMethodCall(context: JavaContext, node: UCallExpression, method: PsiMethod) {
         if (method.containingClass?.qualifiedName != OperatorClass) return
