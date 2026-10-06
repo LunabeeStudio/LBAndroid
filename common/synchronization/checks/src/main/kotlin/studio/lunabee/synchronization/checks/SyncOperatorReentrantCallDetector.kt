@@ -32,9 +32,10 @@ import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.getParentOfType
 
 /**
- * Reports a sync request made from inside an engine callback, where the operator's non-reentrant lock is
- * already held by the run executing that callback. The library refuses such a request at runtime
- * (`LBSyncReentrantCallException`); this rule moves the diagnosis to compile time.
+ * Reports a sync request or a `withSyncLock` call made from inside an engine callback, where the operator's
+ * non-reentrant lock is already held by the run executing that callback. The library refuses such a call at
+ * runtime (`LBSyncReentrantCallException`, returned as a failure by a sync request and thrown by
+ * `withSyncLock`); this rule moves the diagnosis to compile time.
  *
  * A callback is recognized by the `@SyncEngineCallback` annotation the library puts on every SPI member
  * its pipeline calls, so the rule follows the annotated set instead of a hardcoded name list. A request
@@ -51,14 +52,18 @@ class SyncOperatorReentrantCallDetector : Detector(), SourceCodeScanner {
         if (!callback.isEngineCallback()) return
         if (node.isLaunchedDetached(callback)) return
 
+        val advice = if (method.name == "withSyncLock") {
+            "launch it on a scope of your own."
+        } else {
+            "register the dependency as an earlier `LBSyncGroup`, or launch the request on a scope of your own."
+        }
         context.report(
             issue = issue,
             scope = node,
             location = context.getLocation(node),
             message = "`LBSyncOperator.${method.name}()` is called from `${callback.name}()`, which the sync " +
-                "engine runs while holding its lock. The request is refused at runtime " +
-                "(`LBSyncReentrantCallException`): register the dependency as an earlier `LBSyncGroup`, or " +
-                "launch the request on a scope of your own.",
+                "engine runs while holding its lock. It is refused at runtime " +
+                "(`LBSyncReentrantCallException`): $advice",
         )
     }
 
@@ -86,17 +91,18 @@ class SyncOperatorReentrantCallDetector : Detector(), SourceCodeScanner {
 
         val issue: Issue = Issue.create(
             id = "SyncOperatorReentrantCall",
-            briefDescription = "Sync request made from inside a sync engine callback",
+            briefDescription = "Sync request or `withSyncLock` called from inside a sync engine callback",
             explanation = """
-                `LBSyncOperator` serializes every sync request behind a lock it holds for the whole run, \
-                and that lock is not reentrant. A request made from inside an engine callback \
-                (`fetchRequest`, `pushObjectsToServer`, … — anything annotated `@SyncEngineCallback`) is \
-                therefore refused with an `LBSyncReentrantCallException`, since honouring it would \
-                deadlock the operator for the lifetime of the process.
+                `LBSyncOperator` serializes every sync request and `withSyncLock` block behind a lock it \
+                holds for the whole run, and that lock is not reentrant. A call made from inside an engine \
+                callback (`fetchRequest`, `pushObjectsToServer`, … — anything annotated \
+                `@SyncEngineCallback`) is therefore refused with an `LBSyncReentrantCallException` \
+                (returned as a failure by a sync request, thrown by `withSyncLock`), since honouring it \
+                would deadlock the operator for the lifetime of the process.
 
-                Model the dependency as an earlier `LBSyncGroup` — groups run sequentially, in \
-                registration order — or launch the request on a scope of your own so it queues behind the \
-                run instead of inside it.
+                For a sync request, model the dependency as an earlier `LBSyncGroup` — groups run \
+                sequentially, in registration order. Otherwise launch the call on a scope of your own so \
+                it queues behind the run instead of inside it.
             """,
             category = Category.CORRECTNESS,
             priority = 8,
