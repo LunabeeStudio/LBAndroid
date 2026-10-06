@@ -43,13 +43,16 @@ LBSyncOperator.sync(group = myGroup)          // one group, its managers per its
 LBSyncOperator.syncGroup(name = "main")       // same, by registration key
 LBSyncOperator.sync(manager = myManager)      // one manager
 LBSyncOperator.sync<UserSyncManager>()        // same, by type — first registered manager of that type
-LBSyncOperator.syncOrJoin(group = myGroup)    // one group, or join the syncOrJoin request of that group in flight
+LBSyncOperator.syncOrJoin(group = myGroup)    // one group, or join the syncOrJoin request of that group not started yet
+LBSyncOperator.syncOrJoin(manager = myManager) // same, for one manager
+LBSyncOperator.syncOrJoin<UserSyncManager>()  // same, by type
 ```
 
-`syncOrJoin(group)` serves a burst of requests with one run: a `syncOrJoin` for a group whose `syncOrJoin`
-request is still queued or running awaits that request and receives its `LBResult` instead of queueing another
-run. A joiner re-reads nothing, so a local change made after the joined run read its uploads waits for the next
-request. If the caller that started the request is cancelled, one of its joiners runs the group itself.
+`syncOrJoin` serves a burst of requests with at most one run behind the one in progress: a `syncOrJoin` for a
+group or manager whose `syncOrJoin` request is still waiting for the lock awaits that request and receives its
+`LBResult` instead of queueing another run. A run that has started is never joined, so a change made before the
+call is always read by the run the caller awaits. A plain `sync(...)` queues one run per call. If the caller that
+started the request is cancelled, one of its joiners runs it itself.
 
 `withSyncLock(block)` runs non-sync work (clearing the synchronized data at logout, for instance) under the
 operator lock: it starts once the sync in progress has ended, and every request made meanwhile queues behind it.

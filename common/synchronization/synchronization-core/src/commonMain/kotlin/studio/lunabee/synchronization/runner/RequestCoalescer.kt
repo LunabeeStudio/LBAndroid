@@ -25,12 +25,13 @@ import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 
 /**
- * Joins concurrent requests sharing a key onto the one already in flight.
+ * Coalesces concurrent requests sharing a key into one pending request.
  *
- * The first [run] call for a key executes its block; every [run] call for the same key arriving before that
- * block returns awaits it and receives the same [LBResult], without executing its own block. Once the block has
- * returned, the next call for the key executes again. Unlike [SyncRunner], no follow-up run is queued: a joining
- * caller is served by the request already in flight.
+ * The first [run] call for a key creates a pending request and executes its block; every [run] call for the same
+ * key arriving before that block calls `markStarted` joins it and receives the same [LBResult], without executing
+ * its own block. Once started, the request no longer accepts joiners: the next call for the key creates a new
+ * pending request. A burst arriving while a request runs therefore costs one follow-up, and a caller never joins a
+ * run that may already have read what it asks for.
  *
  * A cancelled owner hands the request over: one of its joiners executes its own block, and the others join that
  * one. A block failing with an exception resolves its joiners with an [LBResult.Failure] carrying it, then rethrows
@@ -38,18 +39,19 @@ import studio.lunabee.core.model.LBResult
  *
  * @param Key the request identity, compared with [equals].
  */
-internal class SingleFlight<Key> {
+internal class RequestCoalescer<Key> {
     private val mutex: Mutex = Mutex()
-    private val inFlight: MutableMap<Key, CompletableDeferred<LBResult<Unit>?>> = mutableMapOf()
+    private val pending: MutableMap<Key, CompletableDeferred<LBResult<Unit>?>> = mutableMapOf()
 
     /**
-     * Executes [block] for [key], or joins the execution already in flight for it.
+     * Executes [block] for [key], or joins the request for [key] that has not started yet.
      *
-     * @return the result of the execution this caller ran or joined.
+     * @param block the request; it calls `markStarted` once it starts the work later callers must not join.
+     * @return the result of the request this caller ran or joined.
      */
-    suspend fun run(key: Key, block: suspend () -> LBResult<Unit>): LBResult<Unit> {
+    suspend fun run(key: Key, block: suspend (markStarted: suspend () -> Unit) -> LBResult<Unit>): LBResult<Unit> {
         val ownRequest = CompletableDeferred<LBResult<Unit>?>()
-        val request = mutex.withLock { inFlight.getOrPut(key) { ownRequest } }
+        val request = mutex.withLock { pending.getOrPut(key) { ownRequest } }
         return if (request === ownRequest) {
             execute(key = key, request = ownRequest, block = block)
         } else {
@@ -60,19 +62,25 @@ internal class SingleFlight<Key> {
     private suspend fun execute(
         key: Key,
         request: CompletableDeferred<LBResult<Unit>?>,
-        block: suspend () -> LBResult<Unit>,
+        block: suspend (markStarted: suspend () -> Unit) -> LBResult<Unit>,
     ): LBResult<Unit> {
         var outcome: LBResult<Unit>? = null
         try {
-            return block().also { outcome = it }
+            return block { release(key = key, request = request) }.also { outcome = it }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
             outcome = LBResult.Failure(throwable = error)
             throw error
         } finally {
-            withContext(NonCancellable) { mutex.withLock { inFlight.remove(key) } }
+            withContext(NonCancellable) { release(key = key, request = request) }
             request.complete(outcome)
+        }
+    }
+
+    private suspend fun release(key: Key, request: CompletableDeferred<LBResult<Unit>?>) {
+        mutex.withLock {
+            if (pending[key] === request) pending.remove(key)
         }
     }
 }

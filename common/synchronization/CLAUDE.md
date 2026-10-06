@@ -83,9 +83,10 @@ earlier group" rule also holds for direct requests. The lock is NOT held while s
 server-notification listeners (`handleEventData`), and `triggerRefresh` takes it around its launched
 group loop.
 
-Two operator entry points build on the lock: `syncOrJoin(group)` joins the `syncOrJoin` request already in
-flight for the same group (internal `runner/SingleFlight`) instead of queueing a second run; when the caller
-that started the request is cancelled, one of its joiners runs the group itself. `withSyncLock(block)` runs
+Two operator entry points build on the lock: `syncOrJoin(group)` / `syncOrJoin(manager)` join the `syncOrJoin`
+request for the same target that is still waiting for the lock (internal `runner/RequestCoalescer`, released by
+`withRunLock`'s `onLocked` once the lock is taken) instead of queueing a second run, and never join a started run;
+when the caller that started the request is cancelled, one of its joiners runs it itself. `withSyncLock(block)` runs
 non-sync work (e.g. a logout clear) under the lock and inside a `SyncEngineMarker`, so a sync requested from
 inside the block is refused with `LBSyncReentrantCallException` instead of deadlocking, and a `withSyncLock`
 called from a manager callback or another block throws one.
@@ -116,7 +117,7 @@ Two paths deliberately escape the lock:
   leaves the in-flight run untouched. Context inheritance draws the line: the callback's own
   `withContext`/structured children are refused too, a request launched on an unrelated scope is not marked
   and stays allowed (`LBParseRoomSyncManager`'s LiveQuery hook does
-  `liveQueryScope.launch { LBSyncOperator.sync(…) }`). The same trap is caught at compile time by the
+  `liveQueryScope.launch { LBSyncOperator.syncOrJoin(…) }`). The same trap is caught at compile time by the
   `SyncOperatorReentrantCall` lint rule — see **Lint rules** below.
 
 ### Cursor storage (pluggable backend)
@@ -239,6 +240,8 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   caller receives — the old immediate-success-while-dirty behavior is gone. Above that, the operator lock
   serializes the requests themselves, so the collapse now only kicks in for the paths that bypass the
   operator (automatic retry, and a manager reached from two operator requests that were already queued).
+  A burst of `sync(manager)` calls therefore costs one run each; burst-prone triggers (LiveQuery, a
+  floodable button) go through `syncOrJoin`.
 - **Never call `LBSyncOperator.sync*` from inside a manager's SPI** — the operator's `Mutex` is not
   reentrant, and the calling coroutine already holds it. The request fails fast with
   `LBSyncReentrantCallException` instead of deadlocking; launch it on your own scope, or model the

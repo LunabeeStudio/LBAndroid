@@ -54,6 +54,9 @@ Target migration:
       it instead of chaining the lookup yourself: replace
       `LBSyncOperator.syncManager<UserSyncManager>()?.let { LBSyncOperator.sync(manager = it) }` with `LBSyncOperator.sync<UserSyncManager>()`,
       which also stops a lookup miss from silently skipping the sync
+    - a call site that can fire in bursts (a server change notification, a push handler, a button that can be flooded) →
+      `LBSyncOperator.syncOrJoin(manager = myManager)` / `syncOrJoin<UserSyncManager>()` / `syncOrJoin(group = myGroup)` instead of
+      `sync(...)`, so the burst costs at most one run behind the one in progress (see "Concurrent requests no longer collapse" below)
     - `LBSyncOperator.syncAllManagers()` is unchanged — leave those call sites alone
     - all of these are `suspend` and return `LBResult<Unit>`, exactly like the functions they replace, so the surrounding code does not move
     - one exception: `syncGroup(name)` and `sync<T>()` return a non-null `LBResult<Unit>`, while the lookups they replace
@@ -63,7 +66,9 @@ Target migration:
       check what the call site does with a failure
 5. Migrate the call sites that live **inside** a sync manager subclass — typically a custom `onLiveQueryCreateOrUpdate` override, or a
    listener callback that re-triggers its own manager:
-    - `liveQueryScope.launch { synchronize() }` → `liveQueryScope.launch { LBSyncOperator.sync(manager = this@MyParseRoomSyncManager) }`
+    - `liveQueryScope.launch { synchronize() }` →
+      `liveQueryScope.launch { LBSyncOperator.syncOrJoin(manager = this@MyParseRoomSyncManager) }`. Use `syncOrJoin`, not `sync`: LiveQuery
+      echoes every object the manager uploads, and `sync` would run once per event
     - keep the call inside the launched coroutine. It must stay fire-and-forget so it does not run while the manager's own pipeline holds
       the operator's lock
     - the default `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` already does this; only overrides need editing
@@ -91,8 +96,10 @@ Behavior to review after the mechanical replacement:
   on a manager whose retry must not run out of order, and retry at the operator level instead.
 - **Retry pre-emption still works.** Enqueueing a request cancels the pending retry of the managers it targets immediately, before it waits
   for its turn, so a parked retry cannot fire in front of a request that is already queued.
-- **Concurrent requests still collapse.** Two requests for the same manager still collapse into a single follow-up run whose real
-  `LBResult` both callers receive; the operator lock only serializes the requests above that.
+- **Concurrent requests no longer collapse.** The operator lock serializes `sync(...)` requests before they reach the manager, so each one
+  finds the previous run over and starts its own: a burst of N `sync(manager)` calls now costs N runs, where `synchronize()` collapsed
+  them into one follow-up. Route burst-prone triggers through `syncOrJoin(...)`: requests still waiting for the lock coalesce into one run
+  whose `LBResult` they all receive, and a run that has already started is never joined, so a change made before the call is always read.
 
 Unchanged public API — do not touch these:
 
