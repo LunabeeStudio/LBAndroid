@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-06
+
+```
+Synchronization Core 2.1.0-alpha04
+Synchronization Events 2.1.0-alpha04
+Synchronization Core-Datastore 2.1.0-alpha04
+Synchronization Core-Room 2.1.0-alpha04
+Synchronization Parse-Room 2.1.0-alpha04
+Synchronization Remote 2.1.0-alpha04
+bom 4.16.0-alpha04
+```
+
+- Added `LBSyncOperator.syncOrJoin(manager)` and `syncOrJoin<T>()`: synchronizes one manager, or joins the
+  `syncOrJoin` request of that manager still waiting for the lock, so a burst of requests costs at most one run behind
+  the one in progress.
+- **break:** `syncOrJoin(group)` no longer joins a run that has started: a request arriving during the run queues one
+  follow-up that the rest of the burst joins, so a change made before the call is always read by the run the caller
+  awaits.
+- **Fixed:** the default `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` goes through `syncOrJoin(manager)`: since
+  2.1.0-alpha01 a burst of LiveQuery events (the echo of an upload) ran one full sync per event.
+- The `SyncOperatorReentrantCall` lint rule also reports `syncOrJoin` and `withSyncLock` calls from an engine callback.
+
 ## 2026-09-25
 
 ```

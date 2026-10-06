@@ -62,6 +62,25 @@ class SyncOperatorReentrantCallDetectorTest {
     }
 
     @Test
+    fun a_joinable_request_or_a_lock_from_an_annotated_callback_is_reported() {
+        runOnSource(
+            """
+            package test
+
+            import studio.lunabee.synchronization.LBSyncOperator
+            import studio.lunabee.synchronization.syncmanager.LBSyncManager
+
+            class MyManager : LBSyncManager() {
+                override suspend fun fetchRequest() {
+                    LBSyncOperator.syncOrJoin(this)
+                    LBSyncOperator.withSyncLock { }
+                }
+            }
+            """,
+        ).expectErrorCount(2)
+    }
+
+    @Test
     fun a_request_nested_deeper_in_a_callback_is_reported() {
         runOnSource(
             """
@@ -167,6 +186,8 @@ class SyncOperatorReentrantCallDetectorTest {
             suspend fun sync(manager: LBSyncManager) = Unit
             suspend fun syncAllManagers() = Unit
             suspend fun syncGroup(name: String) = Unit
+            suspend fun syncOrJoin(manager: LBSyncManager) = Unit
+            suspend fun withSyncLock(block: suspend () -> Unit) = Unit
         }
         """,
     ).indented()
