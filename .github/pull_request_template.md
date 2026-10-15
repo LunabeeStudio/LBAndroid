@@ -7,7 +7,7 @@
 ## 📝 Checklist
 * [ ] I reviewed the submitted code
 * [ ] I launched `./gradlew detekt`
-* [ ] I filled the [changelog](https://github.com/LunabeeStudio/Lunabee-Compose-Android/blob/develop/CHANGELOG.MD)
+* [ ] I filled the [changelog](https://github.com/LunabeeStudio/LBAndroid/blob/master/CHANGELOG.MD)
 
 ## 🔮 Next steps
 
