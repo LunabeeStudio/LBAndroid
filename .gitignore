@@ -101,8 +101,9 @@ lint/tmp/
 .DS_Store
 *.salive
 
-# Local issue tracker (matt-pocock skills)
-.scratch/
-
 # iOS
 *.xcuserdatad
+
+# whackagent run reports
+.whackagent/reports/*
+!.whackagent/reports/.gitkeep
