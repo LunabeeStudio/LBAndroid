@@ -23,7 +23,7 @@ migration does not re-sync anything.
 
 Target migration:
 
-1. Update the synchronization version entries in `libs.versions.toml` to 2.1.0-alpha01 or later, checking Maven Central for the artifacts
+1. Update the synchronization version entries in `libs.versions.toml` to 2.1.0 or later, checking Maven Central for the artifacts
    the project actually uses:
     - `studio.lunabee.synchronization:synchronization-core`
     - `studio.lunabee.synchronization:synchronization-events`
@@ -34,7 +34,7 @@ Target migration:
       The five artifacts are released in lockstep, so keep them on the same version.
 2. If the project already consumes `studio.lunabee:bom`, prefer the BOM over per-artifact versions. From 4.16.0-alpha01 the BOM pins the
    five `studio.lunabee.synchronization` artifacts, so the project can drop its own synchronization versions:
-    - bump the BOM to 4.16.0-alpha01 or later (check Maven Central)
+    - bump the BOM to 4.16.0 or later (check Maven Central)
     - a versionless dependency needs the BOM in the same scope it is declared in: a module that exposes a synchronization artifact with
       `api(...)` must also declare `api(platform(...))`, otherwise the constraint is not exported and every consumer module fails with
       `Could not find studio.lunabee.synchronization:<artifact>:.` (note the empty version). `implementation(platform(...))` is enough for a

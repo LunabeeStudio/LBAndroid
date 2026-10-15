@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-15
+
+```
+Lbcpresenter 2.1.0
+LbcpresenterHilt 2.1.0
+LbcpresenterKoin 2.1.0
+LbcpresenterHiltKsp 2.1.0
+LbcpresenterKsp 2.1.0
+LbcpresenterKoinKsp 2.1.0
+Synchronization Core 2.1.0
+Synchronization Events 2.1.0
+Synchronization Core-Datastore 2.1.0
+Synchronization Core-Room 2.1.0
+Synchronization Parse-Room 2.1.0
+Synchronization Remote 2.1.0
+bom 4.16.0
+```
+
+- Promote presenter 2.1.0, synchronization 2.1.0 and bom 4.16.0 to stable, with no change since 2.1.0-rc01 / 2.1.0-rc02
+  (presenter), 2.1.0-alpha04 (synchronization) and 4.16.0-alpha04 (bom).
+
 ## 2026-10-06
 
 ```
