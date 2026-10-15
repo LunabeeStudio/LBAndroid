@@ -22,9 +22,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 import studio.lunabee.synchronization.LogTag
+import studio.lunabee.synchronization.SyncEngineCallback
+import studio.lunabee.synchronization.SyncEngineMarker
 import studio.lunabee.synchronization.runner.SyncRunner
 import studio.lunabee.synchronization.store.LBSyncStorage
 import studio.lunabee.synchronization.store.SyncKey
@@ -142,6 +145,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * Save the new fresh data you just got from the sync download
      * @param data: object list to be updated
      */
+    @SyncEngineCallback
     protected abstract suspend fun updateData(data: List<ServerData>)
 
     /**
@@ -157,16 +161,19 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param sinceLastDate: the last server `updatedAt` cursor, or `null` to fetch from the beginning.
      * @return the fetched page.
      */
+    @SyncEngineCallback
     protected abstract suspend fun fetchRequest(
         page: Int = 0,
         cursor: String? = null,
         sinceLastDate: Instant?,
     ): FetchPage<ServerData, PageInfo>
 
+    @SyncEngineCallback
     protected abstract fun updatedAt(obj: ServerData): Instant?
 
     protected abstract fun isInSync(obj: LocalData): Boolean
 
+    @SyncEngineCallback
     protected abstract suspend fun objectToBeUploaded(): List<LocalData>
 
     /**
@@ -177,6 +184,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      *
      * @param objects: the object list to push.
      */
+    @SyncEngineCallback
     protected abstract suspend fun pushObjectsToServer(objects: List<LocalData>)
 
     abstract suspend fun hasSomethingToUpload(): Boolean
@@ -185,13 +193,26 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * Override this if you want to support paging
      * @return the number of object you want to fetch by page
      */
+    @SyncEngineCallback
     protected open fun queryPageSize(): Int? = null
 
     /**
      * You can activate this option to optimize a sync failure.
      * This requires records fetched to be ordered by ascending updatedAt
      */
+    @SyncEngineCallback
     protected open fun supportIncrementalSync(): Boolean = false
+
+    /**
+     * Whether a run uploads the local changes before downloading, instead of the default download → upload →
+     * re-download. When `true`, a run is upload → download: an upload failure fails the run before anything is
+     * downloaded, and a single download follows a successful upload (so [supportChangeNotificationFromServer]
+     * no longer decides a re-download).
+     *
+     * Defaults to `false`.
+     */
+    @SyncEngineCallback
+    protected open fun uploadBeforeDownload(): Boolean = false
 
     /**
      * Whether the server pushes change notifications to this client (e.g. Parse LiveQuery), so the
@@ -207,6 +228,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * [startServerNotificationListener] subscribes a LiveQuery) must override this to `true` to actually
      * activate it; otherwise the listener is never started and every sync re-downloads after upload.
      */
+    @SyncEngineCallback
     open fun supportChangeNotificationFromServer(): Boolean = false
 
     /**
@@ -242,9 +264,36 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * notifies of changes) re-download. Concurrent calls collapse into a single follow-up run via
      * [SyncRunner]; a failed run is retried automatically after [retryTempo].
      *
+     * Engine-internal: the public route is
+     * [studio.lunabee.synchronization.LBSyncOperator.sync], which serializes the run against every other
+     * sync request so the operator keeps ordering under control.
+     *
+     * The pipeline runs under a [SyncEngineMarker], which is what lets the operator refuse a sync request
+     * made from inside a manager callback instead of deadlocking on its lock.
+     *
      * @return [LBResult.Success] when the pipeline completed, or [LBResult.Failure] carrying the cause.
      */
-    suspend fun synchronize(): LBResult<Unit> = syncRunner.run { runPipeline() }
+    internal suspend fun synchronize(): LBResult<Unit> = syncRunner.run {
+        withContext(SyncEngineMarker()) { runPipeline() }
+    }
+
+    /**
+     * Pre-empt a pending automatic retry now, without waiting for the sync request to actually start.
+     * Called by [studio.lunabee.synchronization.LBSyncOperator] when a request targeting this manager is
+     * enqueued, so a retry parked behind the operator's sync lock cannot fire while the explicit request
+     * waits its turn.
+     */
+    internal suspend fun cancelPendingRetry() {
+        syncRunner.cancelPendingRetry()
+    }
+
+    /**
+     * Suspend until the run in flight, if any, has ended. The run is detached from its callers, so the operator
+     * waits for it here before releasing its sync lock on behalf of a cancelled caller.
+     */
+    internal suspend fun awaitRunEnd() {
+        syncRunner.awaitIdle()
+    }
 
     /**
      * Reset the sync manager
@@ -276,10 +325,15 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
 
     private suspend fun runPipeline(): LBResult<Unit> {
         return try {
-            download()
-            val uploaded = upload()
-            if (uploaded && !supportChangeNotificationFromServer()) {
+            if (uploadBeforeDownload()) {
+                upload()
                 download()
+            } else {
+                download()
+                val uploaded = upload()
+                if (uploaded && !supportChangeNotificationFromServer()) {
+                    download()
+                }
             }
             setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
             LBResult.Success(Unit)
@@ -348,7 +402,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
                 val fetchPage = fetchRequest(page = page, cursor = cursor, sinceLastDate = lastUpdatedDate)
                 val objects = fetchPage.objects
 
-                progress = progress.advance(objects.mapNotNull(::updatedAt))
+                progress = progress.advance(objects.mapNotNull(::updatedAt) + listOfNotNull(fetchPage.maxUpdatedAt))
 
                 updateData(objects)
                 val hasNext = hasNextPage(objects.size, fetchPage.pageInfo)
@@ -402,6 +456,7 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
      * @param pageInfo Data used to determine the pagination state. By default, the number of objects returned by the query as integer.
      * @return true if paged query has a next page
      */
+    @SyncEngineCallback
     protected open fun hasNextPage(pageInfo: PageInfo): Boolean = false
 
     private fun hasNextPage(objectCount: Int, pageInfo: PageInfo?): Boolean {

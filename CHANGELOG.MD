@@ -5,6 +5,266 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-15
+
+```
+Lbcpresenter 2.1.0
+LbcpresenterHilt 2.1.0
+LbcpresenterKoin 2.1.0
+LbcpresenterHiltKsp 2.1.0
+LbcpresenterKsp 2.1.0
+LbcpresenterKoinKsp 2.1.0
+Synchronization Core 2.1.0
+Synchronization Events 2.1.0
+Synchronization Core-Datastore 2.1.0
+Synchronization Core-Room 2.1.0
+Synchronization Parse-Room 2.1.0
+Synchronization Remote 2.1.0
+bom 4.16.0
+```
+
+Stable release of 2.1.0-rc01 / 2.1.0-rc02 (presenter), 2.1.0-alpha04 (synchronization) and 4.16.0-alpha04 (bom), with no
+change since. Recap since the previous stable releases (details in the pre-release entries below):
+
+**Presenter (since 2.0.0)**
+
+- First stable `lbcpresenter-ksp` and `lbcpresenter-koin-ksp` (previously 2.0.0-rc04), `lbcpresenter-hilt` and
+  `lbcpresenter-hilt-ksp`
+- **break:** `lbcpresenter` no longer depends on `lbccore` / `lbcimage`: add them explicitly if your screens used them transitively
+- New `lbcpresenter-hilt`: Hilt flavour of `PresentScreen` (`hiltViewModel()`, explicit `ViewModelStoreOwner` + factory +
+  `CreationExtras`, and `@HiltViewModel(assistedFactory = …)` overloads). Every overload renders nothing once the
+  `LocalLifecycleOwner` is destroyed, avoiding the NavHost `IllegalStateException`
+- New `lbcpresenter-hilt-ksp`: generated reducer factories get an `@Inject` constructor, so a Hilt project only needs
+  `ksp(lbcpresenter-hilt-ksp)`. Constructor qualifiers are propagated (`@Named` keeps its `jakarta`/`javax` flavour)
+- `lbcpresenter-ksp`: factory generation ownership resolved through `FactoryOwningProcessorProvider` (KSP service registrations),
+  with a compile error instead of duplicate or missing factories; `GeneratedFactoryDecorator.constructorAnnotations` exposed
+- `lbcpresenter-hilt` / `lbcpresenter-koin` expose the view model libraries the inline `PresentScreen` calls as `api`
+
+**Synchronization (since 2.0.0)**
+
+- **break:** `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are `internal`: every sync goes through
+  `LBSyncOperator` (`sync(manager)`, `sync(group)`, `syncGroup(name)`, `sync<T>()`), which serializes requests. See
+  [MIGRATION-SYNCHRONIZATION-2.1.0.MD](common/synchronization/MIGRATION-SYNCHRONIZATION-2.1.0.MD)
+- **break:** a cancelled sync caller returns only once the targeted runs have ended (the operator lock is held until then)
+- Added `syncOrJoin(group)` / `syncOrJoin(manager)` / `syncOrJoin<T>()` to coalesce bursts of requests, and `withSyncLock(block)`
+  to run work (e.g. logout cleanup) between syncs
+- A sync request from an engine callback (`@SyncEngineCallback`) fails with `LBSyncReentrantCallException` instead of
+  deadlocking, and the `SyncOperatorReentrantCall` lint rule (shipped with the Datastore and Room backends) reports it at build time
+- `LBSyncGroup` `executionMode` (`Parallel` / `Sequential`), `LBSyncManager.uploadBeforeDownload()`, `FetchPage.maxUpdatedAt`
+- Sync requests mark their managers `PendingSync` while queued; new `isActive()` / `statusByKey(groupNames)` /
+  `isSyncing(groupNames)` / `lastSuccessfulSyncDate()` observers
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic remote pull and two-way sync managers
+- `synchronization-core-datastore` has a JVM target
+- **Fixed:** cold-start `AppForeground` re-synchronizing every group regardless of its delay; LiveQuery bursts running one full
+  sync per event; combined status flows completing on an empty registry
+
+**bom (since 4.15.0)**
+
+- Pins the `studio.lunabee.synchronization` artifacts, so a project can drop its per-artifact synchronization versions
+- Also pins `synchronization-core-datastore-jvm`, published since the module gained its JVM target
+
+## 2026-10-06
+
+```
+Synchronization Core 2.1.0-alpha04
+Synchronization Events 2.1.0-alpha04
+Synchronization Core-Datastore 2.1.0-alpha04
+Synchronization Core-Room 2.1.0-alpha04
+Synchronization Parse-Room 2.1.0-alpha04
+Synchronization Remote 2.1.0-alpha04
+bom 4.16.0-alpha04
+```
+
+- Added `LBSyncOperator.syncOrJoin(manager)` and `syncOrJoin<T>()`: synchronizes one manager, or joins the
+  `syncOrJoin` request of that manager still waiting for the lock, so a burst of requests costs at most one run behind
+  the one in progress.
+- **break:** `syncOrJoin(group)` no longer joins a run that has started: a request arriving during the run queues one
+  follow-up that the rest of the burst joins, so a change made before the call is always read by the run the caller
+  awaits.
+- **Fixed:** the default `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` goes through `syncOrJoin(manager)`: since
+  2.1.0-alpha01 a burst of LiveQuery events (the echo of an upload) ran one full sync per event.
+- The `SyncOperatorReentrantCall` lint rule also reports `syncOrJoin` and `withSyncLock` calls from an engine callback.
+
+## 2026-09-25
+
+```
+Synchronization Core 2.1.0-alpha03
+Synchronization Events 2.1.0-alpha03
+Synchronization Core-Datastore 2.1.0-alpha03
+Synchronization Core-Room 2.1.0-alpha03
+Synchronization Parse-Room 2.1.0-alpha03
+Synchronization Remote 2.1.0-alpha03
+bom 4.16.0-alpha03
+```
+
+- Added `FetchPage.maxUpdatedAt`: a page-level `updatedAt` folded into the incremental cursor together with the
+  per-object dates, for pages holding records left out of `objects` that must still move the cursor.
+- Added `LBSyncManager.uploadBeforeDownload()`: `true` runs upload → download, so an upload failure fails the run
+  before anything is downloaded. Defaults to `false` (download → upload → re-download, unchanged).
+- Added `LBSyncOperator.syncOrJoin(group)`: synchronizes a group, or joins the `syncOrJoin` request already in flight
+  for that group and receives its result, instead of queueing another run. When the caller that started the request
+  is cancelled, one of its joiners runs the group itself.
+- Added `LBSyncOperator.withSyncLock(block)`: runs a block under the operator sync lock, after the sync in progress
+  and before any sync requested meanwhile (e.g. to clear the synchronized data at logout). A sync requested from
+  inside the block fails with `LBSyncReentrantCallException` instead of deadlocking.
+- **break:** a sync caller cancelled mid-run no longer releases the operator lock while its detached pipeline keeps
+  running: the lock is held, `NonCancellable`, until the targeted managers' runs have ended, so a `withSyncLock` block
+  never overlaps them. A cancelled `syncAllManagers()`, `sync(group)` or `sync(manager)` caller therefore returns only
+  once the targeted runs have ended: `withTimeout { LBSyncOperator.sync(…) }` or a cancelled scope no longer returns
+  at the deadline.
+- **Fixed:** a sync request or `withSyncLock` made from an `LBSyncGroup.isEnabled` gate fails with
+  `LBSyncReentrantCallException` instead of deadlocking the operator.
+- `synchronization-core-datastore` now has a JVM target: JVM consumers build `DataStoreSyncTimestampLocalDataSource`
+  over their own `DataStore<Preferences>`.
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic, final `LBRemotePullSyncManager` and
+  `LBRemoteSyncManager` over a remote data source (keyset-paged pull since a cursor, `fetchPage(cursor, updatedAfter)`
+  → `LBRemotePage` with its `nextCursor`; find by id then create or update) and a local data source (whole-download
+  write, conditional mark-pushed), with no Ktor, Parse or Room dependency.
+
+## 2026-09-24
+
+```
+LbcpresenterHilt 2.1.0-rc02
+```
+
+- **Fixed:** every `PresentScreen` overload renders nothing once the composition's `LocalLifecycleOwner` is destroyed. A
+  navigation-compose `NavHost` can still recompose a `NavBackStackEntry` that has just been destroyed while it leaves the
+  composition, and resolving the presenter then threw `IllegalStateException: You cannot access the NavBackStackEntry's
+  ViewModels after the NavBackStackEntry is destroyed.`
+- `lbcpresenter-hilt` now exposes `lifecycle-runtime-compose` as an `api` dependency, since the inlined `PresentScreen`
+  reads `LocalLifecycleOwner` in the consumer's code
+
+## 2026-09-21
+
+```
+Synchronization Core 2.1.0-alpha02
+Synchronization Events 2.1.0-alpha02
+Synchronization Core-Datastore 2.1.0-alpha02
+Synchronization Core-Room 2.1.0-alpha02
+Synchronization Parse-Room 2.1.0-alpha02
+bom 4.16.0-alpha02
+```
+
+- Added `LBSyncProcessStatus.isActive()`: `PendingSync` on top of what `isProcessing()` covers, i.e. a run
+  queued behind the one the operator is currently running.
+- **Changed:** every `LBSyncOperator` sync request (`syncAllManagers`, `sync(group)`, `sync(manager)`,
+  `syncGroup(name)`) now marks its target managers `PendingSync` before queueing on the operator lock,
+  as the event-triggered path already did. A consumer observing statuses therefore sees
+  "Waiting for synchronization" during the queueing window instead of the previous terminal status. A
+  manager the run in progress is already processing keeps its status, and a cancelled caller (a
+  `withTimeout`, a cancelled scope) restores the status it published instead of leaving the manager
+  pending forever.
+- **Fixed:** the per-event refresh debounce (`LBSyncRefreshEvent.minimumDelay`) reads the persisted sync
+  cursor instead of the status-derived date. That date fell back to epoch 0 until
+  `LBSyncOperator.loadAllStatuses()` had run, so on every cold start the first `AppForeground` event
+  re-synchronized every group regardless of its configured delay. The internal
+  `LBSyncGroup.lastSuccessfulSync` is gone, replaced by `LBSyncGroup.lastSuccessfulSyncDate()`.
+- Added `LBSyncGroup.isActive()` and `LBSyncOperator.isActive()`, the `isActive()` counterparts of
+  `isSyncing()`. Await those to cover a sync request from the moment it is enqueued, since the operator
+  serializes requests and a queued group only leaves `PendingSync` when its turn comes.
+- Added `LBSyncOperator.statusByKey(groupNames)`, `LBSyncOperator.isSyncing(groupNames)` and
+  `LBSyncOperator.isActive(groupNames)`, which observe the groups registered under the given names
+  instead of the whole registry. Duplicate members are observed once; an unresolved name is logged and
+  skipped.
+- **Fixed:** the combined status flows of `LBSyncGroup` / `LBSyncOperator` no longer complete when the
+  registry snapshot is empty — they emit `emptyMap()` (`false` for the derived flows) once and then
+  suspend, so a `first { … }` on an empty registry waits instead of throwing `NoSuchElementException`.
+- Added `LBSyncGroup.lastSuccessfulSyncDate()`: the oldest member date read from the store and coerced to
+  now, or `null` when the group is empty or a member has never synchronized successfully.
+
+## 2026-09-16
+
+```
+Lbcpresenter 2.1.0-rc01
+LbcpresenterHilt 2.1.0-rc01
+LbcpresenterKoin 2.1.0-rc01
+LbcpresenterHiltKsp 2.1.0-rc01
+LbcpresenterKsp 2.1.0-rc01
+LbcpresenterKoinKsp 2.1.0-rc01
+```
+
+- Add `lbcpresenter-hilt` with the Hilt flavour of `PresentScreen`, resolving the presenter through `hiltViewModel()`, plus an
+  overload taking an explicit `ViewModelStoreOwner` and `ViewModelProvider.Factory` for hosts that are not a Hilt view model
+  store owner, such as an input method service, and an overload taking a `@HiltViewModel(assistedFactory = …)` creation callback for
+  presenters needing a runtime value only the composition has
+- Add `lbcpresenter-hilt-ksp`, generating reducer factories with a `@javax.inject.Inject` primary constructor so Hilt binds them without
+  any hand-written module. Qualifiers declared on injected reducer constructor parameters are propagated onto the generated factory, and
+  `@FactoryArg` parameters keep living in the generated `FactoryArgs` data class
+- **break:** `lbcpresenter` no longer depends on `lbccore` / `lbcimage`: neither was used by the presenter runtime, and shipping them
+  forced every consumer to resolve the `studio.lunabee.compose:core` coordinates (duplicate classes for projects still on
+  `studio.lunabee.compose:lbccore`). Add the dependency explicitly if your screens needed it transitively
+- `lbcpresenter-ksp` now exposes `GeneratedFactoryDecorator.constructorAnnotations` and stands down from factory generation when
+  `lbcpresenter-hilt-ksp` is on the KSP classpath, so a Hilt project only needs `ksp(lbcpresenter-hilt-ksp)` with no extra KSP option
+- `lbcpresenter-ksp` now exposes `FactoryOwningProcessorProvider`, the contract a DI specific processor provider implements to take
+  factory generation over. Ownership is resolved once through the KSP service registrations instead of a hard-coded class name, and
+  every processor of the compilation generates the factories only when it owns them. `lbcpresenter-hilt-ksp` warns when another DI
+  processor is on the KSP classpath (its factories then carry `@Inject` only) or when `studio.lunabee.presenter.annotateFactory` is
+  disabled (its factories then carry no `@Inject` constructor at all)
+- `lbcpresenter-ksp` fails the compilation, instead of generating a factory twice or none, when two DI specific processors take factory
+  generation over for the same configuration, when the KSP services of the processor classpath cannot be read, or when
+  `studio.lunabee.presenter.annotateFactory` is set to a value which is neither `true` nor `false`
+- `@Named` qualifiers propagated onto a generated factory keep the `jakarta.inject` flavour when the reducer declared it, instead of
+  always falling back to `javax.inject.Named`
+- `lbcpresenter-hilt` and `lbcpresenter-koin` expose `hilt-lifecycle-viewmodel-compose` + `lifecycle-viewmodel-compose` /
+  `koin-compose-viewmodel` as `api`: all of them are called from the inline `PresentScreen`, so a consumer could not compile it without
+  declaring them again
+- The `lbcpresenter-hilt` `PresentScreen` overload taking a `ViewModelStoreOwner` also takes the `CreationExtras` the presenter is built
+  with, so a presenter reading its route arguments from a `SavedStateHandle` works on a host with no default extras
+
+## 2026-09-08
+
+```
+Synchronization Core 2.1.0-alpha01
+Synchronization Events 2.1.0-alpha01
+Synchronization Core-Datastore 2.1.0-alpha01
+Synchronization Core-Room 2.1.0-alpha01
+Synchronization Parse-Room 2.1.0-alpha01
+bom 4.16.0-alpha01
+```
+
+- **break:** `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are now `internal`. Every sync
+  request goes through `LBSyncOperator`, which is therefore the only place ordering is decided. Replace
+  `myManager.synchronize()` with `LBSyncOperator.sync(manager = myManager)` and `myGroup.syncManagers()`
+  with `LBSyncOperator.sync(group = myGroup)`.
+- Added `LBSyncOperator.sync(manager)`, `LBSyncOperator.sync(group)`, `LBSyncOperator.syncGroup(name)` and the reified
+  `LBSyncOperator.sync<MyManager>()`, which synchronizes the first registered manager of that type. The two lookup variants return a
+  `Failure` carrying an `IllegalArgumentException` when nothing matches, instead of silently skipping the sync.
+- Sync requests are now serialized by the operator: a manager or group synchronized on its own waits for
+  the run already in progress instead of overlapping it, so group registration order also holds for
+  direct requests. The automatic retry of a failed run stays detached (set `retryTempo = null` on a
+  manager whose retry must not run out of order).
+- Calling an `LBSyncOperator` sync API from inside a manager's own SPI (`fetchRequest`,
+  `pushObjectsToServer`, …) no longer deadlocks the operator: the request is refused with a `Failure`
+  carrying the new `LBSyncReentrantCallException`, and the run in progress is left alone. A request
+  launched on a scope of your own from a callback is unaffected and still queues normally.
+- Added the `@SyncEngineCallback` marker annotation on every SPI member the pipeline calls while holding
+  the lock (`fetchRequest`, `updateData`, `updatedAt`, `objectToBeUploaded`, `pushObjectsToServer`,
+  `queryPageSize`, `supportIncrementalSync`, `supportChangeNotificationFromServer`, `hasNextPage`, and the
+  `parse-room` hooks `createObjectFrom`, `push`, `parseQuery`, `tableParseName`, `update`). Members reached
+  outside a run — `startServerNotificationListener`, `hasSomethingToUpload`, the LiveQuery hooks — are
+  deliberately left unmarked, since a sync request from there is legitimate.
+- `LBSyncGroup` takes an `executionMode` (`LBSyncExecutionMode.Parallel` by default, so existing groups
+  are unchanged): `Sequential` runs the group's managers one at a time, in `syncManagers` order, for a
+  group whose managers must not hit the server concurrently. The `isEnabled` gate, the "every manager
+  attempts" rule and the failure aggregation are identical in both modes — only the concurrency changes.
+  A real dependency between managers still belongs in two groups, which the operator runs in
+  registration order.
+- New Android Lint rule `SyncOperatorReentrantCall` (severity error) reports a sync request written inside
+  a `@SyncEngineCallback` member, so the deadlock is diagnosed at compile time instead of at runtime. It
+  ships inside `synchronization-core-datastore` and `synchronization-core-room` (`lintPublish`), so an
+  Android consumer of either storage backend gets it without wiring anything. A request handed to
+  `launch`/`async` is not reported (that is the documented fire-and-forget escape), and neither is one
+  hidden behind a helper function — the runtime refusal covers what static analysis cannot see.
+- Enqueueing a sync request pre-empts the pending automatic retry of the managers it targets immediately,
+  before it waits for its turn: `SyncRunner`'s pre-emption only applies once a request reaches `run()`, so
+  without this a retry could fire in front of a request already queued behind the operator. Added
+  `SyncRunner.cancelPendingRetry()`, which cancels a parked retry without touching the in-flight run.
+- `LBParseRoomSyncManager` LiveQuery notifications now trigger their sync through `LBSyncOperator`.
+- Add [MIGRATION-SYNCHRONIZATION-2.1.0.MD](common/synchronization/MIGRATION-SYNCHRONIZATION-2.1.0.MD) to help client projects move their
+  sync call sites onto the operator.
+- Bump `bom` to 4.16.0-alpha01: it now pins the five `studio.lunabee.synchronization` artifacts, so a project can drop its per-artifact
+  synchronization versions.
+
 ## 2026-08-31
 
 ```

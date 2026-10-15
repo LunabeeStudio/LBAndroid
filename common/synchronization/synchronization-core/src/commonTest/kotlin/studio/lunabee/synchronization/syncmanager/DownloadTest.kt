@@ -389,4 +389,44 @@ class DownloadTest {
     }
 
     // endregion
+
+    // region page-level cursor
+
+    @Test
+    fun a_page_max_updated_at_moves_the_cursor_without_any_object() = runManagerTest { store, scope ->
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = listOf(FetchPage(objects = emptyList(), maxUpdatedAt = Instant.fromEpochMilliseconds(900L))),
+            supportChangeNotification = true,
+        )
+
+        manager.synchronize()
+
+        assertEquals(
+            expected = Instant.fromEpochMilliseconds(900L),
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "records left out of the page objects still move the cursor through FetchPage.maxUpdatedAt",
+        )
+    }
+
+    @Test
+    fun a_page_max_updated_at_older_than_its_objects_keeps_the_object_max() = runManagerTest { store, scope ->
+        val manager = FakeSyncManager(
+            store = store,
+            scope = scope,
+            pages = listOf(FetchPage(objects = listOf(obj(epochMillis = 700L)), maxUpdatedAt = Instant.fromEpochMilliseconds(300L))),
+            supportChangeNotification = true,
+        )
+
+        manager.synchronize()
+
+        assertEquals(
+            expected = Instant.fromEpochMilliseconds(700L),
+            actual = store.lastServerSyncDate(syncKey = manager.syncKey),
+            "the cursor is the max of the object dates and the page date",
+        )
+    }
+
+    // endregion
 }

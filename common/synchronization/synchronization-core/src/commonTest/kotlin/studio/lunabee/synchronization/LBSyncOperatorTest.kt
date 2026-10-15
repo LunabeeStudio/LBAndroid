@@ -16,10 +16,17 @@
 
 package studio.lunabee.synchronization
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.synchronization.store.SyncKey
@@ -35,7 +42,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class LBSyncOperatorTest {
@@ -62,6 +71,244 @@ class LBSyncOperatorTest {
             actual = order,
             "groups complete in LinkedHashMap registration order",
         )
+    }
+
+    // endregion
+
+    // region single entry point serialization
+
+    @Test
+    fun a_manager_synchronized_directly_waits_for_the_in_flight_full_run() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val grouped = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "grouped",
+            runOrder = order,
+            runId = "grouped",
+            fetchGate = fetchGate,
+        )
+        register("grouped", LBSyncGroup(syncManagers = linkedSetOf(grouped)))
+        val direct = FakeOperatorManager(store = store, scope = scope, syncKey = "direct", runOrder = order, runId = "direct")
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val directRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(manager = direct) }
+        runCurrent()
+
+        assertEquals(
+            expected = listOf("grouped"),
+            actual = order,
+            "the direct request has not started while the full run holds the operator",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        assertTrue(directRun.await() is LBResult.Success, "the direct request succeeds")
+        assertEquals(expected = listOf("grouped", "direct"), actual = order, "the direct request ran after the full run")
+    }
+
+    @Test
+    fun a_queued_request_marks_its_targets_pending_before_it_gets_the_lock() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        register("blocking", LBSyncGroup(syncManagers = linkedSetOf(blocking)))
+        val queuedManager = FakeOperatorManager(store = store, scope = scope, syncKey = "queued", runOrder = order, runId = "queued")
+        val queuedGroup = LBSyncGroup(syncManagers = linkedSetOf(queuedManager))
+        register("queued", queuedGroup)
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val queuedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = queuedGroup) }
+        runCurrent()
+
+        assertEquals(
+            expected = LBSyncProcessStatus.PendingSync,
+            actual = queuedManager.currentSyncStatus,
+            "a request waiting for the lock already publishes PendingSync, so isActive covers it",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        assertTrue(queuedRun.await() is LBResult.Success, "the queued request succeeds")
+        assertTrue(queuedManager.currentSyncStatus is LBSyncProcessStatus.SyncSuccessfully, "the pipeline overwrites PendingSync")
+    }
+
+    @Test
+    fun a_queued_request_leaves_a_running_target_alone() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val running = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "running",
+            runOrder = order,
+            runId = "running",
+            fetchGate = fetchGate,
+        )
+        val runningGroup = LBSyncGroup(syncManagers = linkedSetOf(running))
+        register("running", runningGroup)
+
+        val inFlight: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = runningGroup) }
+        runCurrent()
+        val statusWhileRunning = running.currentSyncStatus
+        val queuedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+
+        assertTrue(statusWhileRunning.isProcessing(), "the in-flight run is mid-pipeline")
+        assertEquals(
+            expected = statusWhileRunning,
+            actual = running.currentSyncStatus,
+            "a queued request does not reset a manager the in-flight run is processing",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(inFlight.await() is LBResult.Success, "the in-flight run succeeds")
+        assertTrue(queuedRun.await() is LBResult.Success, "the queued request succeeds")
+    }
+
+    @Test
+    fun a_cancelled_request_does_not_leave_its_targets_pending() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        val blockingGroup = LBSyncGroup(syncManagers = linkedSetOf(blocking))
+        register("blocking", blockingGroup)
+        val abandonedManager = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "abandoned",
+            runOrder = order,
+            runId = "abandoned",
+        )
+        val abandonedGroup = LBSyncGroup(syncManagers = linkedSetOf(abandonedManager))
+        register("abandoned", abandonedGroup)
+        val statusBefore = abandonedManager.currentSyncStatus
+
+        val blockingRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = blockingGroup) }
+        runCurrent()
+        val abandonedRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = abandonedGroup) }
+        runCurrent()
+        assertEquals(expected = LBSyncProcessStatus.PendingSync, actual = abandonedManager.currentSyncStatus, "the request is queued")
+
+        abandonedRun.cancel()
+        runCurrent()
+
+        assertEquals(
+            expected = statusBefore,
+            actual = abandonedManager.currentSyncStatus,
+            "a cancelled caller restores the status it published, instead of latching PendingSync forever",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(blockingRun.await() is LBResult.Success, "the blocking run succeeds")
+    }
+
+    @Test
+    fun a_request_queued_behind_the_operator_pre_empts_the_pending_retry() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val blocking = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "blocking",
+            runOrder = order,
+            runId = "blocking",
+            fetchGate = fetchGate,
+        )
+        register("blocking", LBSyncGroup(syncManagers = linkedSetOf(blocking)))
+        val failing = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "failing",
+            runOrder = order,
+            runId = "failing",
+            failFetchTimes = 1,
+            retryTempo = 30.seconds,
+        )
+
+        assertTrue(LBSyncOperator.sync(manager = failing) is LBResult.Failure, "the first run fails, scheduling a retry")
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val queued: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(manager = failing) }
+        runCurrent()
+        advanceTimeBy(60.seconds)
+        runCurrent()
+
+        assertEquals(
+            expected = listOf("failing", "blocking"),
+            actual = order,
+            "the retry tempo elapsed while the request was queued, but the queued request pre-empted the retry",
+        )
+
+        fetchGate.complete(Unit)
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        assertTrue(queued.await() is LBResult.Success, "the queued request succeeds")
+        assertEquals(
+            expected = listOf("failing", "blocking", "failing"),
+            actual = order,
+            "the queued request ran exactly once, after the full run",
+        )
+    }
+
+    @Test
+    fun sync_by_type_runs_the_registered_manager_of_that_type() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("first", group(store, scope, "a", order = order, id = "first"))
+
+        val result = LBSyncOperator.sync<FakeOperatorManager>()
+
+        assertTrue(result is LBResult.Success, "the registered manager succeeding returns Success")
+        assertEquals(expected = listOf("first"), actual = order, "the manager found by type ran")
+    }
+
+    @Test
+    fun sync_by_type_fails_when_no_manager_of_that_type_is_registered() = runOperatorTest { _, _ ->
+        val result = LBSyncOperator.sync<FakeOperatorManager>()
+
+        assertTrue(result is LBResult.Failure, "an unregistered type returns Failure")
+        assertTrue(result.throwable is IllegalArgumentException, "the failure carries an IllegalArgumentException")
+    }
+
+    @Test
+    fun sync_group_runs_only_the_named_group() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("first", group(store, scope, "a", order = order, id = "first"))
+        register("second", group(store, scope, "b", order = order, id = "second"))
+
+        val result = LBSyncOperator.syncGroup(name = "second")
+
+        assertTrue(result is LBResult.Success, "the named group succeeding returns Success")
+        assertEquals(expected = listOf("second"), actual = order, "only the named group ran")
+    }
+
+    @Test
+    fun sync_group_with_an_unknown_key_fails_without_running_anything() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("first", group(store, scope, "a", order = order, id = "first"))
+
+        val result = LBSyncOperator.syncGroup(name = "nope")
+
+        assertTrue(result is LBResult.Failure, "an unregistered key returns Failure")
+        assertTrue(result.throwable is IllegalArgumentException, "the failure carries an IllegalArgumentException")
+        assertTrue(order.isEmpty(), "no group ran")
     }
 
     // endregion
@@ -116,14 +363,14 @@ class LBSyncOperatorTest {
     fun groups_for_event_excludes_a_group_whose_delay_has_not_elapsed_and_includes_one_whose_delay_has() =
         runOperatorTest { store, scope ->
             val fresh = FakeOperatorManager(store = store, scope = scope, syncKey = "fresh")
-            fresh.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Clock.System.now()))
+            store.saveSyncDates(syncKey = SyncKey("fresh"), serverDate = null, localDate = Clock.System.now())
             val freshGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(fresh),
                 refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
             )
 
             val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
-            stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
+            store.saveSyncDates(syncKey = SyncKey("stale"), serverDate = null, localDate = Instant.fromEpochMilliseconds(0L))
             val staleGroup = LBSyncGroup(
                 syncManagers = linkedSetOf(stale),
                 refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
@@ -138,9 +385,45 @@ class LBSyncOperatorTest {
         }
 
     @Test
+    fun groups_for_event_reads_the_persisted_cursor_so_the_debounce_holds_before_statuses_are_loaded() =
+        runOperatorTest { store, scope ->
+            // Statuses stay NeverSync: this is a cold start, before loadAllStatuses() has run.
+            val synced = FakeOperatorManager(store = store, scope = scope, syncKey = "synced")
+            store.saveSyncDates(syncKey = SyncKey("synced"), serverDate = null, localDate = Clock.System.now())
+            register(
+                "synced",
+                LBSyncGroup(
+                    syncManagers = linkedSetOf(synced),
+                    refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
+                ),
+            )
+
+            val matched = LBSyncOperator.groupsForEvent(LBSyncRefreshEvent.AppForeground::class)
+
+            assertTrue(
+                matched.isEmpty(),
+                "the persisted cursor debounces the event even though the status is still NeverSync",
+            )
+        }
+
+    @Test
+    fun groups_for_event_matches_a_group_that_never_synchronized() = runOperatorTest { store, scope ->
+        val never = FakeOperatorManager(store = store, scope = scope, syncKey = "never")
+        val neverGroup = LBSyncGroup(
+            syncManagers = linkedSetOf(never),
+            refreshEvents = listOf(LBSyncRefreshEvent.AppForeground(minimumDelay = 1.hours)),
+        )
+        register("never", neverGroup)
+
+        val matched = LBSyncOperator.groupsForEvent(LBSyncRefreshEvent.AppForeground::class)
+
+        assertEquals(expected = listOf(neverGroup), actual = matched, "a group with no cursor always matches")
+    }
+
+    @Test
     fun groups_for_event_ignores_groups_carrying_a_different_event_type() = runOperatorTest { store, scope ->
         val stale = FakeOperatorManager(store = store, scope = scope, syncKey = "stale")
-        stale.setStatusInternal(LBSyncProcessStatus.SyncSuccessfully(Instant.fromEpochMilliseconds(0L)))
+        store.saveSyncDates(syncKey = SyncKey("stale"), serverDate = null, localDate = Instant.fromEpochMilliseconds(0L))
         val internetGroup = LBSyncGroup(
             syncManagers = linkedSetOf(stale),
             refreshEvents = listOf(LBSyncRefreshEvent.InternetIsBack(minimumDelay = 1.hours)),
@@ -150,6 +433,383 @@ class LBSyncOperatorTest {
         val matched = LBSyncOperator.groupsForEvent(LBSyncRefreshEvent.AppForeground::class)
 
         assertTrue(matched.isEmpty(), "a group carrying only a different event type does not match")
+    }
+
+    // endregion
+
+    // region re-entrancy guard
+
+    @Test
+    fun a_direct_request_from_inside_a_manager_callback_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.sync(manager = target) },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes — the nested request did not deadlock it")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "a request made from inside a callback is refused")
+        assertTrue(
+            nestedResult.throwable is LBSyncReentrantCallException,
+            "the refusal carries LBSyncReentrantCallException, not a hang",
+        )
+        assertEquals(expected = listOf("nesting"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun a_full_run_requested_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("grouped", group(store, scope, "grouped", order = order, id = "grouped"))
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.syncAllManagers() },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "syncAllManagers() from inside a callback is refused")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "no registered group ran")
+    }
+
+    @Test
+    fun a_named_group_requested_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        register("grouped", group(store, scope, "grouped", order = order, id = "grouped"))
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { nested = LBSyncOperator.syncGroup(name = "grouped") },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "syncGroup() from inside a callback is refused")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "the named group never ran")
+    }
+
+    @Test
+    fun a_request_launched_structurally_from_a_manager_callback_is_refused_too() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = {
+                // A child coroutine of the callback inherits the marker, and deadlocks just as it does.
+                coroutineScope { launch { nested = LBSyncOperator.sync(manager = target) } }
+            },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run still completes")
+        val nestedResult = nested
+        assertTrue(nestedResult is LBResult.Failure, "a child coroutine of the callback is refused as well")
+        assertTrue(nestedResult.throwable is LBSyncReentrantCallException, "the refusal carries LBSyncReentrantCallException")
+        assertEquals(expected = listOf("nesting"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun a_request_launched_on_an_unrelated_scope_from_a_manager_callback_is_allowed() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var fireAndForget: Deferred<LBResult<Unit>>? = null
+        val nesting = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "nesting",
+            runOrder = order,
+            runId = "nesting",
+            duringFetch = { fireAndForget = scope.async { LBSyncOperator.sync(manager = target) } },
+        )
+
+        val result = LBSyncOperator.sync(manager = nesting)
+
+        assertTrue(result is LBResult.Success, "the outer run completes")
+        val queued = fireAndForget
+        assertTrue(queued != null, "the callback launched a request on its own scope")
+        assertTrue(queued.await() is LBResult.Success, "a request that does not inherit the engine marker still runs")
+        assertEquals(
+            expected = listOf("nesting", "target"),
+            actual = order,
+            "it simply queued behind the run it was launched from",
+        )
+    }
+
+    @Test
+    fun a_request_made_from_a_group_gate_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val target = FakeOperatorManager(store = store, scope = scope, syncKey = "target", runOrder = order, runId = "target")
+        var nested: LBResult<Unit>? = null
+        val gated = group(store, scope, "gated", order = order, id = "gated").apply {
+            isEnabled = {
+                nested = LBSyncOperator.sync(manager = target)
+                true
+            }
+        }
+
+        val result = LBSyncOperator.sync(group = gated)
+
+        assertTrue(result is LBResult.Success, "the gated run still completes")
+        assertTrue((nested as? LBResult.Failure)?.throwable is LBSyncReentrantCallException, "the gate request is refused")
+        assertEquals(expected = listOf("gated"), actual = order, "the nested target never ran")
+    }
+
+    @Test
+    fun with_sync_lock_from_a_group_gate_is_refused() = runOperatorTest { store, scope ->
+        var refusal: Throwable? = null
+        val gated = group(store, scope, "gated", order = mutableListOf(), id = "gated").apply {
+            isEnabled = {
+                refusal = runCatching { LBSyncOperator.withSyncLock { } }.exceptionOrNull()
+                true
+            }
+        }
+
+        LBSyncOperator.sync(group = gated)
+
+        assertTrue(refusal is LBSyncReentrantCallException, "the nested lock request is refused instead of deadlocking")
+    }
+
+    // endregion
+
+    // region join and lock
+
+    @Test
+    fun sync_or_join_requests_of_a_group_arriving_during_its_run_share_one_follow_up() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeOperatorManager(
+                    store = store,
+                    scope = scope,
+                    syncKey = "joined",
+                    runOrder = order,
+                    runId = "joined",
+                    fetchGate = fetchGate,
+                ),
+            ),
+        )
+
+        val first: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncOrJoin(group = group) }
+        runCurrent()
+        val burst: List<Deferred<LBResult<Unit>>> = List(size = 3) { async { LBSyncOperator.syncOrJoin(group = group) } }
+        runCurrent()
+        fetchGate.complete(Unit)
+
+        assertTrue(first.await() is LBResult.Success, "the first request succeeds")
+        burst.forEach { assertTrue(it.await() is LBResult.Success, "every request of the burst receives the follow-up success") }
+        assertEquals(
+            expected = listOf("joined", "joined"),
+            actual = order,
+            "the burst did not join the started run and cost a single follow-up",
+        )
+    }
+
+    @Test
+    fun sync_or_join_requests_of_a_manager_waiting_for_the_lock_share_one_run() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        register(
+            key = "blocking",
+            group = LBSyncGroup(
+                syncManagers = linkedSetOf(
+                    FakeOperatorManager(
+                        store = store,
+                        scope = scope,
+                        syncKey = "blocking",
+                        runOrder = order,
+                        runId = "blocking",
+                        fetchGate = fetchGate,
+                    ),
+                ),
+            ),
+        )
+        val manager = FakeOperatorManager(store = store, scope = scope, syncKey = "notified", runOrder = order, runId = "notified")
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val burst: List<Deferred<LBResult<Unit>>> = List(size = 50) { async { LBSyncOperator.syncOrJoin(manager = manager) } }
+        runCurrent()
+        fetchGate.complete(Unit)
+
+        assertTrue(fullRun.await() is LBResult.Success, "the full run succeeds")
+        burst.forEach { assertTrue(it.await() is LBResult.Success, "every request of the burst receives the run success") }
+        assertEquals(
+            expected = listOf("blocking", "notified"),
+            actual = order,
+            "the burst queued behind the full run cost a single manager run",
+        )
+    }
+
+    @Test
+    fun sync_or_join_of_an_unregistered_manager_type_fails() = runOperatorTest { _, _ ->
+        val result = LBSyncOperator.syncOrJoin<FakeOperatorManager>()
+
+        assertTrue(
+            (result as? LBResult.Failure)?.throwable is IllegalArgumentException,
+            "a lookup miss fails with IllegalArgumentException",
+        )
+    }
+
+    @Test
+    fun a_sync_or_join_request_after_the_run_ended_runs_again() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val group = group(store, scope, "again", order = order, id = "again")
+
+        LBSyncOperator.syncOrJoin(group = group)
+        LBSyncOperator.syncOrJoin(group = group)
+
+        assertEquals(
+            expected = listOf("again", "again"),
+            actual = order,
+            "a request made once the run ended starts a new one",
+        )
+    }
+
+    @Test
+    fun with_sync_lock_waits_for_the_sync_in_progress() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        register(
+            "grouped",
+            LBSyncGroup(
+                syncManagers = linkedSetOf(
+                    FakeOperatorManager(
+                        store = store,
+                        scope = scope,
+                        syncKey = "grouped",
+                        runOrder = order,
+                        runId = "grouped",
+                        fetchGate = fetchGate,
+                    ),
+                ),
+            ),
+        )
+
+        val fullRun: Deferred<LBResult<Unit>> = async { LBSyncOperator.syncAllManagers() }
+        runCurrent()
+        val locked: Deferred<Unit> = async { LBSyncOperator.withSyncLock { order += "locked" } }
+        runCurrent()
+        assertEquals(expected = listOf("grouped"), actual = order, "the block waits for the run in progress")
+
+        fetchGate.complete(Unit)
+        fullRun.await()
+        locked.await()
+
+        assertEquals(expected = listOf("grouped", "locked"), actual = order, "the block ran once the run had ended")
+    }
+
+    @Test
+    fun a_cancelled_sync_caller_keeps_the_lock_until_its_run_has_ended() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val fetchGate = CompletableDeferred<Unit>()
+        val group = LBSyncGroup(
+            syncManagers = linkedSetOf(
+                FakeOperatorManager(
+                    store = store,
+                    scope = scope,
+                    syncKey = "cancelled",
+                    runOrder = order,
+                    runId = "fetch start",
+                    fetchGate = fetchGate,
+                    duringFetch = { order += "fetch end" },
+                ),
+            ),
+        )
+        val caller: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = group) }
+        runCurrent()
+        caller.cancel()
+        runCurrent()
+
+        val locked: Deferred<Unit> = async { LBSyncOperator.withSyncLock { order += "locked" } }
+        runCurrent()
+        assertEquals(expected = listOf("fetch start"), actual = order, "the lock is still held while the run fetches")
+        fetchGate.complete(Unit)
+        locked.await()
+
+        assertEquals(expected = listOf("fetch start", "fetch end", "locked"), actual = order, "the block ran after the run")
+    }
+
+    @Test
+    fun a_sync_requested_while_the_lock_is_held_runs_after_the_block() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val lockGate = CompletableDeferred<Unit>()
+        val group = group(store, scope, "queued", order = order, id = "queued")
+
+        val locked: Deferred<Unit> = async {
+            LBSyncOperator.withSyncLock {
+                order += "lock start"
+                lockGate.await()
+                order += "lock end"
+            }
+        }
+        runCurrent()
+        val queued: Deferred<LBResult<Unit>> = async { LBSyncOperator.sync(group = group) }
+        runCurrent()
+        lockGate.complete(Unit)
+        locked.await()
+        queued.await()
+
+        assertEquals(
+            expected = listOf("lock start", "lock end", "queued"),
+            actual = order,
+            "the sync waited for the block",
+        )
+    }
+
+    @Test
+    fun a_sync_requested_inside_a_with_sync_lock_block_is_refused_instead_of_deadlocking() = runOperatorTest { store, scope ->
+        val order = mutableListOf<String>()
+        val group = group(store, scope, "nested", order = order, id = "nested")
+
+        val result = LBSyncOperator.withSyncLock { LBSyncOperator.sync(group = group) }
+
+        assertTrue((result as? LBResult.Failure)?.throwable is LBSyncReentrantCallException, "the nested request is refused")
+        assertTrue(order.isEmpty(), "the nested request ran nothing")
+    }
+
+    @Test
+    fun with_sync_lock_from_inside_a_manager_callback_is_refused() = runOperatorTest { store, scope ->
+        var refusal: Throwable? = null
+        val manager = FakeOperatorManager(
+            store = store,
+            scope = scope,
+            syncKey = "reentrant",
+            duringFetch = { refusal = runCatching { LBSyncOperator.withSyncLock { } }.exceptionOrNull() },
+        )
+
+        LBSyncOperator.sync(manager = manager)
+
+        assertTrue(refusal is LBSyncReentrantCallException, "the nested lock request is refused instead of deadlocking")
     }
 
     // endregion
@@ -190,8 +850,11 @@ private data class OperatorLocalObj(val id: String)
 /**
  * Configurable fake [LBSyncManager] for operator-level assertions. When [runOrder]/[runId] are set, it
  * appends [runId] to [runOrder] as its `fetchRequest` runs, so sequential group order can be observed.
- * Setting [fetchError] makes the run fail (download error). Automatic retry is disabled so a failure
- * resolves immediately under virtual time.
+ * Setting [fetchError] makes every run fail (download error), [failFetchTimes] only the first N; setting
+ * [fetchGate] parks the fetch — after the [runId] has been recorded — until the gate completes, so a run
+ * can be held in flight; [duringFetch] runs an arbitrary block from inside the callback (used by the
+ * re-entrancy tests). Automatic retry is disabled unless [retryTempo] is passed, so a failure resolves
+ * immediately under virtual time.
  */
 private class FakeOperatorManager(
     store: SyncTimestampLocalDataSource,
@@ -200,10 +863,14 @@ private class FakeOperatorManager(
     private val runOrder: MutableList<String>? = null,
     private val runId: String? = null,
     private val fetchError: Exception? = null,
+    private val fetchGate: CompletableDeferred<Unit>? = null,
+    private val duringFetch: (suspend () -> Unit)? = null,
+    private var failFetchTimes: Int = 0,
+    retryTempo: Duration? = null,
 ) : LBSyncManager<OperatorServerObj, OperatorLocalObj, Nothing>(scope = scope) {
 
     init {
-        retryTempo = null
+        this.retryTempo = retryTempo
     }
 
     override val syncKey: SyncKey = SyncKey(syncKey)
@@ -214,7 +881,13 @@ private class FakeOperatorManager(
 
     override suspend fun fetchRequest(page: Int, cursor: String?, sinceLastDate: Instant?): FetchPage<OperatorServerObj, Nothing> {
         runId?.let { runOrder?.add(it) }
+        fetchGate?.await()
+        duringFetch?.invoke()
         fetchError?.let { throw it }
+        if (failFetchTimes > 0) {
+            failFetchTimes -= 1
+            throw IllegalStateException("fetch failure #${runId.orEmpty()}")
+        }
         return FetchPage(objects = emptyList())
     }
 

@@ -8,9 +8,10 @@ modules.
 |---|---|---|---|---|---|
 | `:synchronization-core` | `synchronization-core/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_CORE_VERSION` | yes — flow/sequence diagrams; sharp edges documented below |
 | `:synchronization-events` | `synchronization-events/` | KMP android-library (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.events` | `SYNCHRONIZATION_EVENTS_VERSION` | no — documented below |
-| `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
+| `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`, plus a JVM target) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
 | `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
+| `:synchronization-remote` | `synchronization-remote/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_REMOTE_VERSION` | yes — backend-agnostic remote↔local managers |
 
 The engine (`:synchronization-core`) is **storage-agnostic**: it persists sync cursors through the
 `SyncTimestampLocalDataSource` interface and never constructs a backend. A backend module provides the concrete
@@ -21,13 +22,19 @@ store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor st
 consumed via `LBSyncOperator.registerEventListeners(...)`. Type-safe
 accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`.
+`projects.synchronizationParseRoom`, `projects.synchronizationRemote`, `projects.synchronizationChecks`.
 
 `:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
 (storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
 picks the backend). Its `README.md` is the source of truth for that module (source-set split, the
 BaseDao `@Upsert` trick, why no KSP lives there, the `api`-vs-`implementation` leakage rules). Don't
 duplicate it here — read it before touching that module.
+
+`:synchronization-remote` is the backend-agnostic counterpart (commonMain only, no Ktor/Parse/Room): the consumer
+implements a remote data source (keyset-paged pull since a cursor, find-by-id then create or update) and a local data
+source (whole-download write, conditional mark-pushed), and gets the final `LBRemotePullSyncManager` /
+`LBRemoteSyncManager` (both extend `LBSyncManager` directly and share the download buffering through the internal
+`RemotePullBuffer`). Its `README.md` documents the contract.
 
 Both modules were **moved from `LunabeeStudio/Libraries_Android`** (commits 17d6452, d165c26), so the
 code predates this repo's conventions and version lineage (the migration shim mentions "3.8.0" though
@@ -46,7 +53,9 @@ core. The platform integrations (connectivity, app lifecycle) live in `:synchron
 Async primitive is **Kotlin coroutines/Flow** — no Bolts `Task`, no `GlobalScope`, no completion
 callbacks (those were purged in the `feature/lbsync` 2.0.0 rewrite; Bolts now only exists transitively
 inside the Parse SDK). Each level has ONE suspend entry point returning `LBResult<Unit>`:
-`LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()`.
+`LBSyncManager.synchronize()`, `LBSyncGroup.syncManagers()`, `LBSyncOperator.syncAllManagers()` — but the
+first two are **`internal`**: every public sync request goes through `LBSyncOperator` (see "Single sync
+entry point" below).
 Detached-from-caller execution (receiver-triggered syncs, automatic retry) runs in an injected,
 library-owned `CoroutineScope` — the no-store constructor defaults it to the shared internal
 `defaultSyncScope` (`CoroutineScope(SupervisorJob() + Dispatchers.IO)`). The single-flight
@@ -56,6 +65,60 @@ modules (`:synchronization-events`, both backends, `:synchronization-parse-room`
 (`AndroidConfig.SynchronizationMinSdk`) — the connectivity listener relies on
 `registerDefaultNetworkCallback` (API 24) — while the rest of the repo stays at `minSdk 23`.
 `:synchronization-core` itself has no Android target.
+
+### Single sync entry point
+
+Client-facing 2.0.0 → 2.1.0 migration: `MIGRATION-SYNCHRONIZATION-2.1.0.MD` (agent-executable, same shape as
+`compose/presenter/MIGRATION_V2.MD`).
+
+`LBSyncOperator` is the only public way to start a sync: `syncAllManagers()`, `sync(group)`,
+`syncGroup(name)`, `sync(manager)`, `sync<T>()` (reified lookup over the registry, same match as
+`syncManager<T>()`). A `syncGroup`/`sync<T>()` lookup miss → `Failure(IllegalArgumentException)`.
+`LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are `internal` (still callable from
+`commonTest`, which is a friend source set — the existing tests call them directly).
+
+Requests are serialized by a private `Mutex` in the operator, held for the whole run: a `sync(manager)`
+queues behind an in-flight `syncAllManagers()` instead of racing it, so the "put the dependency in an
+earlier group" rule also holds for direct requests. The lock is NOT held while starting/stopping the
+server-notification listeners (`handleEventData`), and `triggerRefresh` takes it around its launched
+group loop.
+
+Two operator entry points build on the lock: `syncOrJoin(group)` / `syncOrJoin(manager)` join the `syncOrJoin`
+request for the same target that is still waiting for the lock (internal `runner/RequestCoalescer`, released by
+`withRunLock`'s `onLocked` once the lock is taken) instead of queueing a second run, and never join a started run;
+when the caller that started the request is cancelled, one of its joiners runs it itself. `withSyncLock(block)` runs
+non-sync work (e.g. a logout clear) under the lock and inside a `SyncEngineMarker`, so a sync requested from
+inside the block is refused with `LBSyncReentrantCallException` instead of deadlocking, and a `withSyncLock`
+called from a manager callback or another block throws one.
+
+A caller cancelled while it holds the lock does not release it at once: the pipelines are detached from their
+callers (`SyncRunner` launches them in the manager scope), so the operator's `withRunLock` catches the
+cancellation and waits, `NonCancellable`, for the targeted managers' runs to end (`LBSyncManager.awaitRunEnd()`
+→ `SyncRunner.awaitIdle()`) before rethrowing. Otherwise a `withSyncLock` block (a logout clear) could start
+while the cancelled run still writes.
+
+Two paths deliberately escape the lock:
+- **automatic retry** — `SyncRunner` re-runs the pipeline block directly, detached. It cannot take the
+  operator lock: the operator awaits managers while holding it, and a retry blocked on that lock would
+  deadlock against the collapsed follow-up run. `retryTempo = null` disables retry per manager.
+  `SyncRunner`'s "a new explicit request pre-empts a pending retry" only holds from `run()` entry, and the
+  operator lock delays that — so each operator entry point calls `cancelPendingRetry()` on the managers it
+  targets **before** taking the lock (`SyncRunner.cancelPendingRetry()`, `LBSyncGroup.cancelPendingRetries()`).
+  Without it, a retry parked at +`retryTempo` fires in front of a request already queued, then that request
+  collapses onto a follow-up behind it. A retry scheduled *after* the enqueue (a run failing while the
+  request waits) is still pre-empted by `run()` itself.
+- **re-entrancy** — the `Mutex` is not reentrant, so calling an operator sync API from inside a manager's
+  SPI (`fetchRequest`, `pushObjectsToServer`, …), from an `LBSyncGroup.isEnabled` gate or from a `withSyncLock` block
+  would deadlock. It is **refused instead**: the engine runs `runPipeline()`, and the operator everything it runs
+  under its lock (`withRunLock`, so the `isEnabled` gates too, and every `withSyncLock` block), under a
+  `SyncEngineMarker` coroutine-context element (`SyncEngineMarker.kt`, internal) and
+  every lock-taking operator entry point checks `currentCoroutineContext()[SyncEngineMarker]` first,
+  returning `Failure(LBSyncReentrantCallException)` — before `cancelPendingRetr*`, so a refused request
+  leaves the in-flight run untouched. Context inheritance draws the line: the callback's own
+  `withContext`/structured children are refused too, a request launched on an unrelated scope is not marked
+  and stays allowed (`LBParseRoomSyncManager`'s LiveQuery hook does
+  `liveQueryScope.launch { LBSyncOperator.syncOrJoin(…) }`). The same trap is caught at compile time by the
+  `SyncOperatorReentrantCall` lint rule — see **Lint rules** below.
 
 ### Cursor storage (pluggable backend)
 
@@ -114,11 +177,13 @@ Three layers, top to bottom:
   `LBAppForegroundEventListener` — ship in `:synchronization-events`. There is no broadcast bridge
   anymore — `LBSyncApplication` was removed. `syncManager<T>()` finds a registered manager by type.
 - **`LBSyncGroup`** — managers in the **same group sync in parallel** (`async`/`awaitAll` over their
-  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity); the **operator runs
-  groups sequentially**. So model table dependencies by putting the dependency in an earlier group. A
+  `LBResult`s; a failing sibling never cancels the others — `whenAll` parity), unless the group sets
+  `executionMode = LBSyncExecutionMode.Sequential`, which runs them one at a time in `syncManagers`
+  order (same gate, same aggregation, no short-circuit — it only removes the concurrency); the
+  **operator runs groups sequentially**. `syncManagers()` is `internal` — sync a group with `LBSyncOperator.sync(group)`. So model table dependencies by putting the dependency in an earlier group. A
   single `var isEnabled: suspend () -> Boolean` gates a whole group (e.g. only when logged in),
   evaluated once per attempt — a blocked group sets its managers to `Disabled` and fails with
-  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`).
+  `LBSyncClosureException`. `refreshEvents` carry a per-event min-delay debounce (`Duration`), measured from the group's persisted cursor (`lastSuccessfulSyncDate()`), so it holds on a cold start before `loadAllStatuses()` has run.
 - **`LBSyncManager<ServerData, LocalData, PageInfo>`** — abstract per-entity engine. Pipeline is
   download → upload (then re-download unless `supportChangeNotificationFromServer()`). The subclass SPI
   is **suspend + throw-based**: `fetchRequest(...)` returns a `FetchPage`, `pushObjectsToServer(...)`,
@@ -133,8 +198,19 @@ Three layers, top to bottom:
 Status & observation: `LBSyncProcessStatus` (sealed, immutable, `kotlin.time.Instant`-based) is exposed
 as `LBSyncManager.status: StateFlow<LBSyncProcessStatus>` (collect it; `currentSyncStatus` is a
 read-only alias for `status.value`). `LBSyncGroup`/`LBSyncOperator` add a combined
-`statusByKey(): Flow<Map<String, LBSyncProcessStatus>>` and `isSyncing(): Flow<Boolean>` (snapshot of
-the registry at collection time; KDoc spells out the snapshot + `syncKey`-collision caveats). Multiple
+`statusByKey(): Flow<Map<SyncKey, LBSyncProcessStatus>>`, `isSyncing(): Flow<Boolean>` (any member
+`isProcessing()`) and `isActive(): Flow<Boolean>` (`isSyncing()` + `PendingSync`, i.e. also the requests
+queued behind the run in progress — every operator entry point marks its targets `PendingSync` before
+taking the lock, skipping whatever the run in progress is already processing and restoring the previous
+status if the caller is cancelled, so this is the flow to await a request from the moment it is
+enqueued; it does not see the retry `SyncRunner` parks after a failure). All three are a snapshot of the registry at collection
+time; KDoc spells out the snapshot + `syncKey`-collision caveats, and an empty snapshot emits
+`emptyMap()`/`false` once and then suspends rather than completing. On the operator the three come with
+a `(groupNames: Collection<String>)` overload restricted to the groups registered under those names
+(deduplicated; unresolved names are logged and skipped, unlike `syncGroup`, which fails). `LBSyncGroup`
+also exposes `suspend lastSuccessfulSyncDate(): Instant?` — the oldest member date read from the store
+(coerced to now), `null` when the group is empty or a member never synced; distinct from the
+status-derived `internal lastSuccessfulSync`, which falls back to epoch 0. Multiple
 failures aggregate into `LBSyncAggregateException`. App foreground/background is observed by
 `:synchronization-events`' `LBAppForegroundEventListener` (no custom `Application` needed).
 
@@ -151,15 +227,51 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   rename. Treat `syncKey` as a persisted key.
 - `currentSyncStatus` is a **read-only alias** for `status.value`; only the engine mutates state (via
   the `internal setStatusInternal`). Never try to set it from a consumer — collect `status` instead.
+- `FetchPage.maxUpdatedAt` is folded into the cursor with the per-object `updatedAt`: set it when the page holds
+  records left out of `objects` that must still move the cursor.
+- `uploadBeforeDownload()` (default `false`) turns the pipeline into upload → download: an upload failure fails the
+  run before any download, and `supportChangeNotificationFromServer()` no longer decides a re-download.
 - **Incremental sync requires `fetchRequest` results ordered by ascending `updatedAt`** — the cursor
   saves the max instant seen, so out-of-order results lose records.
 - A failed run is retried automatically by `SyncRunner` after `retryTempo` (a `Duration?`, default 30 s;
   `null` disables retry). `cancelAllRequests()` cancels the in-flight run **and** any pending retry, and
   surfaces the terminal status `Cancelled` (so `isProcessing()` / `isSyncing` drop to `false`).
 - Concurrent `synchronize()` calls **collapse into a single follow-up run** whose real `LBResult` every
-  caller receives — the old immediate-success-while-dirty behavior is gone.
+  caller receives — the old immediate-success-while-dirty behavior is gone. Above that, the operator lock
+  serializes the requests themselves, so the collapse now only kicks in for the paths that bypass the
+  operator (automatic retry, and a manager reached from two operator requests that were already queued).
+  A burst of `sync(manager)` calls therefore costs one run each; burst-prone triggers (LiveQuery, a
+  floodable button) go through `syncOrJoin`.
+- **Never call `LBSyncOperator.sync*` from inside a manager's SPI** — the operator's `Mutex` is not
+  reentrant, and the calling coroutine already holds it. The request fails fast with
+  `LBSyncReentrantCallException` instead of deadlocking; launch it on your own scope, or model the
+  dependency as an earlier group.
 - `StateFlow` is conflated (status is state, not an event stream) and observer threading is the
   collector's choice — the old synchronous-background-thread closure sharp edge no longer applies.
+
+## Lint rules
+
+`common/synchronization/checks` (`:synchronization-checks`, no publication of its own) holds the
+`SyncOperatorReentrantCall` Android Lint rule: a sync request written inside a member annotated
+`@SyncEngineCallback` is an error. The annotation (public, `synchronization-core`) marks **exactly** the
+SPI the pipeline calls while holding the operator lock, so the detector follows the annotated set instead
+of a hardcoded name list — annotate a new pipeline-reached hook and the rule covers it. Members reached
+outside a run (`startServerNotificationListener`, `hasSomethingToUpload`, LiveQuery hooks) must stay
+unmarked: a sync request from there is legitimate.
+
+It reaches consumers through `lintPublish(projects.synchronizationChecks)` in
+`synchronization-core-datastore` and `synchronization-core-room` — the two storage backends, one of which
+every client installs — which embeds `lint.jar` in their AARs. It cannot be hung on
+`:synchronization-core` itself: that module is `kmp-jvm-library-conventions`, has no Android target and
+therefore no `lintPublish` configuration.
+
+Known blind spots, all covered by the runtime `SyncEngineMarker` check: a request handed to
+`launch`/`async` (deliberately skipped — that is the legit fire-and-forget, and syntax cannot tell the
+detached scopes from the run's own), a request behind a helper function the callback calls, and the
+`LBSyncGroup.isEnabled` gate (a `var` lambda, so there is no override to anchor on).
+
+Detector tests live in `checks/src/test` and use `com.android.tools.lint:lint-tests` (`libs.lintTests`)
+with source stubs — no dependency on the real modules.
 
 ## Changelog
 
@@ -168,7 +280,7 @@ update the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in th
 `CHANGELOG.MD`; bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference
 modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`.
+`projects.synchronizationParseRoom`, `projects.synchronizationRemote`.
 
 ## Build & verify
 
@@ -177,8 +289,9 @@ Standard repo flow (see root `AGENTS.MD`). Quick reference:
 ```bash
 ./gradlew :synchronization-core:assemble :synchronization-events:assemble \
   :synchronization-core-datastore:assemble :synchronization-core-room:assemble \
-  :synchronization-parse-room:assemble
+  :synchronization-parse-room:assemble :synchronization-remote:assemble
 ./gradlew :synchronization-core:jvmTest                       # engine tests (commonTest) on the JVM target
+./gradlew :synchronization-remote:jvmTest                     # remote managers over in-memory fakes (commonTest)
 ./gradlew :synchronization-core-datastore:testAndroidHostTest # DataStore round-trip tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed
 ```

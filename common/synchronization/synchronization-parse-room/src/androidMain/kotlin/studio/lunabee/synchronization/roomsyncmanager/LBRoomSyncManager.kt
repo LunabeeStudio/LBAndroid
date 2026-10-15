@@ -17,6 +17,7 @@
 package studio.lunabee.synchronization.roomsyncmanager
 
 import kotlinx.coroutines.CancellationException
+import studio.lunabee.synchronization.SyncEngineCallback
 import studio.lunabee.synchronization.syncmanager.LBSyncManager
 import kotlin.time.Instant
 
@@ -48,6 +49,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
      * Pulled rows are in sync, so the returned entity **must** carry `lbInSync = true` — there is no
      * mutable `apply` step (the entity is immutable), it must be set in the constructor here.
      */
+    @SyncEngineCallback
     protected abstract fun createObjectFrom(serverObject: ServerData): RoomData
 
     /**
@@ -59,6 +61,7 @@ abstract class LBRoomSyncManager<ServerData, RoomData : LBRoomSyncModel, PageInf
      *
      * @param obj the entity to push.
      */
+    @SyncEngineCallback
     protected open suspend fun push(obj: RoomData) {
     }
 

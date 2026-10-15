@@ -99,12 +99,13 @@ dependencies {
 
     ksp(libs.androidxRoomCompiler)
     ksp(libs.hiltAndroidCompiler)
+    ksp(projects.compose.presenterHiltKsp)
     ksp(projects.compose.presenterKoinKsp)
 
     implementation(libs.androidxActivityCompose)
     implementation(libs.androidxAppcompat)
     implementation(libs.androidxCore)
-    implementation(libs.androidxHiltNavigationCompose)
+    implementation(libs.androidxHiltLifecycleViewmodelCompose)
     implementation(libs.androidxLifecycleRuntimeCompose)
     implementation(libs.androidxRoomRuntime)
     implementation(libs.androidxUiToolingPreview)
@@ -129,6 +130,7 @@ dependencies {
     implementation(projects.compose.image)
     implementation(projects.compose.navigation)
     implementation(projects.compose.presenter)
+    implementation(projects.compose.presenterHilt)
     implementation(projects.compose.presenterKoin)
     implementation(projects.compose.theme)
     implementation(projects.compose.uifieldCore)

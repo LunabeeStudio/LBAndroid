@@ -41,8 +41,6 @@ dependencies {
     implementation(libs.composeUi)
     implementation(libs.touchlabKermit)
 
-    implementation(projects.compose.core)
-    implementation(projects.compose.image)
     api(projects.compose.presenterAnnotations)
 
     androidTestImplementation(libs.kotlinTestJunit)

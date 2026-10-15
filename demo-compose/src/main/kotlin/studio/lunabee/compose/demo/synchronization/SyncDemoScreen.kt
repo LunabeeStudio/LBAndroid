@@ -186,35 +186,46 @@ private fun ActionButtons(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Deliberately never disabled: flooding the button exercises the SyncRunner
-            // collapse-and-join behavior (concurrent requests collapse into one follow-up run).
+            // Deliberately never disabled: flooding Sync queues one run per press, flooding Sync or join
+            // coalesces the presses into at most one run behind the one in progress.
             Button(
                 onClick = viewModel::synchronize,
                 modifier = Modifier.weight(1f),
             ) {
-                Text(text = "Synchronize")
+                Text(text = "Sync")
             }
-            OutlinedButton(
-                onClick = viewModel::reset,
+            Button(
+                onClick = viewModel::synchronizeOrJoin,
                 modifier = Modifier.weight(1f),
             ) {
-                Text(text = "Reset")
+                Text(text = "Sync or join")
             }
         }
 
         if (syncRequestCount > 0) {
             Text(
                 text = "$syncRequestCount request(s) → $syncRunCount run(s) — " +
-                    "flood Synchronize to see concurrent requests collapse",
+                    "flood Sync to queue every request, Sync or join to coalesce them",
                 style = MaterialTheme.typography.labelSmall,
             )
         }
 
-        OutlinedButton(
-            onClick = viewModel::clearLocalDb,
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = "Clear client DB")
+            OutlinedButton(
+                onClick = viewModel::reset,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "Reset")
+            }
+            OutlinedButton(
+                onClick = viewModel::clearLocalDb,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(text = "Clear client DB")
+            }
         }
     }
 }

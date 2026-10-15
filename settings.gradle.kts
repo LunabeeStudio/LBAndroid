@@ -105,6 +105,8 @@ addComposeModule(
     "test/robolectrictest",
     "presenter/presenter",
     "presenter/presenter-annotations",
+    "presenter/presenter-hilt",
+    "presenter/presenter-hilt-ksp",
     "presenter/presenter-koin",
     "presenter/presenter-koin-ksp",
     "presenter/presenter-ksp",
@@ -142,5 +144,7 @@ addCommonModule(
     "synchronization/synchronization-core-room",
     "synchronization/synchronization-parse-room",
     "synchronization/synchronization-events",
+    "synchronization/synchronization-remote",
 )
 addModule(":loading-checks", File("common/loading/loading-compose/checks"), "loading-checks")
+addModule(":synchronization-checks", File("common/synchronization/checks"), "synchronization-checks")

@@ -33,6 +33,7 @@ Purpose: describe text and images as **data** so reducers/UiStates carry them wi
   - `AnnotatedBuilder` works only in composition; `Resources` overloads are `DeprecationLevel.ERROR` and log error.
   - `Inlinable` + `LbcInlineTextContent` carry inline content; `null` placeholder lets consuming `Text` measure it (e.g. icon sized to text height).
 - `LbcImageSpec` (sealed): `Icon` (drawable res + tint), `KtImageVector`, `ImageDrawable` (optional forced `uiMode`), `Bitmap`, `ByteArray`, `Url` / `Uri` (`allowCaching`, `fallback`). `compose/core/src/main/kotlin/studio/lunabee/compose/core/LbcImageSpec.kt`
+- `presenter` does not depend on `compose:core` / `compose:image` → presenter screens using specs declare them explicitly.
 
 ## image
 

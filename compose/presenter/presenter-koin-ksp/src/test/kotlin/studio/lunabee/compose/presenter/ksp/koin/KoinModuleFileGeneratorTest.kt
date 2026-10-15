@@ -65,7 +65,7 @@ class KoinModuleFileGeneratorTest {
                         hasRuntimeAnnotation = false,
                         hasDefault = false,
                         isVararg = false,
-                        qualifier = DiQualifier.Named("api"),
+                        qualifier = DiQualifier.Named(value = "api", annotationClassName = ClassName("org.koin.core.annotation", "Named")),
                     ),
                     RawReducerParameter(
                         name = "qualifierScopedDependency",

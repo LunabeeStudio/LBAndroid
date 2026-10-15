@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import studio.lunabee.synchronization.LBSyncOperator
 import studio.lunabee.synchronization.connectivity.LBConnectivityManager
 import studio.lunabee.synchronization.syncmanager.LBSyncProcessStatus
 import javax.inject.Inject
@@ -54,7 +55,7 @@ class SyncDemoViewModel @Inject constructor(
     val retryCount: StateFlow<Int>
         field = MutableStateFlow(0)
 
-    /** Number of Synchronize presses; flood the button to see requests collapse into fewer runs. */
+    /** Number of sync presses; flood Sync or join to see requests collapse into fewer runs, Sync to see them queue. */
     val syncRequestCount: StateFlow<Int>
         field = MutableStateFlow(0)
 
@@ -154,7 +155,12 @@ class SyncDemoViewModel @Inject constructor(
 
     fun synchronize() {
         syncRequestCount.update { it + 1 }
-        viewModelScope.launch { syncManager.synchronize() }
+        viewModelScope.launch { LBSyncOperator.sync(manager = syncManager) }
+    }
+
+    fun synchronizeOrJoin() {
+        syncRequestCount.update { it + 1 }
+        viewModelScope.launch { LBSyncOperator.syncOrJoin(manager = syncManager) }
     }
 
     fun clearLocalDb() {

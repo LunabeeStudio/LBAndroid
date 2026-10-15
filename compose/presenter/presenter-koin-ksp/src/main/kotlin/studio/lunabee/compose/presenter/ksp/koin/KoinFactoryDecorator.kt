@@ -61,6 +61,6 @@ internal object KoinFactoryDecorator : GeneratedFactoryDecorator {
             .addMember("%S", qualifier.value)
             .build()
 
-        is DiQualifier.Typed -> AnnotationSpec.builder(qualifier.annotationClassName).build()
+        is DiQualifier.Typed -> qualifier.annotationSpec
     }
 }
