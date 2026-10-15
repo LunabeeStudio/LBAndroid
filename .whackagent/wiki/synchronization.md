@@ -13,7 +13,7 @@ Coroutine-native, storage-agnostic remote↔local sync engine (`studio.lunabee.s
 
 ## Module map
 
-All under `common/synchronization/`. Versions share `SYNCHRONIZATION_CORE_VERSION` in `buildSrc/src/main/kotlin/AndroidConfig.kt`. Convention plugins: see [[build-and-publishing]].
+All under `common/synchronization/`. Every module's `*_VERSION` aliases `SYNCHRONIZATION_CORE_VERSION` in `buildSrc/src/main/kotlin/AndroidConfig.kt`. Published modules pinned by `common/bom`. Convention plugins: see [[build-and-publishing]].
 
 | Module (path) | Platform | Role |
 |---|---|---|
@@ -22,10 +22,10 @@ All under `common/synchronization/`. Versions share `SYNCHRONIZATION_CORE_VERSIO
 | `synchronization-core-datastore` | KMP: Android + iOS + JVM | DataStore cursor backend (keeps legacy file `com.lunabee.lbsynchronization`) |
 | `synchronization-core-room` | KMP: Android + iOS (Room/KSP) | Room cursor backend (standalone DB, `sync_timestamp` table) |
 | `synchronization-remote` | KMP: JVM + iOS, no Android | Backend-agnostic final managers over two small data-source interfaces |
-| `synchronization-parse-room` | KMP: Android (`commonMain` contract + `androidMain` managers) | Parse↔Room managers + Parse LiveQuery client |
-| `checks` (`:synchronization-checks`) | JVM (Android Lint) | `SyncOperatorReentrantCall` lint rule; not published alone |
+| `synchronization-parse-room` | KMP: Android + iOS (managers + LiveQuery in `androidMain` only; iOS gets `commonMain` contract) | Parse↔Room managers + Parse LiveQuery client |
+| `checks` (`:synchronization-checks`) | JVM (Android Lint) | `SyncOperatorReentrantCall` lint rule; no publish conventions, ships via `lintPublish` |
 
-Android-target modules use `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`, for `registerDefaultNetworkCallback`). Rest of repo is 23. Local `common/synchronization/synchronization/` folder with only `build/` = stale leftover, not module.
+Android-target modules use `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`, for `registerDefaultNetworkCallback`). Rest of repo is 23.
 
 ## Core concepts and invariants
 
@@ -77,7 +77,7 @@ LiveQuery path: `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` does `liveQue
 |---|---|---|
 | `synchronization-core/src/commonTest` | `SyncRunnerTest`, `RequestCoalescerTest`, pipeline (`DownloadTest`, `UploadTest`, `ConflictTest`, `SynchronizationRetryTest`, `RefreshEventTest`), group/operator, combined flows; fixture `testfixture/SyncTestFixture.kt` | `:synchronization-core:jvmTest` |
 | `synchronization-remote/src/commonTest` | Managers driven via `LBSyncOperator` with in-memory `Fake*` remote/local/cursor stores | `:synchronization-remote:jvmTest` |
-| `synchronization-core-datastore/src/commonTest` | DataStore round-trip | `:synchronization-core-datastore:testAndroidHostTest` |
+| `synchronization-core-datastore/src/commonTest` | DataStore round-trip | `:synchronization-core-datastore:jvmTest` / `:testAndroidHostTest` |
 | `checks/src/test` | Lint detector with source stubs (`libs.lintTests`) | `:synchronization-checks:test` |
 
 `runTest` + virtual time. Internal constructors inject fake `SyncTimestampLocalDataSource` and `TestScope`. `commonTest` is friend source set → calls `internal` entry points directly. Room backend and parse-room have no tests. Demo: `demo-compose/.../demo/synchronization/` (compares `sync` vs `syncOrJoin` bursts).

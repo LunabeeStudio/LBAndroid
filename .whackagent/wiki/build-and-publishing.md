@@ -30,19 +30,20 @@ Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchron
 - **kmp-library**: Kotlin Multiplatform + SKIE; `iosArm64` + `iosSimulatorArm64` **static** frameworks named after project; JUnit platform; opt-ins `-Xexpect-actual-classes`, `ExperimentalTime`, `ExperimentalAtomicApi`. Extra targets (`jvm`, `macosArm64`, `linuxX64`, `mingwX64`) declared per module.
 - **kmp-android-library**: kmp-library + `com.android.kotlin.multiplatform.library` (`android { }` target).
 - **kmp-jvm-library**: kmp-library + `jvm()`.
-- **java-library**: `java-library`, JDK 21, sources jar (KSP processors, annotations, color utils).
+- **java-library**: `java-library`, JDK 21, sources jar (KSP processors, annotations, color utils, lint-check projects). No `maven-publish` itself; lint-check projects skip publish conventions.
 
 ## Per-module versions
 
 - Each module sets `version = AndroidConfig.<CONST>` in its `build.gradle.kts`; constants in `buildSrc/src/main/kotlin/AndroidConfig.kt`.
 - Naming rule (comment in file): module name `UPPER_CASE`, `-` → `_`, suffix `_VERSION`. Compose modules get `LBC` prefix (`LBCCORE_VERSION`, `LBCPRESENTER_KSP_VERSION`).
-- Families share version via aliasing or reuse: `LBCUIFIELD_{PHONE,COUNTRY}PICKER_VERSION = LBCUIFIELD_CORE_VERSION`, `MONITORING_* = MONITORING_CORE_VERSION`, `LBCPRESENTER_KOIN_KSP_VERSION = LBCPRESENTER_KSP_VERSION`; `CORE_VERSION`, `KTOR_VERSION`, `LOADING_VERSION`, `LOGGER_KERMIT_VERSION` used by several modules.
+- Families share version via aliasing or reuse: `LBCUIFIELD_{PHONE,COUNTRY}PICKER_VERSION = LBCUIFIELD_CORE_VERSION`, `MONITORING_* = MONITORING_CORE_VERSION`, `LBCPRESENTER_{KOIN,HILT}_KSP_VERSION = LBCPRESENTER_KSP_VERSION`, `SYNCHRONIZATION_{EVENTS,CORE_DATASTORE,CORE_ROOM,PARSE_ROOM,REMOTE}_VERSION = SYNCHRONIZATION_CORE_VERSION`; `CORE_VERSION`, `KTOR_VERSION`, `LOADING_VERSION`, `LOGGER_KERMIT_VERSION` used by several modules; `:synchronization-checks` uses `SYNCHRONIZATION_CORE_VERSION` directly.
+- Presenter modules versioned independently: `LBCPRESENTER_VERSION`, `LBCPRESENTER_ANNOTATIONS_VERSION`, `LBCPRESENTER_HILT_VERSION`, `LBCPRESENTER_KOIN_VERSION`, `LBCPRESENTER_KSP_VERSION` (KSP processors alias it).
 - Gotcha: `compose/crop` currently uses `LBCHAPTIC_VERSION`.
 - Rule matters for `setAllSnapshotVersion` (below), which derives constant names from project names.
 
 ## Versioning and changelog rules (AGENTS.MD)
 
-- Semver per module; major = breaking API change only.
+- Semver per module. Major reserved for wide-reaching change (rewrite, API-surface redesign, migration consumers must plan). Narrow break (one removed symbol, dropped transitive dep, renamed param) = **minor** bump, flagged `**break:**` in changelog.
 - Bump module **once per branch** — fold later work into existing unreleased bump.
 - Module's transitive dependency moves → bump that module's minor too (e.g. synchronization adapters bumped with `synchronization-core`).
 - Every user-visible change updates `CHANGELOG.MD`: `## YYYY-MM-DD`, fenced block listing `Module version` lines, then bullets; breaking items prefixed `**break:**`.
@@ -71,7 +72,7 @@ Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchron
 |---|---|---|
 | `publishList` | root `build.gradle.kts` | Prints `;`-joined names of projects with `publish` task (CI uses). |
 | `:<path>:PrintCoordinates` | publish conventions | Prints `group:name:version`. |
-| `setAllSnapshotVersion --buildNumber=N` | `buildSrc/.../SetAllSnapshotVersionTask.kt` | Rewrites `AndroidConfig.kt` **in place**: for every `maven-publish` project, appends `-alpha-<N>-<branch last segment>-SNAPSHOT` to constants matching `<NAME>_VERSION`. Regex unanchored → `LBC`-prefixed constants match; shared constants not named after project (e.g. `KTOR_VERSION`, `LOADING_VERSION`, `PLATFORM_VERSION`) untouched. |
+| `setAllSnapshotVersion --buildNumber=N` | `buildSrc/.../SetAllSnapshotVersionTask.kt` | Rewrites `AndroidConfig.kt` **in place**: for every `maven-publish` project, appends `-alpha-<N>-<branch last segment>-SNAPSHOT` to constants matching `<NAME>_VERSION`. Regex unanchored → `LBC`-prefixed constants match; only `= "…"` literals rewritten, so aliases (`= SYNCHRONIZATION_CORE_VERSION`) follow their source; shared constants not named after project (e.g. `KTOR_VERSION`, `LOADING_VERSION`, `PLATFORM_VERSION`) untouched. |
 
 ## Detekt
 
