@@ -23,8 +23,42 @@ Synchronization Remote 2.1.0
 bom 4.16.0
 ```
 
-- Promote presenter 2.1.0, synchronization 2.1.0 and bom 4.16.0 to stable, with no change since 2.1.0-rc01 / 2.1.0-rc02
-  (presenter), 2.1.0-alpha04 (synchronization) and 4.16.0-alpha04 (bom).
+Stable release of 2.1.0-rc01 / 2.1.0-rc02 (presenter), 2.1.0-alpha04 (synchronization) and 4.16.0-alpha04 (bom), with no
+change since. Recap since the previous stable releases (details in the pre-release entries below):
+
+**Presenter (since 2.0.0)**
+
+- **break:** `lbcpresenter` no longer depends on `lbccore` / `lbcimage`: add them explicitly if your screens used them transitively
+- New `lbcpresenter-hilt`: Hilt flavour of `PresentScreen` (`hiltViewModel()`, explicit `ViewModelStoreOwner` + factory +
+  `CreationExtras`, and `@HiltViewModel(assistedFactory = …)` overloads). Every overload renders nothing once the
+  `LocalLifecycleOwner` is destroyed, avoiding the NavHost `IllegalStateException`
+- New `lbcpresenter-hilt-ksp`: generated reducer factories get an `@Inject` constructor, so a Hilt project only needs
+  `ksp(lbcpresenter-hilt-ksp)`. Constructor qualifiers are propagated (`@Named` keeps its `jakarta`/`javax` flavour)
+- `lbcpresenter-ksp`: factory generation ownership resolved through `FactoryOwningProcessorProvider` (KSP service registrations),
+  with a compile error instead of duplicate or missing factories; `GeneratedFactoryDecorator.constructorAnnotations` exposed
+- `lbcpresenter-hilt` / `lbcpresenter-koin` expose the view model libraries the inline `PresentScreen` calls as `api`
+
+**Synchronization (since 2.0.0)**
+
+- **break:** `LBSyncManager.synchronize()` and `LBSyncGroup.syncManagers()` are `internal`: every sync goes through
+  `LBSyncOperator` (`sync(manager)`, `sync(group)`, `syncGroup(name)`, `sync<T>()`), which serializes requests. See
+  [MIGRATION-SYNCHRONIZATION-2.1.0.MD](common/synchronization/MIGRATION-SYNCHRONIZATION-2.1.0.MD)
+- **break:** a cancelled sync caller returns only once the targeted runs have ended (the operator lock is held until then)
+- Added `syncOrJoin(group)` / `syncOrJoin(manager)` / `syncOrJoin<T>()` to coalesce bursts of requests, and `withSyncLock(block)`
+  to run work (e.g. logout cleanup) between syncs
+- A sync request from an engine callback (`@SyncEngineCallback`) fails with `LBSyncReentrantCallException` instead of
+  deadlocking, and the `SyncOperatorReentrantCall` lint rule (shipped with the Datastore and Room backends) reports it at build time
+- `LBSyncGroup` `executionMode` (`Parallel` / `Sequential`), `LBSyncManager.uploadBeforeDownload()`, `FetchPage.maxUpdatedAt`
+- Sync requests mark their managers `PendingSync` while queued; new `isActive()` / `statusByKey(groupNames)` /
+  `isSyncing(groupNames)` / `lastSuccessfulSyncDate()` observers
+- New module `synchronization-remote` (JVM + iOS): backend-agnostic remote pull and two-way sync managers
+- `synchronization-core-datastore` has a JVM target
+- **Fixed:** cold-start `AppForeground` re-synchronizing every group regardless of its delay; LiveQuery bursts running one full
+  sync per event; combined status flows completing on an empty registry
+
+**bom (since 4.15.0)**
+
+- Pins the `studio.lunabee.synchronization` artifacts, so a project can drop its per-artifact synchronization versions
 
 ## 2026-10-06
 
