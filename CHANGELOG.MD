@@ -28,6 +28,8 @@ change since. Recap since the previous stable releases (details in the pre-relea
 
 **Presenter (since 2.0.0)**
 
+- First stable `lbcpresenter-ksp` and `lbcpresenter-koin-ksp` (previously 2.0.0-rc04), `lbcpresenter-hilt` and
+  `lbcpresenter-hilt-ksp`
 - **break:** `lbcpresenter` no longer depends on `lbccore` / `lbcimage`: add them explicitly if your screens used them transitively
 - New `lbcpresenter-hilt`: Hilt flavour of `PresentScreen` (`hiltViewModel()`, explicit `ViewModelStoreOwner` + factory +
   `CreationExtras`, and `@HiltViewModel(assistedFactory = …)` overloads). Every overload renders nothing once the
@@ -59,6 +61,7 @@ change since. Recap since the previous stable releases (details in the pre-relea
 **bom (since 4.15.0)**
 
 - Pins the `studio.lunabee.synchronization` artifacts, so a project can drop its per-artifact synchronization versions
+- Also pins `synchronization-core-datastore-jvm`, published since the module gained its JVM target
 
 ## 2026-10-06
 
