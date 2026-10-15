@@ -13,6 +13,8 @@
 | `studio.lunabee.compose:theme`                           | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose/theme?style=for-the-badge)                           |
 | `studio.lunabee.compose.presenter:presenter`             | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter?style=for-the-badge)             |
 | `studio.lunabee.compose.presenter:presenter-annotations` | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-annotations?style=for-the-badge) |
+| `studio.lunabee.compose.presenter:presenter-hilt`        | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-hilt?style=for-the-badge)        |
+| `studio.lunabee.compose.presenter:presenter-hilt-ksp`    | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-hilt-ksp?style=for-the-badge)    |
 | `studio.lunabee.compose.presenter:presenter-koin`        | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-koin?style=for-the-badge)        |
 | `studio.lunabee.compose.presenter:presenter-koin-ksp`    | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-koin-ksp?style=for-the-badge)    |
 | `studio.lunabee.compose.presenter:presenter-ksp`         | ![](https://img.shields.io/maven-central/v/studio.lunabee.compose.presenter/presenter-ksp?style=for-the-badge)         |
@@ -43,6 +45,12 @@
 | `studio.lunabee.monitoring:monitoring-okhttp`            | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-okhttp?style=for-the-badge)            |
 | `studio.lunabee.monitoring:monitoring-room`              | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-room?style=for-the-badge)              |
 | `studio.lunabee.monitoring:monitoring-ui`                | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-ui?style=for-the-badge)                |
+| `studio.lunabee.synchronization:synchronization-core`    | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core?style=for-the-badge)    |
+| `studio.lunabee.synchronization:synchronization-core-datastore` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-datastore?style=for-the-badge) |
+| `studio.lunabee.synchronization:synchronization-core-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-room?style=for-the-badge) |
+| `studio.lunabee.synchronization:synchronization-events`  | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-events?style=for-the-badge)  |
+| `studio.lunabee.synchronization:synchronization-parse-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-parse-room?style=for-the-badge) |
+| `studio.lunabee.synchronization:synchronization-remote`  | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-remote?style=for-the-badge)  |
 
 # Lunabee Jetpack Compose library
 
