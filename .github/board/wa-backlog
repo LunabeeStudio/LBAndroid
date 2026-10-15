@@ -1,0 +1,1327 @@
+#!/usr/bin/env python3
+"""whackagent backlog provider for GitHub Projects v2.
+
+Implements the operations in providers/CONTRACT.md on top of `gh`. Stdlib only.
+Settings come from repository variables (shared with the board workflow), IDs are
+cached per clone in <git-common-dir>/whackagent/github-cache.json.
+
+Exit codes: 0 ok · 1 error · 2 usage · 3 claim taken · 4 wrong state for the operation.
+"""
+
+import argparse
+import base64
+import re
+import concurrent.futures
+import hashlib
+import datetime as dt
+import functools
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+STATES = ["todo", "grilling", "grilled", "coding", "review", "done"]
+DEFAULT_STATE_NAMES = {
+    "todo": "Todo",
+    "grilling": "Grilling",
+    "grilled": "Grilled",
+    "coding": "Coding",
+    "review": "Review",
+    "done": "Done",
+}
+STATE_COLORS = {
+    "todo": "GRAY",
+    "grilling": "ORANGE",
+    "grilled": "BLUE",
+    "coding": "PURPLE",
+    "review": "YELLOW",
+    "done": "GREEN",
+}
+STATE_DESCRIPTIONS = {
+    "todo": "Not grilled yet",
+    "grilling": "Locked: an agent is grilling it",
+    "grilled": "Spec written (issue body or its branch), ready to code",
+    "coding": "Locked: an agent is coding it",
+    "review": "PR open",
+    "done": "PR merged",
+}
+SIZES = ["quickwin", "medium", "large"]
+SIZE_COLORS = {"quickwin": "GREEN", "medium": "YELLOW", "large": "RED"}
+# Phase claimed → states the ticket may be in when the claim is taken. `grilled` → `grilling` = re-grill:
+# the spec is rewritten on the same branch, and the push hook moves it back to `grilled`.
+CLAIM_FROM = {"grilling": {"todo", "grilled"}, "coding": {"grilled", "review"}}
+CLAIM_NAMESPACE = "wa-claims"
+IGNORE_LABEL = "wa-ignore"
+# Sprint = parent issue labeled wa-sprint, sprint name = its title in kebab-case; its tickets are its
+# sub-issues. Not a ticket itself: kept off the board, never claimed. The milestone is the release scope.
+SPRINT_LABEL = "wa-sprint"
+
+EXIT_ERROR, EXIT_USAGE, EXIT_TAKEN, EXIT_WRONG_STATE = 1, 2, 3, 4
+# Board contract this script implements: the project's BOARD.md, its PR template sections and its workflow
+# caller carry the same stamp. Installed and updated together by the setup PR.
+CONTRACT_VERSION = "2.2"
+# Built-in Project workflows that set Status on their own, against the board contract.
+CONFLICTING_WORKFLOWS = {"Pull request linked to issue"}
+
+
+class Failure(Exception):
+    def __init__(self, message, code=EXIT_ERROR):
+        super().__init__(message)
+        self.code = code
+
+
+class StaleCache(Exception):
+    """Board holds ids the cache doesn't know: the Project changed since the cache was built."""
+
+
+# ---------------------------------------------------------------- gh plumbing
+
+
+def gh(args, payload=None, check=True):
+    proc = subprocess.run(
+        ["gh", *args],
+        input=json.dumps(payload) if payload is not None else None,
+        capture_output=True,
+        text=True,
+    )
+    if check and proc.returncode != 0:
+        raise Failure(f"gh {' '.join(args[:3])}: {proc.stderr.strip() or proc.stdout.strip()}")
+    return proc
+
+
+def rest(method, path, body=None, check=True):
+    args = ["api", "-X", method, path]
+    if body is not None:
+        args += ["--input", "-"]
+    proc = gh(args, body, check=check)
+    out = proc.stdout.strip()
+    data = json.loads(out) if out else None
+    return (proc.returncode, data) if not check else data
+
+
+def graphql(query, **variables):
+    data = rest("POST", "graphql", {"query": query, "variables": variables})
+    if data.get("errors"):
+        raise Failure("graphql: " + "; ".join(e.get("message", "") for e in data["errors"]))
+    return data["data"]
+
+
+def emit(value):
+    json.dump(value, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+
+
+def note(message):
+    print(message, file=sys.stderr)
+
+
+# ---------------------------------------------------------------- settings
+
+
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def cache_path():
+    return Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")) / "whackagent" / "github-cache.json"
+
+
+def current_repo():
+    return gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).stdout.strip()
+
+
+def repo_variables(repo):
+    data = rest("GET", f"repos/{repo}/actions/variables?per_page=100")
+    return {v["name"]: v["value"] for v in data.get("variables", [])}
+
+
+def owner_node(owner):
+    """Projects hang off a user or an organization; the GraphQL root differs."""
+    data = graphql(
+        "query($l:String!){repositoryOwner(login:$l){__typename id}}", l=owner
+    )["repositoryOwner"]
+    if not data:
+        raise Failure(f"unknown owner {owner}")
+    return data["__typename"].lower(), data["id"]
+
+
+def project_fields(owner_kind, owner, number):
+    data = graphql(
+        f"""query($l:String!,$n:Int!){{{owner_kind}(login:$l){{projectV2(number:$n){{id url
+            fields(first:50){{nodes{{... on ProjectV2SingleSelectField{{id name options{{id name color description}}}}}}}}}}}}}}""",
+        l=owner,
+        n=number,
+    )[owner_kind]["projectV2"]
+    if not data:
+        raise Failure(f"project {owner}/{number} not found")
+    fields = {f["name"]: f for f in data["fields"]["nodes"] if f}
+    return data["id"], data["url"], fields
+
+
+def fingerprint(variables):
+    settings = {k: v for k, v in sorted(variables.items()) if k.startswith("WA_")}
+    return hashlib.sha256(json.dumps(settings).encode()).hexdigest()
+
+
+def load(refresh=False):
+    """Settings from repo variables, ids from the Project. The cache is reused only while the
+    variables are unchanged (one cheap call per run), so a re-provision elsewhere is picked up."""
+    path = cache_path()
+    cached = json.loads(path.read_text()) if path.exists() else None
+    repo = cached["repo"] if cached else current_repo()
+    variables = repo_variables(repo)
+    if cached and not refresh and cached.get("fingerprint") == fingerprint(variables):
+        return cached
+    if "WA_PROJECT_NUMBER" not in variables:
+        raise Failure(f"{repo} has no WA_PROJECT_NUMBER variable — run /wa-setup backlog (provision)")
+    owner = variables.get("WA_PROJECT_OWNER", repo.split("/")[0])
+    number = int(variables["WA_PROJECT_NUMBER"])
+    owner_kind, _ = owner_node(owner)
+    project_id, url, fields = project_fields(owner_kind, owner, number)
+    status_name = variables.get("WA_STATUS_FIELD", "Status")
+    size_name = variables.get("WA_SIZE_FIELD", "Size")
+    custom = json.loads(variables.get("WA_STATES", "{}"))
+    # Unknown keys ignored: a transitional WA_STATES may still carry an old state id for older hooks.
+    state_names = {s: custom.get(s, DEFAULT_STATE_NAMES[s]) for s in STATES}
+    status = fields.get(status_name)
+    if not status:
+        raise Failure(f"project has no single-select field {status_name!r}")
+    options = {o["name"]: o["id"] for o in status["options"]}
+    missing = [s for s, n in state_names.items() if n not in options]
+    if missing:
+        raise Failure(f"Status options missing for {missing} — run provision again")
+    size = fields.get(size_name)
+    config = {
+        "repo": repo,
+        "owner": owner,
+        "owner_kind": owner_kind,
+        "project_number": number,
+        "project_id": project_id,
+        "project_url": url,
+        "fingerprint": fingerprint(variables),
+        "status_field": status["id"],
+        "status_option_names": {o["id"]: o["name"] for o in status["options"]},
+        "state_options": {s: options[n] for s, n in state_names.items()},
+        "state_names": state_names,
+        "size_field": size["id"] if size else None,
+        "size_options": {o["name"]: o["id"] for o in size["options"]} if size else {},
+        "tasks_path": variables.get("WA_TASKS_PATH", ".whackagent/tasks"),
+        "branch_prefix": variables.get("WA_BRANCH_PREFIX", "wa/"),
+        "stale_after_hours": int(variables.get("WA_STALE_AFTER_HOURS", "24")),
+        "tracks": json.loads(variables.get("WA_TRACKS", "[]")),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(config, indent=2))
+    return config
+
+
+# ---------------------------------------------------------------- tickets
+
+ITEM_FIELDS = """
+  id
+  content { __typename
+    ... on Issue { number title body url state stateReason
+      milestone { title } labels(first:20) { nodes { name } } assignees(first:10) { nodes { login } }
+      parent { number title labels(first:20) { nodes { name } } } }
+    ... on DraftIssue { title } }
+  fieldValues(first:50) { nodes {
+    ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2SingleSelectField { id } } } } }
+"""
+
+
+@functools.cache
+def viewer_login():
+    return graphql("query{viewer{login}}")["viewer"]["login"]
+
+
+def summary_of(body):
+    for line in (body or "").splitlines():
+        line = line.strip()
+        if line and not line.startswith("<!--"):
+            return line
+    return ""
+
+
+def items(config):
+    query = f"""query($p:ID!,$after:String){{node(id:$p){{... on ProjectV2{{
+        items(first:100, after:$after){{pageInfo{{hasNextPage endCursor}} nodes{{{ITEM_FIELDS}}}}}}}}}}}"""
+    after, nodes = None, []
+    while True:
+        page = graphql(query, p=config["project_id"], after=after)["node"]["items"]
+        nodes += page["nodes"]
+        if not page["pageInfo"]["hasNextPage"]:
+            return nodes
+        after = page["pageInfo"]["endCursor"]
+
+
+def claims(config, number=None):
+    """Live claims, all of them or one ticket's. Map by number, or list when number given."""
+    scope = f"{CLAIM_NAMESPACE}/{number}/" if number is not None else f"{CLAIM_NAMESPACE}/"
+    code, data = rest("GET", f"repos/{config['repo']}/git/matching-refs/{scope}", check=False)
+    if code != 0 or not isinstance(data, list):
+        raise Failure(f"could not list claims: {(data or {}).get('message', 'gh api failed') if isinstance(data, dict) else 'gh api failed'}")
+    found = {}
+    for ref in data:
+        _, _, held_by, phase = ref["ref"].split("/", 3)
+        found.setdefault(int(held_by), []).append({"phase": phase, "sha": ref["object"]["sha"]})
+    return found if number is None else found.get(number, [])
+
+
+def claim_fields(config, sha):
+    """Trailer lines of a claim commit (agent, claimed, assigned), plus its commit date."""
+    commit = rest("GET", f"repos/{config['repo']}/git/commits/{sha}")
+    fields = dict(
+        line.split(": ", 1) for line in commit["message"].splitlines()[1:] if ": " in line
+    )
+    return {**fields, "date": commit["committer"]["date"]}
+
+
+def claim_owner(config, sha):
+    fields = claim_fields(config, sha)
+    return {"agent": fields.get("agent", "?"), "since": fields["date"]}
+
+
+def is_sprint(issue):
+    return SPRINT_LABEL in [l["name"] for l in issue["labels"]["nodes"]]
+
+
+def sprint_name(title):
+    """Kebab-case of a sprint issue title: the branch-safe name. Same rule as sprintName() in the hooks."""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def sprint_of(parent):
+    return sprint_name(parent["title"]) if parent and is_sprint(parent) else None
+
+
+def to_ticket(config, node, claim_map, with_owners=False, keep_sha=False):
+    content = node["content"] or {}
+    if content.get("__typename") != "Issue":
+        return {"draft": True, "title": content.get("title", ""), "item_id": node["id"]}
+    values = {
+        v["field"]["id"]: v["optionId"]
+        for v in node["fieldValues"]["nodes"]
+        if v and v.get("field")
+    }
+    by_option = {o: s for s, o in config["state_options"].items()}
+    by_size = {o: s for s, o in config["size_options"].items()}
+    number = content["number"]
+    status_option = values.get(config["status_field"])
+    if status_option and status_option not in config["status_option_names"]:
+        raise StaleCache(f"unknown Status option {status_option}")
+    assignees = [a["login"] for a in content["assignees"]["nodes"]]
+    held = claim_map.get(number, [])
+    if with_owners:
+        held = [{**c, **claim_owner(config, c["sha"])} for c in held]
+    return {
+        "number": number,
+        "title": content["title"],
+        "summary": summary_of(content["body"]),
+        "state": by_option.get(status_option),
+        "column": config["status_option_names"].get(status_option),
+        "size": by_size.get(values.get(config["size_field"])),
+        "sprint": sprint_of(content["parent"]),
+        "milestone": (content["milestone"] or {}).get("title"),
+        "closed": content["state"] == "CLOSED",
+        "not_planned": content.get("stateReason") == "NOT_PLANNED",
+        "ignored": bool({IGNORE_LABEL, SPRINT_LABEL} & {l["name"] for l in content["labels"]["nodes"]}),
+        "assignees": assignees,
+        # Assigned to someone else: a human reserved it, no agent of another account may claim it.
+        "reserved": bool(assignees) and viewer_login() not in assignees,
+        "claims": [dict(c) if keep_sha else {k: v for k, v in c.items() if k != "sha"} for c in held],
+        "url": content["url"],
+        "item_id": node["id"],
+    }
+
+
+def find(config, number, with_owners=True):
+    """Read one ticket through the issue, not the project item list: that list lags behind
+    writes by minutes, the issue's own projectItems don't."""
+    owner, name = config["repo"].split("/")
+    query = f"""query($o:String!,$r:String!,$n:Int!){{repository(owner:$o,name:$r){{issue(number:$n){{
+        title labels(first:20){{nodes{{name}}}} projectItems(first:20){{nodes{{project{{id}} {ITEM_FIELDS}}}}}}}}}}}"""
+    for attempt in range(2):
+        issue = graphql(query, o=owner, r=name, n=number)["repository"]["issue"]
+        if not issue:
+            raise Failure(f"#{number} does not exist")
+        if is_sprint(issue):
+            raise Failure(f"#{number} is sprint {issue['title']!r}, not a ticket", EXIT_WRONG_STATE)
+        if IGNORE_LABEL in [l["name"] for l in issue["labels"]["nodes"]]:
+            raise Failure(f"#{number} is labeled {IGNORE_LABEL}, not a ticket", EXIT_WRONG_STATE)
+        for node in issue["projectItems"]["nodes"]:
+            if node["project"]["id"] == config["project_id"]:
+                ticket = to_ticket(config, node, {number: claims(config, number)}, with_owners)
+                if ticket["column"] is None:  # no Status at all: fresh card, not a column we don't know
+                    set_state_raw(config, ticket, "todo")
+                    ticket["state"] = ticket["column"] = "todo"
+                return ticket
+        if attempt == 0:
+            add_to_board(config, number)  # every issue is a ticket; the opened hook may have missed it
+    raise Failure(f"#{number} could not be added to the board")
+
+
+def issue_node_id(config, number):
+    return rest("GET", f"repos/{config['repo']}/issues/{number}")["node_id"]
+
+
+def add_to_board(config, number):
+    return graphql(
+        "mutation($p:ID!,$c:ID!){addProjectV2ItemById(input:{projectId:$p,contentId:$c}){item{id}}}",
+        p=config["project_id"],
+        c=issue_node_id(config, number),
+    )["addProjectV2ItemById"]["item"]["id"]
+
+
+def set_option(config, item_id, field, option):
+    graphql(
+        """mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){updateProjectV2ItemFieldValue(input:{
+            projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){projectV2Item{id}}}""",
+        p=config["project_id"],
+        i=item_id,
+        f=field,
+        o=option,
+    )
+
+
+def set_state_raw(config, ticket, state):
+    set_option(config, ticket["item_id"], config["status_field"], config["state_options"][state])
+
+
+def comment(config, number, text):
+    rest("POST", f"repos/{config['repo']}/issues/{number}/comments", {"body": text})
+
+
+def agent_id(explicit=None):
+    if explicit:
+        return explicit
+    if os.environ.get("WA_AGENT"):
+        return os.environ["WA_AGENT"]
+    try:
+        where = git("rev-parse", "--show-toplevel")
+    except subprocess.CalledProcessError:
+        where = os.getcwd()
+    return f"{socket.gethostname().split('.')[0]}:{where}"
+
+
+def claim_tree(config):
+    """One-file tree for claim commits; created once, kept in the cache.
+
+    Never reuse a branch tree: once it holds `.github/workflows/`, GitHub refuses (404) a ref to a
+    commit adding workflow files unless the token has the `workflow` scope.
+    """
+    if not config.get("claim_blob_tree"):
+        tree = rest("POST", f"repos/{config['repo']}/git/trees", {
+            "tree": [{"path": "CLAIM", "mode": "100644", "type": "blob", "content": "whackagent claim\n"}],
+        })
+        config["claim_blob_tree"] = tree["sha"]
+        cache_path().write_text(json.dumps(config, indent=2))
+    return config["claim_blob_tree"]
+
+
+def remote_branch(config, number):
+    code, data = rest(
+        "GET", f"repos/{config['repo']}/git/matching-refs/heads/{config['branch_prefix']}{number}-", check=False
+    )
+    names = [r["ref"].removeprefix("refs/heads/") for r in data or []]
+    return names[0] if names else None
+
+
+def task_phase(config, branch):
+    """`phase:` of the task file on a ticket branch (`in-progress`, `review`, `validated`); None when
+    the branch or file is missing or the field is empty. Branch `wa/12-login` holds `{tasks}/12-login.md`."""
+    if not branch:
+        return None
+    path = f"{config['tasks_path'].rstrip('/')}/{branch.removeprefix(config['branch_prefix'])}.md"
+    code, data = rest("GET", f"repos/{config['repo']}/contents/{path}?ref={quote(branch, safe='')}", check=False)
+    if code != 0 or not data or "content" not in data:
+        return None
+    text = base64.b64decode(data["content"]).decode("utf-8", "replace")
+    match = re.search(r"^phase:[ \t]*([\w-]*)", text, re.M)
+    return (match.group(1) or None) if match else None
+
+
+# ---------------------------------------------------------------- operations
+
+
+def op_config(args):
+    emit(load(refresh=args.refresh))
+
+
+def op_list(args):
+    config = load()
+    claim_map = claims(config)
+    wanted = set(args.state.split(",")) if args.state else None
+    rows = []
+    for node in items(config):
+        ticket = to_ticket(config, node, claim_map, keep_sha=args.owners)
+        if ticket.get("draft"):
+            if not wanted and not args.sprint and not args.milestone:  # drafts: only in unfiltered lists
+                rows.append(ticket)
+            continue
+        if ticket["ignored"]:
+            continue
+        if ticket["closed"] and not args.all:  # canceled, split parent: closed without a merge
+            continue
+        if wanted and ticket["state"] not in wanted:
+            continue
+        if not wanted and not args.all and ticket["state"] == "done":
+            continue
+        if args.sprint and ticket["sprint"] != sprint_name(args.sprint):
+            continue
+        if args.milestone and ticket["milestone"] != args.milestone:
+            continue
+        rows.append(ticket)
+    # review = humans on turn; the task file's phase says which turn (test, retest, merge)
+    review = [t for t in rows if t.get("state") == "review"]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        phases = pool.map(lambda t: task_phase(config, remote_branch(config, t["number"])), review)
+        for ticket, phase in zip(review, phases):
+            ticket["phase"] = phase
+    if args.owners:
+        claimed = [c for t in rows for c in t.get("claims", [])]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            for claim, owner in zip(claimed, pool.map(lambda c: claim_owner(config, c["sha"]), claimed)):
+                claim.update(owner)
+    for t in rows:
+        for c in t.get("claims", []):
+            c.pop("sha", None)
+    emit(rows)
+
+
+def op_get(args):
+    config = load()
+    ticket = find(config, args.number)
+    ticket["branch"] = remote_branch(config, args.number)
+    ticket["phase"] = task_phase(config, ticket["branch"])
+    ticket["blocked_by"] = blocked_by(config, args.number)
+    emit(ticket)
+
+
+def op_create(args):
+    config = load()
+    body = args.summary + ("\n\n" + args.note if args.note else "")
+    # No --milestone: the highest open milestone, so new work lands in the scope being planned,
+    # never in the current or a past one. "" = none. Resolved first: a bad title creates nothing.
+    milestone = latest_milestone(config) if args.milestone is None else milestone_number(config, args.milestone)
+    issue = rest("POST", f"repos/{config['repo']}/issues", {"title": args.title, "body": body, "milestone": milestone})
+    number = issue["number"]
+    item_id = add_to_board(config, number)  # idempotent with the issues.opened hook
+    ticket = {"number": number, "item_id": item_id}
+    set_state_raw(config, ticket, "todo")
+    if args.size:
+        set_size(config, ticket, args.size)
+    if args.sprint:
+        set_sprint(config, number, args.sprint)
+    emit({"number": number, "url": issue["html_url"], "state": "todo", "milestone": (issue["milestone"] or {}).get("title")})
+
+
+def op_claim(args):
+    config = load()
+    phase = args.phase
+    ticket = find(config, args.number, with_owners=False)
+    if ticket["closed"]:
+        raise Failure(f"#{args.number} is closed", EXIT_WRONG_STATE)
+    if ticket["reserved"]:
+        who = ", ".join(f"@{a}" for a in ticket["assignees"])
+        emit({"number": args.number, "phase": phase, "taken": True, "agent": who, "assigned": True})
+        raise Failure(f"#{args.number} is assigned to {who}, not to @{viewer_login()}", EXIT_TAKEN)
+    ref = f"refs/{CLAIM_NAMESPACE}/{args.number}/{phase}"
+    agent = agent_id(args.agent)
+    held = next((c for c in claims(config, args.number) if c["phase"] == phase), None)
+    if held:  # before the state check, so a loser learns who holds it; leaves no commit behind
+        owner = claim_owner(config, held["sha"])
+        if owner["agent"] == agent:  # a retry by the holder (say after a failed run): still yours
+            emit({"number": args.number, "phase": phase, "taken": False, "agent": agent, "since": owner["since"], "already": True})
+            return
+        taken(config, args.number, phase, held["sha"])
+    if ticket["state"] not in CLAIM_FROM[phase]:
+        where = ticket["state"] or f"in column {ticket['column']!r}"
+        raise Failure(f"#{args.number} is {where}, {phase} needs {sorted(CLAIM_FROM[phase])}", EXIT_WRONG_STATE)
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # The winner assigns its account, so other accounts' agents see the ticket reserved. Recorded
+    # in the claim so `release` gives back only an assignment this claim made.
+    login = viewer_login()
+    assigning = login not in ticket["assignees"]
+    trailer = f"assigned: {login}\n" if assigning else ""
+    commit = rest(
+        "POST",
+        f"repos/{config['repo']}/git/commits",
+        {
+            "message": f"wa-claim {phase} #{args.number}\n\nagent: {agent}\nclaimed: {now}\n{trailer}",
+            "tree": claim_tree(config),
+            "parents": [],
+        },
+    )
+    code, data = rest("POST", f"repos/{config['repo']}/git/refs", {"ref": ref, "sha": commit["sha"]}, check=False)
+    if code != 0:
+        if (data or {}).get("message") != "Reference already exists":
+            raise Failure(f"could not create claim ref {ref}: {(data or {}).get('message', 'unknown error')}")
+        existing = rest("GET", f"repos/{config['repo']}/git/ref/{ref.removeprefix('refs/')}")
+        taken(config, args.number, phase, existing["object"]["sha"])
+    if ticket["state"] == "grilled":
+        # Both phases claim from `grilled` (re-grill, code) on two refs, so the ref alone isn't the lock.
+        # Checked after creating ours: of two racers, the later checker always sees the other one. Two
+        # simultaneous checkers can both back off: never two winners, at worst none (claim again later).
+        other = next((c for c in claims(config, args.number) if c["phase"] != phase), None)
+        if other:
+            rest("DELETE", f"repos/{config['repo']}/git/{ref}", check=False)
+            taken(config, args.number, other["phase"], other["sha"])
+    try:
+        set_state_raw(config, ticket, phase)
+    except BaseException:  # a lock on a card that never moved misleads everyone: give the ref back
+        rest("DELETE", f"repos/{config['repo']}/git/{ref}", check=False)
+        raise
+    if assigning:
+        code, data = rest("POST", f"repos/{config['repo']}/issues/{args.number}/assignees", {"assignees": [login]}, check=False)
+        if code != 0 or login not in [a["login"] for a in (data or {}).get("assignees", [])]:
+            note(f"warning: claim held, but could not assign @{login} to #{args.number}")
+    comment(config, args.number, f"🔒 **{phase}** — `{agent}` · {now}")
+    emit({"number": args.number, "phase": phase, "taken": False, "agent": agent, "since": now})
+
+
+def taken(config, number, phase, sha):
+    owner = claim_owner(config, sha)
+    emit({"number": number, "phase": phase, "taken": True, **owner})
+    raise Failure(f"#{number} {phase} already claimed by {owner['agent']} since {owner['since']}", EXIT_TAKEN)
+
+
+def op_release(args):
+    config = load()
+    ref = f"{CLAIM_NAMESPACE}/{args.number}/{args.phase}"
+    held = next((c for c in claims(config, args.number) if c["phase"] == args.phase), None)
+    assigned = claim_fields(config, held["sha"]).get("assigned") if held else None
+    code, data = rest("DELETE", f"repos/{config['repo']}/git/refs/{ref}", check=False)
+    if code != 0 and held:  # the ref is there but stays: never reset a card whose lock is still held
+        raise Failure(f"could not release {ref}: {(data or {}).get('message', 'gh api failed')}")
+    if code == 0 and assigned:  # undo only the assignment this claim made; a human's stays
+        rest("DELETE", f"repos/{config['repo']}/issues/{args.number}/assignees", {"assignees": [assigned]}, check=False)
+    if args.reset_to:
+        set_state_raw(config, find(config, args.number, with_owners=False), args.reset_to)
+    reason = f" — {args.reason}" if args.reason else ""
+    target = f", back to **{args.reset_to}**" if args.reset_to else ""
+    comment(config, args.number, f"🔓 **{args.phase}** released{target}{reason}")
+    emit({"number": args.number, "phase": args.phase, "released": code == 0, "state": args.reset_to})
+
+
+def op_set_state(args):
+    config = load()
+    set_state_raw(config, find(config, args.number, with_owners=False), args.state)
+    emit({"number": args.number, "state": args.state})
+
+
+def op_move(args):
+    config = load()
+    nodes = [n for n in items(config) if (n["content"] or {}).get("number") is not None]
+    by_number = {n["content"]["number"]: n["id"] for n in nodes}
+    order = [n["content"]["number"] for n in nodes]
+    for n in filter(lambda n: n is not None, [args.number, args.before, args.after]):
+        if n not in by_number:
+            raise Failure(f"#{n} is not on the board (or not listed yet — new cards show up after 1–3 min)", EXIT_USAGE)
+    after = None
+    if args.bottom:
+        rest_order = [n for n in order if n != args.number]
+        after = by_number[rest_order[-1]] if rest_order else None
+    elif args.after is not None:
+        after = by_number[args.after]
+    elif args.before is not None:
+        rest_order = [n for n in order if n != args.number]
+        index = rest_order.index(args.before)
+        after = by_number[rest_order[index - 1]] if index > 0 else None
+    variables = {"p": config["project_id"], "i": by_number[args.number]}
+    if after:
+        variables["a"] = after
+    graphql(
+        "mutation($p:ID!,$i:ID!,$a:ID){updateProjectV2ItemPosition(input:{projectId:$p,itemId:$i,afterId:$a}){clientMutationId}}",
+        **variables,
+    )
+    emit({"number": args.number, "moved": True})
+
+
+def set_size(config, ticket, size):
+    if not config["size_field"]:
+        raise Failure("project has no Size field — run provision again")
+    set_option(config, ticket["item_id"], config["size_field"], config["size_options"][size])
+
+
+def milestones(config, state):
+    return rest("GET", f"repos/{config['repo']}/milestones?state={state}&per_page=100")
+
+
+def milestone_rank(milestone):
+    """Version order of the title (digit runs compared as numbers: 0.10.0 > 0.9.0 > 0.3.0 > 0.2.1), then creation order."""
+    parts = re.findall(r"\d+|\D+", milestone["title"].casefold())
+    return [(1, int(part), "") if part.isdigit() else (0, 0, part) for part in parts], milestone["number"]
+
+
+def latest_milestone(config):
+    """Number of the highest open milestone (milestone_rank), or None. Track milestones (branch.tracks)
+    never: new work lands on base, joining a track is the user's call."""
+    tracks = set(config.get("tracks", []))
+    opened = [m for m in milestones(config, "open") if m["title"] not in tracks]
+    return max(opened, key=milestone_rank)["number"] if opened else None
+
+
+def op_milestones(args):
+    config = load()
+    highest_first = lambda ms: sorted(ms, key=milestone_rank, reverse=True)
+    rows = highest_first(milestones(config, "open"))
+    rows += [m for m in highest_first(milestones(config, "closed")) if m["open_issues"]]
+    emit([
+        {"title": m["title"], "open": m["state"] == "open", "tickets": m["open_issues"] + m["closed_issues"], "done": m["closed_issues"]}
+        for m in rows
+    ])
+
+
+def milestone_number(config, title):
+    """Milestones are made and closed by humans: an unknown title is an error, never created. "" = none."""
+    if not title:
+        return None
+    found = [m for m in milestones(config, "all") if m["title"] == title]
+    if not found:
+        raise Failure(f"no milestone {title!r} — create it on GitHub first", EXIT_USAGE)
+    return found[0]["number"]
+
+
+def op_close_milestone(args):
+    """Close a shipped milestone. Only /wa-release calls it, on the user's yes."""
+    config = load()
+    number = milestone_number(config, args.title)
+    if number is None:
+        raise Failure("milestone title required", EXIT_USAGE)
+    rest("PATCH", f"repos/{config['repo']}/milestones/{number}", {"state": "closed"})
+    emit({"title": args.title, "open": False})
+
+
+def set_milestone(config, number, title):
+    rest("PATCH", f"repos/{config['repo']}/issues/{number}", {"milestone": milestone_number(config, title)})
+
+
+def sprint_issues(config, name):
+    return [
+        i for i in rest("GET", f"repos/{config['repo']}/issues?labels={SPRINT_LABEL}&state=all&per_page=100")
+        if sprint_name(i["title"]) == name and "pull_request" not in i
+    ]
+
+
+def sprint_issue(config, name):
+    """Number of sprint <name>'s parent issue, created on first use. A closed one (sprint landed
+    before) is reopened: same name, same sprint."""
+    repo = config["repo"]
+    found = sprint_issues(config, name)
+    if found:
+        if found[0]["state"] == "closed":
+            rest("PATCH", f"repos/{repo}/issues/{found[0]['number']}", {"state": "open"})
+        return found[0]["number"]
+    body = "Sprint: whackagent groups its tickets here as sub-issues. Closed when the sprint lands."
+    return rest("POST", f"repos/{repo}/issues", {"title": name, "body": body, "labels": [SPRINT_LABEL]})["number"]
+
+
+def set_sprint(config, number, sprint):
+    """Make the ticket a sub-issue of sprint <sprint>'s parent issue; "" detaches it."""
+    repo = config["repo"]
+    sprint = sprint_name(sprint)
+    owner, name = repo.split("/")
+    parent = graphql(
+        "query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){parent{number title labels(first:20){nodes{name}}}}}}",
+        o=owner, r=name, n=number,
+    )["repository"]["issue"]["parent"]
+    if parent and not is_sprint(parent):  # one parent per issue: never replace a human's own hierarchy
+        raise Failure(f"#{number} is already a sub-issue of #{parent['number']} (not a sprint) — detach it first", EXIT_WRONG_STATE)
+    if sprint_of(parent) == (sprint or None):
+        return
+    issue_id = rest("GET", f"repos/{repo}/issues/{number}")["id"]
+    if not sprint:
+        rest("DELETE", f"repos/{repo}/issues/{parent['number']}/sub_issue", {"sub_issue_id": issue_id})
+        return
+    target = sprint_issue(config, sprint)
+    rest("POST", f"repos/{repo}/issues/{target}/sub_issues", {"sub_issue_id": issue_id, "replace_parent": True})
+
+
+def op_set_field(args):
+    config = load()
+    if args.field == "size":
+        if args.value not in SIZES:
+            raise Failure(f"size must be one of {SIZES}", EXIT_USAGE)
+        set_size(config, find(config, args.number, with_owners=False), args.value)
+    elif args.field == "sprint":
+        set_sprint(config, args.number, args.value)
+    else:
+        set_milestone(config, args.number, args.value)
+    emit({"number": args.number, args.field: args.value or None})
+
+
+def op_split(args):
+    """The ticket becomes the root of its split: sprint named after its title, off the board, children
+    join it as sub-issues (create --sprint <name>). Number, history and milestone stay."""
+    config = load()
+    number = args.number
+    ticket = find(config, number, with_owners=False)
+    if ticket["closed"]:
+        raise Failure(f"#{number} is closed", EXIT_WRONG_STATE)
+    if ticket["sprint"]:  # sprints don't nest: the children join this one instead
+        raise Failure(f"#{number} is already in sprint {ticket['sprint']!r}", EXIT_WRONG_STATE)
+    if ticket["claims"]:
+        held = ", ".join(c["phase"] for c in ticket["claims"])
+        raise Failure(f"#{number} is claimed ({held}) — release it first", EXIT_WRONG_STATE)
+    name = sprint_name(ticket["title"])
+    if not name:
+        raise Failure(f"#{number} title has no letter or digit to name a sprint", EXIT_USAGE)
+    clash = sprint_issues(config, name)
+    if clash:
+        raise Failure(f"sprint {name!r} already exists (#{clash[0]['number']}) — retitle #{number} first", EXIT_WRONG_STATE)
+    rest("POST", f"repos/{config['repo']}/issues/{number}/labels", {"labels": [SPRINT_LABEL]})
+    graphql(
+        "mutation($p:ID!,$i:ID!){deleteProjectV2Item(input:{projectId:$p,itemId:$i}){deletedItemId}}",
+        p=config["project_id"],
+        i=ticket["item_id"],
+    )
+    comment(config, number, f"🌳 **split** — sprint `{name}`, its tickets are the sub-issues of this issue")
+    emit({"number": number, "sprint": name})
+
+
+def op_comment(args):
+    config = load()
+    if args.body_file is None:
+        text = args.text
+    elif args.body_file == "-":
+        text = sys.stdin.read()
+    else:
+        text = Path(args.body_file).read_text()
+    comment(config, args.number, text)
+    emit({"number": args.number, "commented": True})
+
+
+def op_depend(args):
+    """Record that <number> is blocked by each ticket in --on (issue Relationships). Idempotent."""
+    config = load()
+    blocked = issue_node_id(config, args.number)
+    added, kept = [], []
+    for blocker in args.on:
+        try:
+            graphql(
+                "mutation($i:ID!,$b:ID!){addBlockedBy(input:{issueId:$i,blockingIssueId:$b}){issue{number}}}",
+                i=blocked,
+                b=issue_node_id(config, blocker),
+            )
+            added.append(blocker)
+        except Failure as error:
+            if "already" not in str(error).lower():
+                raise
+            kept.append(blocker)
+    emit({"number": args.number, "blocked_by_added": added, "blocked_by_existing": kept})
+
+
+SHOTS_START, SHOTS_END = "<!-- wa-screenshots -->", "<!-- /wa-screenshots -->"
+
+
+def op_screenshots(args):
+    """Upload screenshots with `gh image` (GitHub user-attachments) and show them in PR <pr>'s body.
+
+    Never pushed to a branch: attachments live outside git, like images pasted in the web UI.
+    An image given as `<caption>=<https url>` is already uploaded (browser fallback when `gh image`
+    can't get an upload token) and kept as is. Rerun replaces the section.
+    """
+    config = load()
+    repo = config["repo"]
+    shots = [image.split("=", 1) if re.match(r"[^=/]+=https://", image) else [Path(image).stem, image] for image in args.images]
+    files = [path for _, path in shots if not path.startswith("https://")]
+    uploaded = []
+    if files:
+        proc = subprocess.run(["gh", "image", "--repo", repo, *files], capture_output=True, text=True)
+        uploaded = re.findall(r"!\[[^\]]*\]\((https://[^)]+)\)", proc.stdout)
+        if proc.returncode != 0 or len(uploaded) != len(files):
+            raise Failure(f"gh image: {proc.stderr.strip() or proc.stdout.strip()} (needs the drogers0/gh-image extension)")
+    uploaded = iter(uploaded)
+    urls = [path if path.startswith("https://") else next(uploaded) for _, path in shots]
+    cells = "".join(
+        f'<td align="center"><img src="{url}" width="{args.width}"><br><sub>{caption}</sub></td>'
+        for (caption, _), url in zip(shots, urls)
+    )
+    section = f"{SHOTS_START}\n## Screenshots\n\n<table><tr>{cells}</tr></table>\n{SHOTS_END}"
+    body = rest("GET", f"repos/{repo}/pulls/{args.pr}")["body"] or ""
+    if SHOTS_START in body:
+        body = re.sub(re.escape(SHOTS_START) + ".*?" + re.escape(SHOTS_END), lambda _: section, body, flags=re.S)
+    else:
+        body = body.rstrip() + "\n\n" + section + "\n"
+    rest("PATCH", f"repos/{repo}/pulls/{args.pr}", {"body": body})
+    emit({"pr": args.pr, "urls": urls})
+
+
+def op_link_pr(args):
+    """Manual closing link from PR <pr> to ticket <n> (PR Development). Idempotent. Repair only: the hooks
+    link every open PR whose ticket they find (`Closes #n` in the body, or a wa/<n>-… branch)."""
+    config = load()
+    issue = rest("GET", f"repos/{config['repo']}/issues/{args.number}")
+    graphql(
+        "mutation($i:ID!,$p:[ID!]!){addCloseIssueReferences(input:{issueId:$i,pullRequestIds:$p}){clientMutationId}}",
+        i=issue["node_id"],
+        p=[rest("GET", f"repos/{config['repo']}/pulls/{args.pr}")["node_id"]],
+    )
+    emit({"number": args.number, "pr": args.pr, "linked": True})
+
+
+def stack_view(config, number):
+    stack = rest("GET", f"repos/{config['repo']}/stacks/{number}")
+    pattern = re.compile(re.escape(config["branch_prefix"]) + r"(\d+)-")
+    prs = []
+    for pr in stack["pull_requests"]:
+        ticket = pattern.match(pr["head"]["ref"])
+        prs.append(
+            {
+                "pr": pr["number"],
+                "ticket": int(ticket.group(1)) if ticket else None,
+                "branch": pr["head"]["ref"],
+                "state": "merged" if pr.get("merged_at") else pr["state"],
+                "draft": pr.get("draft", False),
+            }
+        )
+    return {"stack": stack["number"], "base": stack["base"]["ref"], "open": stack["open"], "prs": prs}
+
+
+def shared_group(config, pr, blocker):
+    """Sprint or track both tickets belong to, or None: only tickets of one body of work stack."""
+    pattern = re.compile(re.escape(config["branch_prefix"]) + r"(\d+)-")
+    numbers = [pattern.match(p["head"]["ref"]) for p in (pr, blocker)]
+    if not all(numbers):
+        raise Failure("only ticket PRs stack", EXIT_WRONG_STATE)
+    mine, theirs = (find(config, int(n.group(1)), with_owners=False) for n in numbers)
+    if mine["sprint"] and mine["sprint"] == theirs["sprint"]:
+        return f"sprint {mine['sprint']}"
+    if mine["milestone"] in config.get("tracks", []) and mine["milestone"] == theirs["milestone"]:
+        return f"track {mine['milestone']}"
+    return None
+
+
+def op_stack(args):
+    """Show the GitHub stack PR <pr> belongs to, or with --on put <pr> on top of <blocker>'s stack.
+
+    GitHub stacks are linear: <pr> must target <blocker>'s branch and <blocker> must be the top.
+    Both tickets must share a sprint or a track.
+    """
+    config = load()
+    repo = config["repo"]
+    pr = rest("GET", f"repos/{repo}/pulls/{args.pr}")
+    if args.on is None:
+        if not pr.get("stack"):
+            emit({"pr": args.pr, "stack": None})
+            return
+        emit(stack_view(config, pr["stack"]["number"]))
+        return
+    blocker = rest("GET", f"repos/{repo}/pulls/{args.on}")
+    if pr["base"]["ref"] != blocker["head"]["ref"]:
+        raise Failure(f"#{args.pr} targets {pr['base']['ref']}, not #{args.on}'s branch {blocker['head']['ref']}", EXIT_WRONG_STATE)
+    below, mine = blocker.get("stack"), pr.get("stack")
+    if mine:
+        if below and mine["number"] == below["number"]:
+            emit(stack_view(config, mine["number"]))
+            return
+        raise Failure(f"#{args.pr} already in stack {mine['number']}", EXIT_WRONG_STATE)
+    if not shared_group(config, pr, blocker):
+        raise Failure(f"#{args.pr} and #{args.on} share no sprint or track: no stack, PR goes on base", EXIT_WRONG_STATE)
+    if not below:
+        stack = rest("POST", f"repos/{repo}/stacks", {"pull_requests": [args.on, args.pr]})
+    elif below["position"] == below["size"]:
+        stack = rest("POST", f"repos/{repo}/stacks/{below['number']}/add", {"pull_requests": [args.pr]})
+    else:
+        raise Failure(f"#{args.on} is not the top of stack {below['number']}: stacks are linear", EXIT_WRONG_STATE)
+    emit(stack_view(config, stack["number"]))
+
+
+def op_merge(args):
+    """Merge PR <pr> alone through the async merge API, the only one GitHub accepts for a stacked PR.
+
+    A stack merge also lands every open PR below, so a PR with open PRs below it is refused.
+    """
+    config = load()
+    repo = config["repo"]
+    pr = rest("GET", f"repos/{repo}/pulls/{args.pr}")
+    if pr.get("merged"):
+        emit({"pr": args.pr, "status": "merged", "sha": pr.get("merge_commit_sha")})
+        return
+    if pr["state"] != "open" or pr.get("draft"):
+        raise Failure(f"#{args.pr} is {'draft' if pr.get('draft') else pr['state']}", EXIT_WRONG_STATE)
+    if pr.get("stack"):
+        prs = stack_view(config, pr["stack"]["number"])["prs"]
+        below = [p["pr"] for p in prs[: pr["stack"]["position"] - 1] if p["state"] == "open"]
+        if below:
+            raise Failure(f"#{below[-1]} below it in stack {pr['stack']['number']} merges first", EXIT_WRONG_STATE)
+    path = f"repos/{repo}/pulls/{args.pr}/merge-async"
+    code, result = rest("PUT", path, {"merge_method": args.method, "sha": pr["head"]["sha"]}, check=False)
+    result = result or {}
+    uuid = (result.get("details") or {}).get("uuid")
+    if code != 0 and not uuid:
+        raise Failure(f"merge #{args.pr}: {result.get('message') or result}")
+    deadline = dt.datetime.now() + dt.timedelta(seconds=args.timeout)
+    while result.get("status") == "pending" or (code != 0 and uuid):
+        if dt.datetime.now() > deadline:
+            raise Failure(f"merge #{args.pr} still pending after {args.timeout}s (request {uuid})")
+        time.sleep(2)
+        code, result = 0, rest("GET", f"{path}/{uuid}")
+    details = result.get("details") or {}
+    if result.get("status") == "failed":
+        raise Failure(f"merge #{args.pr} refused: {details.get('message') or result}", EXIT_WRONG_STATE)
+    emit({"pr": args.pr, "status": result.get("status"), "sha": details.get("sha") or details.get("oid")})
+
+
+def blocked_by(config, number):
+    rows = rest("GET", f"repos/{config['repo']}/issues/{number}/dependencies/blocked_by")
+    return [{"number": r["number"], "state": r["state"]} for r in rows]
+
+
+def op_claims(args):
+    config = load()
+    now = dt.datetime.now(dt.timezone.utc)
+
+    def row(number, claim):
+        branch = remote_branch(config, number)
+        last_push = None
+        if branch:
+            head = rest("GET", f"repos/{config['repo']}/commits/{branch}")
+            last_push = head["commit"]["committer"]["date"]
+        owner = claim_owner(config, claim["sha"])
+        latest = max(filter(None, [owner["since"], last_push]))
+        age = now - dt.datetime.fromisoformat(latest.replace("Z", "+00:00"))
+        return {
+            "number": number,
+            "phase": claim["phase"],
+            **owner,
+            "branch": branch,
+            "last_activity": latest,
+            "stale": age.total_seconds() > config["stale_after_hours"] * 3600,
+        }
+
+    work = [(number, claim) for number, held in sorted(claims(config).items()) for claim in held]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        emit(list(pool.map(lambda job: row(*job), work)))
+
+
+def op_whoami(args):
+    emit({"agent": agent_id(args.agent), "login": viewer_login()})
+
+
+def op_branch(args):
+    config = load()
+    emit({"number": args.number, "branch": remote_branch(config, args.number)})
+
+
+# ---------------------------------------------------------------- provisioning
+
+
+def ensure_status_options(field, state_names):
+    """Add missing state options, keeping existing ones (and their ids, so no card loses its Status)."""
+    existing = {o["name"]: o for o in field["options"]}
+    missing = [s for s in STATES if state_names[s] not in existing]
+    if not missing:
+        return False
+    # The mutation replaces the whole option list: resend every existing option exactly as it is
+    # (id, color, description) and append only the missing states.
+    options = [
+        {"id": o["id"], "name": o["name"], "color": o["color"], "description": o["description"] or ""}
+        for o in field["options"]
+    ]
+    options += [
+        {"name": state_names[s], "color": STATE_COLORS[s], "description": STATE_DESCRIPTIONS[s]} for s in missing
+    ]
+    graphql(
+        """mutation($f:ID!,$o:[ProjectV2SingleSelectFieldOptionInput!]){updateProjectV2Field(input:{
+            fieldId:$f,singleSelectOptions:$o}){projectV2Field{... on ProjectV2SingleSelectField{id}}}}""",
+        f=field["id"],
+        o=options,
+    )
+    return True
+
+
+def op_provision(args):
+    repo = current_repo()
+    owner = args.owner or repo.split("/")[0]
+    owner_kind, owner_id = owner_node(owner)
+    created = False
+    if args.project:
+        if args.template:
+            raise Failure("--template copies into a new project: pass it with --title, not --project", EXIT_USAGE)
+        number = args.project
+    elif args.template:
+        source_owner, _, source_number = args.template.rpartition("/")
+        source_owner = source_owner or owner
+        if not source_number.isdigit():
+            raise Failure(f"--template expects [OWNER/]NUMBER, got {args.template!r}", EXIT_USAGE)
+        source_id = project_fields(owner_node(source_owner)[0], source_owner, int(source_number))[0]
+        project = graphql(
+            """mutation($p:ID!,$o:ID!,$t:String!){copyProjectV2(input:{
+                projectId:$p,ownerId:$o,title:$t,includeDraftIssues:false}){projectV2{number}}}""",
+            p=source_id,
+            o=owner_id,
+            t=args.title,
+        )["copyProjectV2"]["projectV2"]
+        number, created = project["number"], True
+    else:
+        project = graphql(
+            "mutation($o:ID!,$t:String!){createProjectV2(input:{ownerId:$o,title:$t}){projectV2{number}}}",
+            o=owner_id,
+            t=args.title,
+        )["createProjectV2"]["projectV2"]
+        number, created = project["number"], True
+    project_id, url, fields = project_fields(owner_kind, owner, number)
+    repo_id = rest("GET", f"repos/{repo}")["node_id"]
+    # A PR based on a branch outside a GitHub stack retargets only when that branch is deleted on merge.
+    rest("PATCH", f"repos/{repo}", {"delete_branch_on_merge": True})
+    graphql(
+        "mutation($p:ID!,$r:ID!){linkProjectV2ToRepository(input:{projectId:$p,repositoryId:$r}){clientMutationId}}",
+        p=project_id,
+        r=repo_id,
+    )
+    state_names = dict(DEFAULT_STATE_NAMES)
+    for pair in args.state or []:
+        state, _, name = pair.partition("=")
+        if state not in STATES:
+            raise Failure(f"unknown state {state!r}, expected one of {STATES}", EXIT_USAGE)
+        state_names[state] = name
+    status = fields.get(args.status_field)
+    if not status:
+        raise Failure(f"project has no single-select field {args.status_field!r}")
+    changed_status = ensure_status_options(status, state_names)
+    size_created = False
+    if args.size_field not in fields:
+        graphql(
+            """mutation($p:ID!,$n:String!,$o:[ProjectV2SingleSelectFieldOptionInput!]){createProjectV2Field(input:{
+                projectId:$p,dataType:SINGLE_SELECT,name:$n,singleSelectOptions:$o}){clientMutationId}}""",
+            p=project_id,
+            n=args.size_field,
+            o=[{"name": s, "color": SIZE_COLORS[s], "description": ""} for s in SIZES],
+        )
+        size_created = True
+    variables = {
+        "WA_PROJECT_OWNER": owner,
+        "WA_PROJECT_NUMBER": str(number),
+        "WA_STATUS_FIELD": args.status_field,
+        "WA_SIZE_FIELD": args.size_field,
+        "WA_STATES": json.dumps(state_names),
+        "WA_TASKS_PATH": args.tasks_path,
+        "WA_BRANCH_PREFIX": args.branch_prefix,
+        "WA_SPRINT_PREFIX": args.sprint_prefix or "none",  # "none": an empty variable reads as unset
+        "WA_STALE_AFTER_HOURS": str(args.stale_after_hours),
+        "WA_TRACKS": json.dumps(args.track or []),
+    }
+    for name, value in variables.items():
+        gh(["variable", "set", name, "--repo", repo, "--body", value])
+    config = load(refresh=True)
+    secret = gh(["secret", "list", "--repo", repo, "--json", "name", "--jq", ".[].name"], check=False).stdout.split()
+    # GitHub's built-in Project workflows that move cards behind the hooks' back. API can only delete them:
+    # setup asks a human to switch them off in the Project settings.
+    workflows = graphql(
+        f"query($l:String!,$n:Int!){{{owner_kind}(login:$l){{projectV2(number:$n){{workflows(first:20){{nodes{{name enabled}}}}}}}}}}",
+        l=owner, n=number,
+    )[owner_kind]["projectV2"]["workflows"]["nodes"]
+    conflicting = [w["name"] for w in workflows if w["enabled"] and w["name"] in CONFLICTING_WORKFLOWS]
+    emit(
+        {
+            "project_url": url,
+            "project_number": number,
+            "project_created": created,
+            "project_template": args.template,
+            "status_options_added": changed_status,
+            "size_field_created": size_created,
+            "variables": variables,
+            "secret_WA_PROJECT_TOKEN": "WA_PROJECT_TOKEN" in secret,
+            "state_options": config["state_options"],
+            "conflicting_workflows": conflicting,
+        }
+    )
+
+
+def op_templates(args):
+    owner = args.owner or current_repo().split("/")[0]
+    kind = owner_node(owner)[0]
+    nodes = graphql(
+        f"""query($l:String!){{{kind}(login:$l){{projectsV2(first:100,query:"is:template"){{
+            nodes{{number title url template closed}}}}}}}}""",
+        l=owner,
+    )[kind]["projectsV2"]["nodes"]
+    emit([{"number": n["number"], "title": n["title"], "url": n["url"]} for n in nodes if n["template"] and not n["closed"]])
+
+
+# ---------------------------------------------------------------- cli
+
+
+def parser():
+    p = argparse.ArgumentParser(prog="wa-backlog", description="whackagent GitHub Projects backlog provider")
+    sub = p.add_subparsers(dest="op", required=True)
+
+    s = sub.add_parser("config", help="print resolved settings")
+    s.add_argument("--refresh", action="store_true", help="re-read repo variables and project ids")
+    s.set_defaults(func=op_config)
+
+    s = sub.add_parser("list", help="board rows in priority order")
+    s.add_argument("--state", help="comma-separated states")
+    s.add_argument("--sprint")
+    s.add_argument("--milestone")
+    s.add_argument("--all", action="store_true", help="include done")
+    s.add_argument("--owners", action="store_true", help="resolve claim owners (one call per claim)")
+    s.set_defaults(func=op_list)
+
+    s = sub.add_parser("get")
+    s.add_argument("number", type=int)
+    s.set_defaults(func=op_get)
+
+    s = sub.add_parser("create")
+    s.add_argument("--title", required=True)
+    s.add_argument("--summary", required=True)
+    s.add_argument("--size", choices=SIZES)
+    s.add_argument("--sprint")
+    s.add_argument("--milestone", help='milestone title (default: highest open one, "" = none)')
+    s.add_argument("--note")
+    s.set_defaults(func=op_create)
+
+    s = sub.add_parser("claim", help="atomic lock; exit 3 when taken")
+    s.add_argument("number", type=int)
+    s.add_argument("phase", choices=sorted(CLAIM_FROM))
+    s.add_argument("--agent")
+    s.set_defaults(func=op_claim)
+
+    s = sub.add_parser("release")
+    s.add_argument("number", type=int)
+    s.add_argument("phase", choices=sorted(CLAIM_FROM))
+    s.add_argument("--reset-to", choices=STATES)
+    s.add_argument("--reason")
+    s.set_defaults(func=op_release)
+
+    s = sub.add_parser("set-state")
+    s.add_argument("number", type=int)
+    s.add_argument("state", choices=STATES)
+    s.set_defaults(func=op_set_state)
+
+    s = sub.add_parser("move")
+    s.add_argument("number", type=int)
+    where = s.add_mutually_exclusive_group(required=True)
+    where.add_argument("--top", action="store_true")
+    where.add_argument("--bottom", action="store_true")
+    where.add_argument("--before", type=int)
+    where.add_argument("--after", type=int)
+    s.set_defaults(func=op_move)
+
+    s = sub.add_parser("set-field")
+    s.add_argument("number", type=int)
+    s.add_argument("field", choices=["size", "sprint", "milestone"])
+    s.add_argument("value", help='size value, sprint name or milestone title ("" clears)')
+    s.set_defaults(func=op_set_field)
+
+    s = sub.add_parser("milestones", help="release scopes, highest first")
+    s.set_defaults(func=op_milestones)
+
+    s = sub.add_parser("close-milestone", help="close a shipped milestone (/wa-release only)")
+    s.add_argument("title")
+    s.set_defaults(func=op_close_milestone)
+
+    s = sub.add_parser("split", help="ticket becomes the sprint root of its split, children = sub-issues")
+    s.add_argument("number", type=int)
+    s.set_defaults(func=op_split)
+
+    s = sub.add_parser("comment")
+    s.add_argument("number", type=int)
+    text = s.add_mutually_exclusive_group(required=True)
+    text.add_argument("text", nargs="?")
+    text.add_argument("--body-file", help="read the text from a file, - = stdin (multi-line comments)")
+    s.set_defaults(func=op_comment)
+
+    s = sub.add_parser("depend", help="ticket is blocked by others (issue Relationships)")
+    s.add_argument("number", type=int)
+    s.add_argument("--on", required=True, type=lambda v: [int(x) for x in v.split(",") if x], help="blocker ids, comma-separated")
+    s.set_defaults(func=op_depend)
+
+    s = sub.add_parser("link-pr", help="repair: closing link PR → ticket (Development); hooks link on their own")
+    s.add_argument("number", type=int)
+    s.add_argument("pr", type=int)
+    s.set_defaults(func=op_link_pr)
+
+    s = sub.add_parser("stack", help="GitHub stack of PR <pr>; --on <blocker pr> puts it on top (same sprint or track only)")
+    s.add_argument("pr", type=int)
+    s.add_argument("--on", type=int, help="blocker PR, its branch = <pr>'s base")
+    s.set_defaults(func=op_stack)
+
+    s = sub.add_parser("merge", help="merge PR <pr> alone (async API, works for stacked PRs); open PRs below it → exit 4")
+    s.add_argument("pr", type=int)
+    s.add_argument("--method", choices=["squash", "merge"], default="squash")
+    s.add_argument("--timeout", type=int, default=300, help="seconds to wait for GitHub to finish the merge")
+    s.set_defaults(func=op_merge)
+
+    s = sub.add_parser("screenshots", help="upload images with gh image, show them in the PR body")
+    s.add_argument("pr", type=int)
+    s.add_argument(
+        "images",
+        nargs="+",
+        help="PNG/JPEG/WebP paths (file stem = caption), or <caption>=<https url> for an image already uploaded",
+    )
+    s.add_argument("--width", type=int, default=260, help="display width in px")
+    s.set_defaults(func=op_screenshots)
+
+    s = sub.add_parser("claims", help="every live claim, owner, last activity, stale flag")
+    s.set_defaults(func=op_claims)
+
+    s = sub.add_parser("whoami")
+    s.add_argument("--agent")
+    s.set_defaults(func=op_whoami)
+
+    s = sub.add_parser("branch", help="remote branch carrying the ticket")
+    s.add_argument("number", type=int)
+    s.set_defaults(func=op_branch)
+
+    s = sub.add_parser("provision", help="create or adopt the project, fields, repo variables")
+    target = s.add_mutually_exclusive_group(required=True)
+    target.add_argument("--title", help="create a new project with this title")
+    target.add_argument("--project", type=int, help="adopt an existing project number")
+    s.add_argument("--owner", help="project owner login (default: repo owner)")
+    s.add_argument(
+        "--template", metavar="[OWNER/]NUMBER", help="with --title: copy this project template (views, fields, workflows)"
+    )
+    s.add_argument("--status-field", default="Status")
+    s.add_argument("--size-field", default="Size")
+    s.add_argument("--state", action="append", metavar="STATE=OPTION", help="map a state onto an existing option")
+    s.add_argument("--tasks-path", default=".whackagent/tasks")
+    s.add_argument("--branch-prefix", default="wa/")
+    s.add_argument("--sprint-prefix", default="sprint/", help='branch.sprint_prefix ("" = sprints have no branch)')
+    s.add_argument("--stale-after-hours", type=int, default=24)
+    s.add_argument("--track", action="append", metavar="MILESTONE", help="branch.tracks key: never a default milestone")
+    s.set_defaults(func=op_provision)
+
+    s = sub.add_parser("templates", help="project templates an owner offers to provision --template")
+    s.add_argument("--owner", help="owner login (default: repo owner)")
+    s.set_defaults(func=op_templates)
+    return p
+
+
+def check_contract():
+    """Warn when the project's BOARD.md names another contract version than this script implements."""
+    try:
+        board = Path(git("rev-parse", "--show-toplevel")) / "BOARD.md"
+        first = board.read_text().splitlines()[0] if board.exists() else ""
+    except (subprocess.CalledProcessError, OSError, IndexError):
+        return
+    match = re.search(r"board-contract:\s*([\d.]+)", first)
+    if match and match.group(1) != CONTRACT_VERSION:
+        note(f"warning: BOARD.md is board-contract {match.group(1)}, this script implements {CONTRACT_VERSION}"
+             " — update both through the setup PR")
+
+
+def main():
+    args = parser().parse_args()
+    check_contract()
+    try:
+        try:
+            args.func(args)
+        except StaleCache:
+            load(refresh=True)  # Project changed under the cache: rebuild once, rerun
+            args.func(args)
+    except Failure as failure:
+        note(f"wa-backlog: {failure}")
+        sys.exit(failure.code)
+    except subprocess.CalledProcessError as error:
+        note(f"wa-backlog: {error.cmd[0]} failed: {error.stderr}")
+        sys.exit(EXIT_ERROR)
+
+
+if __name__ == "__main__":
+    main()

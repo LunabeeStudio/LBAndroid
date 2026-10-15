@@ -1,0 +1,39 @@
+# whackagent board hooks — template version: 16 · board-contract: 2.2
+# Installed by /wa-setup from the whackagent plugin (providers/github/whackagent-board.yml).
+# Caller only: the logic lives in rlatapy-luna/whackagent and updates itself through the `hooks-v2` tag,
+# so this file changes only when its triggers, permissions or secrets do (/wa-setup backlog offers it).
+# Settings are repository variables written by `wa-backlog provision`; WA_PROJECT_TOKEN secret = classic
+# PAT, scopes project + repo (GITHUB_TOKEN can't reach Projects v2).
+# Custom branch prefix? Change the `branches` filter below to match WA_BRANCH_PREFIX.
+
+name: whackagent board
+
+on:
+  issues:
+    types: [opened, edited]
+  push:
+    branches: ["wa/**"]
+  pull_request:
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, synchronize, closed]
+  # report-only board check (BOARD.md → Checks): comments what disagrees with the repository, never moves cards
+  schedule:
+    - cron: "17 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  # PR and push events: event + action in the group. GitHub keeps one pending run per group and cancels the
+  # older one, so a force push (synchronize) followed by `gh pr ready` (ready_for_review) would drop one of them.
+  # Issue events: one group per issue, so `opened` and a quick `edited` run in order, never side by side.
+  group: whackagent-board-${{ github.event.issue.number && format('issue-{0}', github.event.issue.number) || format('{0}-{1}-{2}', github.head_ref || github.ref_name, github.event_name, github.event.action) }}
+  cancel-in-progress: false
+
+jobs:
+  board:
+    uses: rlatapy-luna/whackagent/.github/workflows/board.yml@hooks-v2
+    secrets:
+      WA_PROJECT_TOKEN: ${{ secrets.WA_PROJECT_TOKEN }}
