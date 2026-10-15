@@ -70,10 +70,8 @@ These are project-specific, not generic dev practice:
 - **KMP modules** (e.g. `common/core/core`, `common/extension/extension`) target `iosArm64` + `iosSimulatorArm64` with **SKIE** (static frameworks). Publication uses `PublishType.Kmp` in `lunabee.library-publish-conventions`, with overrides that skip jar artifacts for the iOS targets (workaround for jreleaser/jreleaser#1746).
 - **BOM** (`common/bom`) pins versions across all published modules and reads its version from `AndroidConfig.bomVersion()` (env override: `EnvConfig.EnvVersionName`).
 
-## Agent skills (project-local)
+<!-- board-contract: 2.2 -->
+## Board
 
-The `docs/agents/` directory wires three meta-conventions used by skills:
-
-- **Issue tracker** — markdown files at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with a `Status:` line near the top. PRD is `.scratch/<feature-slug>/PRD.md`. (`docs/agents/issue-tracker.md`)
-- **Triage labels** — five canonical states: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Applied by editing the `Status:` line. (`docs/agents/triage-labels.md`)
-- **Domain docs** — single-context: read `CONTEXT.md` and any relevant `docs/adr/*.md` before exploring. Use glossary vocabulary in titles/proposals; surface ADR conflicts explicitly. Proceed silently if these files don't exist. (`docs/agents/domain.md`)
+Issues and pull requests in this repository follow [BOARD.md](BOARD.md), whatever tool or work loop you use. Before you work on an issue or open a pull request, read BOARD.md and follow it: claim the ticket first, never move a card yourself, one PR per ticket, a human decides every merge.
+<!-- /board-contract -->
