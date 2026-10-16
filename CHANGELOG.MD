@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-16
+
+```
+Migration Core 1.0.0
+Migration Datastore 1.0.0
+bom 4.17.0
+```
+
+- New `migration-core` module (KMP: JVM, iOS, macOS, Linux, Windows): a versioned, step-by-step app data migration
+  engine. `LBMigrationRunner` runs the `LBMigration` steps from the version held by an `LBMigrationVersionStore` up to
+  `lastVersion`, saves the version after each step, stops at the first failing step and returns an `LBResult`. A step
+  gap fails with `LBMissingMigrationException`.
+- New `migration-datastore` module (KMP: JVM, iOS, macOS, Linux): `DataStoreMigrationVersionStore`, an
+  `LBMigrationVersionStore` backed by a `DataStore<Preferences>` the app provides.
+- bom: adds `migration-core` and `migration-datastore`.
+
 ## 2026-10-15
 
 ```

@@ -1,6 +1,6 @@
 # Architecture
 
-Overall shape of LBAndroid: 56 Gradle projects (23 `compose`, 30 `common` incl. 2 lint-check projects, 3 demos) — layout, wiring, Maven coordinate grouping, demo apps.
+Overall shape of LBAndroid: 58 Gradle projects (23 `compose`, 32 `common` incl. 2 lint-check projects, 3 demos) — layout, wiring, Maven coordinate grouping, demo apps.
 
 Related: [[build-and-publishing]] · [[presenter]] · [[synchronization]] · [[common-libraries]] · [[compose-ui]]
 
@@ -61,6 +61,7 @@ Move folder → published coordinate changes.
 | `common/extension` | KMP + Android | Kotlin / Android extension functions. |
 | `common/ktor` | KMP | Ktor client setup, JSON negotiation, Kermit logging. |
 | `common/loading` | KMP core + Android Compose | Global blocking loading manager, Hilt + Koin bindings. |
+| `common/migration` | KMP | Versioned app data migration engine + DataStore version store. See [[common-libraries]]. |
 | `common/monitoring` | KMP (+ Android OkHttp) | Network-call monitoring: core, Ktor/OkHttp interceptors, Room store, Compose UI. |
 | `common/synchronization` | KMP (JVM core + remote; Android+iOS adapters) + JVM lint checks | Storage-agnostic sync engine + DataStore/Room/Parse adapters, backend-agnostic remote managers, events, lint rule. See [[synchronization]]. |
 | `common/test` | KMP + Android | `test-core` (kotlin-test helpers), `test-room`. |
@@ -68,7 +69,8 @@ Move folder → published coordinate changes.
 
 ## Platform split (by convention plugin applied)
 
-- **KMP iOS + JVM + macOS/Linux/mingw**: `core`, `extension`, `logger-kermit`, `ktor-*`, `loading-core`.
+- **KMP iOS + JVM + macOS/Linux/mingw**: `core`, `extension`, `logger-kermit`, `ktor-*`, `loading-core`, `migration-core`.
+- **KMP iOS + JVM + macOS/Linux**: `migration-datastore`.
 - **KMP iOS + JVM**: `monitoring-core`, `monitoring-ktor`, `test-core`, `synchronization-core`, `synchronization-remote`.
 - **KMP iOS + Android + JVM**: `synchronization-core-datastore`.
 - **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,events}`.

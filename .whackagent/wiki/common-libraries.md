@@ -1,6 +1,6 @@
 # Common Libraries
 
-Non-UI building blocks under `common/` (published as `studio.lunabee.<group>:<module>`): results, logging, global loading, Ktor setup, network monitoring, test helpers.
+Non-UI building blocks under `common/` (published as `studio.lunabee.<group>:<module>`): results, logging, global loading, app data migrations, Ktor setup, network monitoring, test helpers.
 
 Out of scope: [[synchronization]] and BOM (see [[build-and-publishing]]). Overall module layout: [[architecture]].
 
@@ -10,7 +10,7 @@ Convention plugin in each `build.gradle.kts` decides platform:
 
 | Convention plugin | Targets | Modules |
 |---|---|---|
-| `lunabee.kmp-library-conventions` + `jvm()` in module | JVM + iosArm64 + iosSimulatorArm64 (SKIE static frameworks) | `core`, `extension`, `ktor-*`, `loading-core`, `logger-kermit`, `monitoring-core`, `monitoring-ktor`, `test-core` |
+| `lunabee.kmp-library-conventions` + `jvm()` in module | JVM + iosArm64 + iosSimulatorArm64 (SKIE static frameworks) | `core`, `extension`, `ktor-*`, `loading-core`, `logger-kermit`, `migration-core`, `migration-datastore`, `monitoring-core`, `monitoring-ktor`, `test-core` |
 | `lunabee.kmp-android-library-conventions` | Android + iOS | `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui` (Compose Multiplatform) |
 | `lunabee.android-library-conventions` | Android | `core-android`, `extension-android`, `monitoring-okhttp`, `test-room` |
 | `lunabee.android-compose-library-conventions` | Android + Compose | `core-compose`, `loading-compose`, `loading-hilt`, `loading-koin` |
@@ -28,6 +28,7 @@ logger-kermit  (api: Kermit)
   ├─ ktor-kermit
   └─ monitoring-okhttp, compose:core
 core ── loading-core ── loading-compose ── loading-hilt / loading-koin (+ core-compose)
+core (api) ── migration-core (api) ── migration-datastore (+ api: datastore-preferences-core)
 ktor-core ── ktor-json, monitoring-ktor
 monitoring-core ── monitoring-ktor / -okhttp / -room / -ui
 ```
@@ -83,6 +84,20 @@ Purpose: app-wide **global loading / interaction-blocking** state driven from an
 - `loading-compose`: `LoadingView` (fade-animated spinner over scrim, blocking slot, back press blocked by default), `LoadingBlockBackView`, `LoadingBackHandler`, `DefaultLoadingContent` (context parameter on `LoadingViewScope`). `common/loading/loading-compose/src/main/kotlin/studio/lunabee/loading/LoadingView.kt`
 - **Lint rule** `ByPassLoadingHandler` (`common/loading/loading-compose/checks/.../LoadingBackHandlerDetector.kt`, shipped via `lintPublish`): warns on `androidx.activity.compose.BackHandler` with quick-fix to `LoadingBackHandler` — plain `BackHandler` added after `LoadingView` would bypass global loading.
 - `loading-hilt` / `loading-koin`: same composables without `loadingManager` param — resolved via Hilt `LoadingManagerEntryPoint` (`rememberLoadingManager()`) or `koinInject()`. Neither module binds `LoadingManager`; app must provide singleton.
+
+## migration — `migration-core`, `migration-datastore`
+
+Purpose: versioned, step-by-step **app data** migrations (not SQLite schema — Room `Migration` does that), shared by Kokoriko, oneSafe6, RunMotion (first consumer, RunMotion_Android#1194). See `common/migration/README.md`. Task #369.
+
+- Engine, not use case: `LBMigrationRunner<Input>(migrations, lastVersion)` — app keeps own use case calling `run(input, versionStore): LBResult<Unit>`, decides what failure means (Kokoriko/RunMotion log + ignore, oneSafe6 fails login).
+- `LBMigration<in Input>`: `startVersion`, `endVersion`, `suspend migrate(input)` — steps **throw**. `Unit` input when steps need nothing; oneSafe6 v0/v15 input split stays app-side (adapter).
+- `run`: reads version, runs step starting there, `setVersion(endVersion)` after each success, stops at first failure. **Any** error (step, store `getVersion`/`setVersion`, missing step) → `Failure(throwable)`; failed step's version never saved → next run retries. `CancellationException` rethrown. Version ≥ `lastVersion` → `Success`, nothing run.
+- No step at current version → `Failure(LBMissingMigrationException(fromVersion))`. Constructor `require`s unique `startVersion`s, `endVersion > startVersion` → bad list fails fast, never loops.
+- `LBMigrationVersionStore` passed to `run`, not constructor → runner = DI singleton, oneSafe6 builds store per safe. No "absent" notion in library: store maps it (fresh install → 0, or `lastVersion` to skip all).
+- Logs via `LBLogger`: info per step, error with throwable (`Migration from X to Y failed`, or `Migration failed` for store/missing-step).
+- `migration-core` exposes `core` as `api` (`LBResult` in public API).
+- `migration-datastore`: `DataStoreMigrationVersionStore(dataStore, key = "lbMigrationVersion", versionWhenAbsent = 0)` over app's own `DataStore<Preferences>` (no file, no `Context`). One `key` per scope. No mingwX64 (datastore-preferences-core has none). Separate module so `migration-core` stays DataStore-free (oneSafe6 stores version in Room).
+- No concurrency guard on `run` (YAGNI: called once at start / login).
 
 ## ktor — `ktor-core`, `ktor-json`, `ktor-kermit`
 
