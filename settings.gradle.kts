@@ -135,6 +135,7 @@ addCommonModule(
     "loading/loading-hilt",
     "loading/loading-koin",
     "migration/migration-core",
+    "migration/migration-datastore",
     "monitoring/monitoring-core",
     "monitoring/monitoring-ktor",
     "monitoring/monitoring-okhttp",
