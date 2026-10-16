@@ -1,6 +1,6 @@
 ---
 issue: 369
-phase: review
+phase: validated
 wiki: [[common-libraries]], [[build-and-publishing]], [[architecture]]
 note: Requested from the RunMotion grill of LunabeeStudio/RunMotion_Android#1194 (first consumer, V0→V1 Parse session copy). Moving Kokoriko and oneSafe6 onto it is out of scope (tickets in their repos).
 created: 2026-10-16
@@ -73,8 +73,25 @@ Pre-existing, out of scope: every `addJvmModule` `-jvm` constraint in the genera
 
 ## Review
 
+### validation (2026-10-16)
+
+- Tools: plain `./gradlew detekt` passes.
+- Verifier pass 1 covered style, elegance, structure and correctness, and returned 5 findings:
+  - [major] [structure] `migration-core` used `implementation(projects.core)`, but `run` returns `LBResult`, so `core` was runtime-only in the published metadata. Fixed: it is now `api(projects.core)`, and the pom shows `core-jvm` at compile scope.
+  - [minor] [correctness] A store error from `getVersion` or `setVersion` escaped `run` instead of coming back as a `Failure`. Fixed: one try now wraps the loop, returns `Failure(e)` for any error and still rethrows `CancellationException`. Two new tests cover it (`getVersion` throws, `setVersion` throws).
+  - [nit] The missing-step failure was not logged. Fixed: it goes through the shared error log.
+  - [nit] The logger tag was a hard-coded string. Fixed: it is now `LBLogger.get<LBMigrationRunner<*>>()`.
+  - [nit] Test calls on continuation lines used positional arguments. Fixed: they use named arguments.
+- Verifier pass 2 found one new minor issue: the shared catch logged a generic "Migration failed", so the log no longer named the failing step. Fixed with a step marker.
+- Verifier pass 3 found that the marker was still set during `setVersion`, so a store write error blamed the step (minor), and that the name and type were misleading (nit). Fixed: `runningStep: LBMigration<Input>?` is cleared before `setVersion`. A step failure logs `Migration from X to Y failed`, and a store or missing-step failure logs `Migration failed`.
+- Verifier pass 4: clean, with all four lenses run.
+- Docs: `common/migration/README.md` now says that a version store error also comes back as a `Failure`.
+- Autofix changed `migration-core/build.gradle.kts`, `LBMigrationRunner.kt`, `FakeMigrationVersionStore.kt` and `LBMigrationRunnerTest.kt` after the user's test.
+
 ## Verification
 
 This is a library (`verify.mode: off`), so build, tests and detekt are the whole proof. The agent did not drive anything at runtime.
+
+After the validation autofix, `./gradlew :migration-core:allTests :migration-datastore:allTests` and plain `./gradlew detekt` pass again. Store-failure behaviour has 2 new tests, so the runner has 10 tests.
 
 ## Feedback
