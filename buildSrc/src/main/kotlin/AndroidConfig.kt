@@ -80,6 +80,7 @@ object AndroidConfig {
     const val TEST_ROOM_VERSION: String = "1.0.0"
     const val KTOR_VERSION: String = "4.10.0"
     const val LOADING_VERSION: String = "4.10.1"
+    const val MIGRATION_CORE_VERSION: String = "1.0.0"
     const val PLATFORM_VERSION: String = "4.16.0"
     const val EXTENSIONS_ANDROID_VERSION: String = "4.9.0"
     const val MONITORING_CORE_VERSION: String = "4.9.1"
