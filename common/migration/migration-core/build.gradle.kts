@@ -35,7 +35,7 @@ kotlin {
 
             implementation(libs.kotlinxCoroutinesCore)
 
-            implementation(projects.core)
+            api(projects.core)
         }
 
         commonTest.dependencies {

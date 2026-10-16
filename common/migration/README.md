@@ -55,8 +55,8 @@ when (val result = runner.run(input = Unit, versionStore = versionStore)) {
 
 `run` reads the stored version, then for each version below `lastVersion` runs the step starting there and saves its
 `endVersion`. It stops at the first failing step without saving that step's version, so the next `run` retries it, and
-returns `LBResult.Failure` carrying the step exception. A `CancellationException` is rethrown. A stored version at or
-above `lastVersion` runs nothing and returns `Success`.
+returns `LBResult.Failure` carrying the step exception. A version store error also comes back as a `Failure`. A
+`CancellationException` is rethrown. A stored version at or above `lastVersion` runs nothing and returns `Success`.
 
 When no step starts at the current version, the `Failure` carries `LBMissingMigrationException`, with the version in
 `fromVersion`.

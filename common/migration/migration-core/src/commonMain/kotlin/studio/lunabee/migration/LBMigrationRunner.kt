@@ -21,7 +21,7 @@ import kotlinx.coroutines.CancellationException
 import studio.lunabee.core.model.LBResult
 import studio.lunabee.logger.LBLogger
 
-private val logger: Logger = LBLogger.get("LBMigrationRunner")
+private val logger: Logger = LBLogger.get<LBMigrationRunner<*>>()
 
 /**
  * Run [migrations] one after the other until the stored version reaches [lastVersion].
@@ -43,38 +43,32 @@ class LBMigrationRunner<Input>(
 
     /**
      * Migrate from the version held by [versionStore] up to the last version, saving the version after each successful step.
-     * Stop at the first failing step, which stays at its start version so the next run retries it.
+     * Stop at the first failure, which leaves the stored version at the last saved step so the next run retries from there.
      *
      * @param input handed to every step
      * @param versionStore where the current version is read and saved
-     * @return [LBResult.Failure] carrying the step exception or [LBMissingMigrationException], [LBResult.Success] otherwise
+     * @return [LBResult.Failure] carrying the exception of a failing step or version store, or [LBMissingMigrationException]
+     * when no step starts at the current version, [LBResult.Success] otherwise
      */
     suspend fun run(input: Input, versionStore: LBMigrationVersionStore): LBResult<Unit> {
-        var version = versionStore.getVersion()
-        var failure: Throwable? = null
-        while (version < lastVersion && failure == null) {
-            val migration = migrationsByStartVersion[version]
-            if (migration == null) {
-                failure = LBMissingMigrationException(version)
-            } else {
-                failure = runStep(migration, input)
-                if (failure == null) {
-                    versionStore.setVersion(migration.endVersion)
-                    logger.i { "Migration from ${migration.startVersion} to ${migration.endVersion} succeeded" }
-                    version = migration.endVersion
-                }
+        var runningStep: LBMigration<Input>? = null
+        return try {
+            var version = versionStore.getVersion()
+            while (version < lastVersion) {
+                val migration = migrationsByStartVersion[version] ?: throw LBMissingMigrationException(version)
+                runningStep = migration
+                migration.migrate(input)
+                runningStep = null
+                versionStore.setVersion(migration.endVersion)
+                logger.i { "Migration from ${migration.startVersion} to ${migration.endVersion} succeeded" }
+                version = migration.endVersion
             }
+            LBResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            logger.e(e) { runningStep?.let { "Migration from ${it.startVersion} to ${it.endVersion} failed" } ?: "Migration failed" }
+            LBResult.Failure(e)
         }
-        return failure?.let { LBResult.Failure(it) } ?: LBResult.Success(Unit)
-    }
-
-    private suspend fun runStep(migration: LBMigration<Input>, input: Input): Throwable? = try {
-        migration.migrate(input)
-        null
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
-        logger.e(e) { "Migration from ${migration.startVersion} to ${migration.endVersion} failed" }
-        e
     }
 }

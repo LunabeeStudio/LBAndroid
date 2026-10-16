@@ -16,12 +16,17 @@
 
 package studio.lunabee.migration
 
-class FakeMigrationVersionStore(var version: Int) : LBMigrationVersionStore {
+class FakeMigrationVersionStore(
+    var version: Int,
+    private val getError: Throwable? = null,
+    private val setError: Throwable? = null,
+) : LBMigrationVersionStore {
     val savedVersions: MutableList<Int> = mutableListOf()
 
-    override suspend fun getVersion(): Int = version
+    override suspend fun getVersion(): Int = getError?.let { throw it } ?: version
 
     override suspend fun setVersion(version: Int) {
+        setError?.let { throw it }
         this.version = version
         savedVersions += version
     }
