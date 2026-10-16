@@ -1,6 +1,6 @@
 ---
 issue: 369
-phase:
+phase: review
 wiki: [[common-libraries]], [[build-and-publishing]], [[architecture]]
 note: Requested from the RunMotion grill of LunabeeStudio/RunMotion_Android#1194 (first consumer, V0→V1 Parse session copy). Moving Kokoriko and oneSafe6 onto it is out of scope (tickets in their repos).
 created: 2026-10-16
@@ -45,8 +45,36 @@ Decisions:
 
 ## Implementation
 
+Brick 1: `migration-core`
+- `common/migration/migration-core/` (new module, `MIGRATION_CORE_VERSION = "1.0.0"`, registered in `settings.gradle.kts`).
+- `LBMigration`, `LBMigrationRunner`, `LBMigrationVersionStore` and `LBMissingMigrationException` are in `studio.lunabee.migration`.
+- `run` has a single return to satisfy detekt `ReturnCount`. A private `runStep` returns the step's throwable and rethrows `CancellationException`.
+- Targets: jvm, iOS (from the convention), macosArm64, linuxX64 and mingwX64.
+- Tests: `LBMigrationRunnerTest` in commonTest has 8 tests, one per runner criterion. The duplicate start version and the bad end version are tested separately.
+
+Brick 2: `migration-datastore`
+- `common/migration/migration-datastore/` (new module, `MIGRATION_DATASTORE_VERSION = MIGRATION_CORE_VERSION`).
+- `DataStoreMigrationVersionStore` is in `studio.lunabee.migration.datastore` and uses `intPreferencesKey(key)`.
+- Targets: jvm, iOS, macosArm64 and linuxX64. mingwX64 is dropped because `datastore-preferences-core` 1.2.1 publishes no `mingw_x64` variant.
+- Tests: `DataStoreMigrationVersionStoreTest` in commonTest has 4 tests on a temp-file DataStore.
+
+Brick 3: release wiring
+- The BOM declares `addJvmModule` for both modules, and `PLATFORM_VERSION` is `4.17.0`.
+- `CHANGELOG.MD` has a `2026-10-16` block, the root `README.md` has two artifact rows, and `common/migration/README.md` documents usage.
+
+Proof
+- `./gradlew :migration-core:assemble :migration-core:allTests` passes: 8 tests on each of jvm, macosArm64 and iosSimulatorArm64.
+- `./gradlew :migration-datastore:assemble :migration-datastore:allTests` passes: 4 tests on each of jvm, macosArm64 and iosSimulatorArm64.
+- `PrintCoordinates` prints `studio.lunabee.migration:migration-core:1.0.0` and `studio.lunabee.migration:migration-datastore:1.0.0`.
+- `:bom:generatePomFileForBomPublication`: the BOM is version 4.17.0 and constrains `migration-core:1.0.0` and `migration-datastore:1.0.0`.
+- Plain `./gradlew detekt` passes.
+
+Pre-existing, out of scope: every `addJvmModule` `-jvm` constraint in the generated BOM pom has version `unspecified`. This includes `loading-core-jvm`, and now `migration-core-jvm` and `migration-datastore-jvm`.
+
 ## Review
 
 ## Verification
+
+This is a library (`verify.mode: off`), so build, tests and detekt are the whole proof. The agent did not drive anything at runtime.
 
 ## Feedback
