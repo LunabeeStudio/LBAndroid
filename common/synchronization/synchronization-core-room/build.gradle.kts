@@ -38,7 +38,7 @@ kotlin {
         commonMain.dependencies {
             implementation(project.dependencies.platform(libs.kotlinxCoroutinesBom))
 
-            implementation(libs.androidxRoomRuntime)
+            api(libs.androidxRoomRuntime)
             api(libs.androidxSqliteBundled)
             implementation(libs.kotlinxCoroutinesCore)
 

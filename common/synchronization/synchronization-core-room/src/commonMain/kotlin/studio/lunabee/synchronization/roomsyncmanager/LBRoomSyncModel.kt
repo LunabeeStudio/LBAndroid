@@ -19,7 +19,7 @@ package studio.lunabee.synchronization.roomsyncmanager
 import kotlin.time.Instant
 
 /**
- * Sync bookkeeping every Room entity synced by [LBRoomSyncManager] must expose.
+ * Sync bookkeeping every Room entity synced by a Room sync manager must expose.
  *
  * @property lbLocalId **must be the Room primary key**
  * @property lbServerId server object id, null until the row has been pushed
