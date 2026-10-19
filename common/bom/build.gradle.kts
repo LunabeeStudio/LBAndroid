@@ -57,6 +57,7 @@ dependencies {
         addModule(projects.synchronizationEvents)
         addJvmModule(projects.synchronizationCoreDatastore)
         addModule(projects.synchronizationCoreRoom)
+        addModule(projects.synchronizationParseKtorRoom)
         addModule(projects.synchronizationParseRoom)
         addJvmModule(projects.synchronizationRemote)
     }
