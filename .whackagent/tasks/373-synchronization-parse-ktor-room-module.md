@@ -1,6 +1,6 @@
 ---
 issue: 373
-phase:
+phase: validated
 wiki: "[[synchronization]], [[architecture]], [[build-and-publishing]], [[parse]]"
 note: "Depends on #372 (parse-ktor, parse-ktor-test). Consumers: RunMotion (phase 2/3 of the Shared KMP Data Layer plan), Kokoriko (push of TimeEntry, AiEntry)."
 created: 2026-10-19
@@ -79,6 +79,15 @@ We need a Parse↔Room sync that runs in KMP common code (Android + iOS) on `par
 - KDoc on every public declaration.
 - The `[[synchronization]]` wiki page is updated.
 
+### Coding decisions
+
+- The DTO is bounded `D : ParseObject`, because the keyset cursor of `pull` needs each object's `objectId` and `updatedAt`. (autopilot assumption)
+- `parse-ktor` `query` and `pull` gain optional `keys` and `include` parameters, plus overloads that take a `KSerializer` for callers without a reified type. This is folded into the unreleased `parse-ktor` 1.0.0, with no version bump. (autopilot assumption)
+- The push body is the JSON encoding of `update(row)` without the reserved `objectId`, `createdAt` and `updatedAt` fields. (autopilot assumption)
+- `findServerId` asks only for `objectId` (`keys=objectId`) on top of `where` and `limit 1`. (autopilot assumption)
+- The BOM stays at 4.17.0, the unreleased bump of #372 below this ticket in the stack. The synchronization 2.2.0 lines join the same `CHANGELOG.MD` release block. (autopilot assumption)
+- `synchronization-core-room` exposes the Room runtime as `api`, because the public `LBRoomSyncDao` now lives there and uses `@Upsert`. (autopilot assumption)
+
 ## Acceptance criteria
 
 1. `./gradlew :synchronization-parse-ktor-room:build :synchronization-core-room:build :synchronization-parse-room:build` succeeds, including the Android host and iOS simulator test tasks.
@@ -100,8 +109,47 @@ We need a Parse↔Room sync that runs in KMP common code (Android + iOS) on `par
 
 ## Implementation
 
+- Brick 1, `parse-ktor`: `query` and `pull` take optional `keys` and `include`, sent comma-joined only when they are not empty. New overloads take a `KSerializer<T>`. On a decoding failure they throw `LBParseException.Decoding`, passed through the client `mapErr` (`LBParseClient.mapErr` is internal). Files: `query/ParseQuery.kt`, `client/LBParseClient.kt`, `ParseQueryTest.kt`, `common/parse/README.md`.
+- Brick 2, contract move: `LBRoomSyncModel` and `LBRoomSyncDao` moved with `git mv` to `synchronization-core-room` `commonMain`, in the same package. `synchronization-core-room` exposes `androidxRoomRuntime` as `api`. `synchronization-parse-room` adds `api(projects.synchronizationCoreRoom)`. `SYNCHRONIZATION_CORE_VERSION` is now 2.2.0.
+- Brick 3, new module `synchronization-parse-ktor-room`:
+  - `LBParseRoomClass` provides `pullManager` and `syncManager`.
+  - Internal `remote/LBParseRemoteDataSource`: serializer `pull` and the `findServerId` lookup. The push body is encoded with `Json { encodeDefaults = true }`, with the reserved fields stripped.
+  - Internal `local/LBRoomSyncLocalDataSource`: skips pulled rows whose local edit is pending.
+  - 13 commonTest tests on `FakeParseServer` and a fake DAO.
+  - The module is registered in `settings.gradle.kts` and in the BOM with `addModule`. `SYNCHRONIZATION_PARSE_KTOR_ROOM_VERSION` is set.
+- Brick 4, docs: the module `README.md`, the "superseded" note in the parse-room README, the root `README.md` row, the `CHANGELOG.MD` lines folded into the 2026-10-19 block, and the `common/synchronization/CLAUDE.md` updates.
+
 ## Review
 
+### validation (autopilot)
+
+- Lenses: style, elegance, structure and correctness, all four on every round. The `detekt` validation tool was clean before the first round.
+- Round 1: 9 findings (1 major, 8 minor).
+  - Major: the `[[synchronization]]` wiki page was not updated (AC16). The PM fixed it during the wiki sync.
+  - Minor, autofixed:
+    - The `keysToSelect` KDoc and README now warn that a restricted list must keep `localIdKey` and the soft-delete field.
+    - The reified `query` and `pull` now delegate to the `KSerializer` overloads, so one decode and `mapErr` path remains, with one response `Json`.
+    - `LBParseRoomClass.serializer` is now `internal`.
+    - `localIdKey` moved first, as property-first member order.
+    - Test cleanups: helper order, `FakeRoomDao.kt` split out, redundant `@Upsert` removed.
+    - The contract bullets in the parse-room README were corrected.
+- Round 2: 5 minor findings, autofixed or fixed by the PM.
+  - The stale `@PublishedApi` was removed from internal query symbols.
+  - Wiki: parse-room is back to Android + iOS (PM).
+  - The `synchronization/CLAUDE.md` source-set row was corrected.
+  - The test `keysToSelect` now includes `deleted`.
+  - A new test covers `pushBeforePull`.
+- Round 3: 1 minor finding: the push-before-pull test now asserts the exact request order (PUT, then the pull GET). Autofixed.
+- Final pass: clean.
+
 ## Verification
+
+- Library, `verify.mode: off`, so no runtime check: build and tests are the proof. No live Parse server was called.
+- `./gradlew detekt` (plain run) is clean.
+- `:synchronization-parse-ktor-room:build` (Android host tests) and `:synchronization-parse-ktor-room:iosSimulatorArm64Test` pass, 13 tests each (AC 1, 6–15).
+- `:synchronization-core-room:build` and `:synchronization-parse-room:build` pass, with no parse-room source change outside its build file (AC 1, 5).
+- `:parse-ktor:jvmTest` and `:parse-ktor:iosSimulatorArm64Test` pass, 13 `ParseQueryTest` tests each.
+- `PrintCoordinates` prints 2.2.0 for all 7 synchronization modules, including `synchronization-parse-ktor-room` (AC 3).
+- `publishList` lists `synchronization-parse-ktor-room`, and the BOM pom holds its constraint (AC 4).
 
 ## Feedback
