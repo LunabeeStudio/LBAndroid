@@ -53,6 +53,7 @@
 | `studio.lunabee.synchronization:synchronization-core-datastore` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-datastore?style=for-the-badge) |
 | `studio.lunabee.synchronization:synchronization-core-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-room?style=for-the-badge) |
 | `studio.lunabee.synchronization:synchronization-events`  | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-events?style=for-the-badge)  |
+| `studio.lunabee.synchronization:synchronization-parse-ktor-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-parse-ktor-room?style=for-the-badge) |
 | `studio.lunabee.synchronization:synchronization-parse-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-parse-room?style=for-the-badge) |
 | `studio.lunabee.synchronization:synchronization-remote`  | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-remote?style=for-the-badge)  |
 
