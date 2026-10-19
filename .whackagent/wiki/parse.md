@@ -1,6 +1,6 @@
 # Parse
 
-KMP client for Parse Server REST API under `common/parse/`, shared by Lunabee Parse apps (Kokoriko, RunMotion). Built on `ktor-*` (see [[common-libraries]]). Module layout: [[architecture]]. Usage guide: `common/parse/README.md`.
+KMP client for Parse Server REST API under `common/parse/`, shared by Lunabee Parse apps (Kokoriko, RunMotion). Built on `ktor-*` (see [[common-libraries]]). Module layout: [[architecture]]. Usage guide: `common/parse/README.md`. Parse↔Room sync on top: `synchronization-parse-ktor-room` ([[synchronization]]).
 
 ## Why it exists
 
@@ -27,6 +27,7 @@ KMP client for Parse Server REST API under `common/parse/`, shared by Lunabee Pa
 - Helpers = extension functions on `LBParseClient`: `query`, `pull` (keyset cursor `updatedAt|objectId`), `callFunction` (unwraps `result`), `uploadFile`, user auth (`signUp`, `logIn`, `logInAnonymously`, `requestPasswordReset` skip session token; `logOut`, `me` send it), installation create/update.
 - `pull` next-page `where` = caller `where` + keyset `$or`; caller `where` already holding `$or` → both wrapped in `$and`, so caller filter survives page 2+.
 - Every public object id = `ParseObjectId` value class, serialized as plain string (`ParsePointer`, `ParseUser`, `ParseObject`, installation create/update). `ParseACL` keys stay `String`: mix user ids, `*`, `role:` names.
+- `query`/`pull` take optional `keys` / `include` (sent comma-joined, only when non-empty) and have `KSerializer` overloads for generic callers (e.g. sync data sources). One decode path: reified versions delegate; decoding failure → `LBParseException.Decoding` → `mapErr`, same as any call. Added by #373.
 - `ParseDateSerializer` = `{"__type":"Date","iso":…}`, ms precision, for custom Date fields only. Top-level `createdAt`/`updatedAt` come back as plain ISO strings → default `Instant` serializer.
 
 ## Errors and retry — invariants
