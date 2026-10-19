@@ -51,6 +51,8 @@ dependencies {
         addModule(projects.monitoringOkhttp)
         addModule(projects.monitoringRoom)
         addModule(projects.monitoringUi)
+        addJvmModule(projects.parseKtor)
+        addJvmModule(projects.parseKtorTest)
         addJvmModule(projects.synchronizationCore)
         addModule(projects.synchronizationEvents)
         addJvmModule(projects.synchronizationCoreDatastore)

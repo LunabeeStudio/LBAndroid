@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-19
+
+```
+Parse Ktor 1.0.0
+Parse Ktor-Test 1.0.0
+bom 4.18.0
+```
+
+- New `parse-ktor`: Parse Server REST client for Kotlin Multiplatform (JVM and iOS) built on `ktor-core`, `ktor-json` and
+  `ktor-kermit`. No HTTP engine is bundled: pass an `HttpClientEngine` to `LBParseClient`
+  - `LBParseClient` / `LBParseConfig`: Parse application id and client key headers, session token and installation id
+    providers, `withoutSessionToken()`, `configure` hook and `httpClient` escape hatch
+  - `LBParseException` (`Network`, `Parse`, `Http`, `Decoding`, `Unexpected`) with `ParseErrorCode` constants, converted
+    to the app error type through `LBParseConfig.mapErr`
+  - One retry by default on `IOException` for every HTTP method (`maxRetries`, 1 s delay), never on a response
+  - `model`: `ParsePointer`, `ParseDateSerializer`, `ParseFile`, `ParseAccess` / `ParseACL`
+  - `query`: `query`, `pull` with the keyset `PullCursor`, `pullWhere`
+  - `function`, `file`, `user`, `installation`: `callFunction`, `uploadFile`, `signUp`, `logIn`, `logInAnonymously`,
+    `logOut`, `me`, `requestPasswordReset`, `createInstallation`, `updateInstallation`
+- New `parse-ktor-test`: `FakeParseServer` (real `LBParseClient` on a Ktor `MockEngine`, per-request handler) and
+  `ParseRequestAssertions`, exposing `ktor-client-mock` as `api`
+- `bom`: constraints for `parse-ktor` and `parse-ktor-test`
+
 ## 2026-10-16
 
 ```
