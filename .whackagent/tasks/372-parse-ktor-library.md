@@ -1,6 +1,6 @@
 ---
 issue: 372
-phase:
+phase: validated
 wiki: "[[common-libraries]], [[architecture]], [[build-and-publishing]], [[parse]] (new)"
 note: "Blocks LunabeeStudio/RunMotion_Android#1202. LunabeeStudio/Kokoriko#327 migrates Kokoriko onto it once published. Parse↔Room sync on parse-ktor is a separate LBAndroid ticket (to create)."
 created: 2026-10-19
@@ -119,8 +119,49 @@ RunMotion moves its Parse remote layer from the Parse Android SDK to a shared KM
 
 ## Implementation
 
+Autopilot round, 4 bricks, one implementer.
+
+1. Scaffold + transport. `parse/parse-ktor` and `parse/parse-ktor-test` are registered in `settings.gradle.kts`. `AndroidConfig.kt` gets `PARSE_KTOR_VERSION = "1.0.0"` and `PARSE_KTOR_TEST_VERSION`, and `PLATFORM_VERSION` goes to `4.17.0`. `libs.versions.toml` gets `ktorClientMock`. The BOM gets `addJvmModule` for both modules. Package `client`: `LBParseClient`, `LBParseConfig`, the two provider interfaces, `ParseHeadersPlugin` (with `withoutSessionToken()`) and `ParseErrorMappingPlugin`. Package `error`: `LBParseException`, `ParseErrorCode`, `ParseErrorBody` and `ParseErrorMapping`. `parse-ktor-test` holds `FakeParseServer` and `ParseRequestAssertions`.
+2. Parse types + query. Package `model`: `ParsePointer`, `ParseDateSerializer` (on `kotlin.time.Instant`), `ParseFile`, `ParseAccess` and `ParseACL`. Package `query`: `ParseObject`, `ParsePage`, `ParseQueryPage`, `PullCursor` and `ParseQuery` (`query`, `pull`, `pullWhere`).
+3. Endpoint helpers. `function/ParseCloudFunction.kt` holds `callFunction`. `file/ParseFileUpload.kt` holds `uploadFile`. `user/ParseUserAuth.kt` holds `signUp`, `logIn`, `logInAnonymously`, `logOut`, `me` and `requestPasswordReset`, and `user/ParseUser.kt` holds the result type. `installation/ParseInstallationEndpoints.kt` holds `createInstallation` and `updateInstallation`.
+4. Docs + release. `common/parse/README.md`, a `CHANGELOG.MD` block, two rows in the root `README.md` and a KDoc pass.
+
+Implementation decisions:
+
+- Plugin install order: `ParseErrorMappingPlugin` first, then `LBKtorExceptionHandler`, `LBKtorJson`, `LBKtorKermit` and the headers plugin, and `HttpRequestRetry` last. HttpSend interceptors installed earlier are the outer ones, so the retry is innermost and sees the raw `IOException` before it is wrapped.
+- `HttpRequestRetry` retries 5xx responses by default. `retryIf(maxRetries) { _, _ -> false }` turns that off, so only `IOException` is retried. With `maxRetries = 0` the retry plugin is not installed.
+- ktor-core's `LBKtorExceptionHandler` wraps any non-`LBKtorException` thrown by its `mapErr` as `Unexpected` and maps it again. So the handler only maps `LBKtorException` to `LBParseException`, and `ParseErrorMappingPlugin` applies `LBParseConfig.mapErr` on top. ktor-core is unchanged.
+- The inline reified helpers use internals, so `PullCursor`, `ParseQueryPage` and `ParseFunctionResult` are `@PublishedApi internal`.
+- The installation helpers take a `JsonObject`, so the library does not guess the installation schema. `ParseUser` exposes only `objectId` and `sessionToken`.
+- `PLATFORM_VERSION` 4.17.0 is the same bump as open PR #370. Whichever PR lands second folds into that unreleased BOM bump (autopilot assumption).
+
 ## Review
 
+### validation (autopilot) — 2026-10-19
+
+Lenses: style ✓ · elegance ✓ · structure ✓ · correctness ✓. Tools: plain `./gradlew detekt` passes. Verdict: clean after 2 autofix rounds.
+
+Round 1 had 15 findings (4 major, 11 minor), all fixed by autofix:
+
+- major: `LBParseConfig.mapErr` was skipped for body decoding failures, because Ktor's `HttpCallValidator` raises them in its own phase before `Receive`. `ParseErrorMappingPlugin` now intercepts its own phase inserted before `Receive`. Two new tests cover `Decoding` with and without `mapErr`.
+- major: the `pull` keyset `$or` overwrote a caller `$or` in `where` on pages 2 and later. Both are now wrapped in `$and`, and a test covers it.
+- major: `kotlinx-serialization-json` is now `api`, because `JsonObject` is part of the public API.
+- major: the README example put `ParseDateSerializer` on `createdAt`, but Parse returns `createdAt` and `updatedAt` as plain ISO strings. The example and the KDoc are fixed, and the query test fixture now uses a plain ISO `updatedAt`.
+- minor: `respondParseError` builds JSON with `buildJsonObject`, and the `FakeParseServer` request log is thread-safe (`AtomicReference`).
+- minor: the unused content-negotiation and json-serialization dependencies are removed, and the trailing-slash `serverUrl` test is real.
+- minor: named arguments on continuation lines, `__type` is a class-body property in `ParsePointer` and `ParseFile` with `@property` KDoc, and `LBParseException` extends `Exception`.
+- minor: `uploadFile` takes a Ktor `ContentType`, and `assertJsonBody(request, expected)` takes the request first like the other assertions.
+
+Round 2 had 2 minor style findings: the formatting of the `$and` branch in `PullCursor`, and the import order in `FakeParseServer`. Both were fixed. Round 3 is clean.
+
 ## Verification
+
+- `./gradlew :parse-ktor:build :parse-ktor-test:build` succeeds: 48 tests on jvmTest and 48 on iosSimulatorArm64Test, 0 failures (criterion 1).
+- Plain `./gradlew detekt` passes with no findings (criterion 2).
+- `PrintCoordinates` prints `studio.lunabee.parse:parse-ktor:1.0.0` and `studio.lunabee.parse:parse-ktor-test:1.0.0` (criterion 3).
+- `publishList` lists both modules, and the BOM pom (`:bom:generatePomFileForBomPublication`) has constraints for `parse-ktor`, `parse-ktor-jvm`, `parse-ktor-test` and `parse-ktor-test-jvm` (criterion 4).
+- MockEngine tests through `FakeParseServer` prove criteria 5 to 24 (client, error, model, query, function, file, user and installation test files).
+- The `[[parse]]` wiki page exists, linked from `[[index]]`, `[[architecture]]` and `[[common-libraries]]` (criterion 25, wiki part).
+- There is no runtime check, because this is a library (`verify.mode: off`). No live Parse server was called.
 
 ## Feedback
