@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-13
+
+```
+Parse Ktor 1.1.0
+Parse Ktor-Test 1.1.0
+Synchronization Core 2.2.0
+Synchronization Events 2.2.0
+Synchronization Core-Datastore 2.2.0
+Synchronization Core-Room 2.2.0
+Synchronization Parse-Ktor-Room 2.2.0
+Synchronization Parse-Room 2.2.0
+Synchronization Remote 2.2.0
+bom 4.19.0
+```
+
+- `parse-ktor` `query` / `pull`: `keys` / `include` parameters and `KSerializer` overloads for types known only as a type
+  parameter
+- **break:** `parse-ktor` internal `ParseQueryPage` and `PullCursor` are no longer `@PublishedApi`: a library compiled
+  against 1.0.0's inline `query` / `pull` must be recompiled against 1.1.0
+- New `synchronization-parse-ktor-room` (Android + iOS): Parse to Room synchronization in common code on `parse-ktor` and
+  `synchronization-remote`, succeeding `synchronization-parse-room`
+  - `LBParseRoomClass<D, R>` declares a Parse class (`tableParseName`, `keysToSelect`, `keysToInclude`,
+    `createObjectFrom`, `localIdKey`, `update`) and builds `pullManager` and `syncManager`
+  - Keyset pull, a lookup by `localIdKey` before pushing a row without server id, soft delete only (no `DELETE` is
+    ever sent), a pulled row is skipped while its local edit is not pushed
+- `LBRoomSyncModel` and `LBRoomSyncDao` moved from `synchronization-parse-room` to `synchronization-core-room`, same
+  package and FQN. `synchronization-parse-room` now exposes `synchronization-core-room` as `api`
+- `synchronization-core-room` exposes the Room runtime as `api`
+- `bom`: constraint for `synchronization-parse-ktor-room`
+
 ## 2026-10-26
 
 ```

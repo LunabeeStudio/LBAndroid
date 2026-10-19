@@ -1,5 +1,9 @@
 # :synchronization-parse-room
 
+> Superseded by `synchronization-parse-ktor-room`; removed in a future major once consumers moved.
+> `LBRoomSyncModel` and `LBRoomSyncDao` now live in `synchronization-core-room` (FQNs unchanged, and this module
+> exposes it as `api`).
+
 A generic Parse↔Room synchronization framework built on top of the `:synchronization-core` library. KMP
 `androidLibrary`, android namespace `studio.lunabee.synchronization.parseroom`. Classes live under
 `studio.lunabee.synchronization.{roomsyncmanager,parseroomsyncmanager}`.
@@ -29,14 +33,9 @@ This is unrelated to the module's own synced-entity Room `@Database`.
 
 ### commonMain (contract)
 
-- `roomsyncmanager/LBRoomSyncModel` — interface synced Room entities implement (sync bookkeeping as
-  immutable read-only properties: `lbLocalId` = primary key, `lbServerId`, `lbUpdatedAt`, `lbInSync`,
-  `lbDeleted`).
-- `roomsyncmanager/LBRoomSyncDao<T>` — generic persistence base. The typed `@Upsert` is resolved
-  generically by Room codegen at the concrete `@Dao` subclass (BaseDao pattern). `notInSync` /
-  `markInSync` / `deleteAll` are **abstract** and each concrete DAO supplies a 3-line table-literal
-  `@Query` — Room can't take a table name as a runtime `@Query` param, and `@RawQuery` is read-only
-  and can't map a generic `T`.
+`LBRoomSyncModel` (interface synced Room entities implement) and `LBRoomSyncDao<T>` (generic persistence base with the
+abstract `@Upsert`) are now defined in `synchronization-core-room`, same package and FQN.
+
 - `parseroomsyncmanager/LBParseRoomModel : LBRoomSyncModel` — marker for the Parse layer (no Parse
   import, so it stays commonMain).
 
