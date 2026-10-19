@@ -31,7 +31,6 @@ import kotlin.time.Instant
  * Keyset position in a pull sorted by [PullOrder]: the next page starts after the object updated at [updatedAt] with
  * id [objectId]. A keyset, not an offset, since an offset skips an object whenever another one is updated mid-pull.
  */
-@PublishedApi
 internal data class PullCursor(
     val updatedAt: Instant,
     val objectId: String,
