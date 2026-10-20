@@ -1,6 +1,6 @@
 ---
 issue: 371
-phase:
+phase: validated
 type: bug
 wiki: [[build-and-publishing]]
 note:
@@ -31,8 +31,35 @@ Decisions:
 
 ## Implementation
 
+- `buildSrc/src/main/kotlin/lunabee.kmp-library-conventions.gradle.kts`: `kotlin { jvmToolchain(AndroidConfig.JDK_VERSION.majorVersion.toInt()) }`. `lunabee.kmp-android-library-conventions` and `lunabee.kmp-jvm-library-conventions` inherit it. No module build script changes.
+- The toolchain also fixes the Android target of KMP modules (`com.android.kotlin.multiplatform.library`): it followed the Gradle JDK too (class file 70 on a JDK 27 build) and is now 65. No separate Android pin is needed.
+- The published `-jvm` Gradle module metadata still carries no `org.gradle.jvm.version` attribute. It was not added, per decision.
+- No `*_VERSION` change and no `CHANGELOG.MD` entry: on JDK 21, which CI uses, the bytecode is the same as before.
+
 ## Review
 
+### validation (autopilot, 2026-10-20)
+
+- Tools: plain `./gradlew detekt` passes.
+- Verifier pass 1 covered style, elegance, structure and correctness. Verdict: clean, no findings.
+- Autofix changed nothing.
+
 ## Verification
+
+Build and tests are the proof: this is a library, so there is no app to run (`verify.platform: none`).
+
+| Classes | JDK running Gradle | Before | After |
+|---|---|---|---|
+| `core` jvm target | 27 | 70 | 65 |
+| `core` jvm target | 21 | 65 | 65 |
+| `logger-kermit-crashlytics` android target | 27 | 70 | 65 |
+| `logger-kermit-crashlytics` android target | 21 | 65 | 65 |
+
+- ✅ JDK 27 `publishToMavenLocal` of `:core`, `:logger-kermit`, `:migration-core`: every class in `core-jvm` 4.11.0 (33), `logger-kermit-jvm` 4.10.0 (3) and `migration-core-jvm` 1.0.0 (6) has class file major 65.
+- ✅ The same publish on JDK 21 gives 65. It ran last, so the jars left in `~/.m2` are the 65 ones.
+- ✅ Android target on JDK 27 equals the `master` JDK 21 baseline (65).
+- ✅ `./gradlew test` (full project) and plain `./gradlew detekt` pass on JDK 21.
+- ⚠️ `./gradlew assemble` passes for every JVM and Android task. Only the iOS and macOS native link tasks fail, because Xcode is not installed on the agent machine (`xcrun: error: unable to find utility "xcodebuild"`). This failure comes from the machine, not from the change: CI or a machine with Xcode must confirm the native links.
+- ✅ No `*_VERSION` constant changed, and `CHANGELOG.MD` is untouched.
 
 ## Feedback
