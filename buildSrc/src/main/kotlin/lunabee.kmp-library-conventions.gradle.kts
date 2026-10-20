@@ -24,6 +24,8 @@ tasks.withType<Test> {
 }
 
 kotlin {
+    jvmToolchain(AndroidConfig.JDK_VERSION.majorVersion.toInt())
+
     listOf(
         iosArm64(),
         iosSimulatorArm64(),
