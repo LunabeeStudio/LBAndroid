@@ -27,7 +27,7 @@ Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchron
 
 - **android-library**: `compileSdk`/`minSdk`, JDK 21 toolchain, single `release` variant w/ sources jar, `kotlin-test-junit`, `allTests` (aggregated `TestReport`) / `cleanAllTests` tasks.
 - **android-compose-library**: android-library + Kotlin Compose compiler plugin.
-- **kmp-library**: Kotlin Multiplatform + SKIE; `iosArm64` + `iosSimulatorArm64` **static** frameworks named after project; JUnit platform; opt-ins `-Xexpect-actual-classes`, `ExperimentalTime`, `ExperimentalAtomicApi`. Extra targets (`jvm`, `macosArm64`, `linuxX64`, `mingwX64`) declared per module.
+- **kmp-library**: Kotlin Multiplatform + SKIE; JDK 21 Kotlin toolchain (`jvmToolchain`) → `jvm` + KMP `android` bytecode = Java 21 whatever JDK runs Gradle (before #371 followed Gradle JDK: class file 70 on JDK 27); `iosArm64` + `iosSimulatorArm64` **static** frameworks named after project; JUnit platform; opt-ins `-Xexpect-actual-classes`, `ExperimentalTime`, `ExperimentalAtomicApi`. Extra targets (`jvm`, `macosArm64`, `linuxX64`, `mingwX64`) declared per module.
 - **kmp-android-library**: kmp-library + `com.android.kotlin.multiplatform.library` (`android { }` target).
 - **kmp-jvm-library**: kmp-library + `jvm()`.
 - **java-library**: `java-library`, JDK 21, sources jar (KSP processors, annotations, color utils, lint-check projects). No `maven-publish` itself; lint-check projects skip publish conventions.
