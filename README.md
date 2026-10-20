@@ -40,6 +40,8 @@
 | `studio.lunabee.loading:loading-koin`                    | ![](https://img.shields.io/maven-central/v/studio.lunabee.loading/loading-koin?style=for-the-badge)                    |
 | `studio.lunabee.logger:logger-kermit`                    | ![](https://img.shields.io/maven-central/v/studio.lunabee.logger/logger-kermit?style=for-the-badge)                    |
 | `studio.lunabee.logger:logger-kermit-crashlytics`        | ![](https://img.shields.io/maven-central/v/studio.lunabee.logger/logger-kermit-crashlytics?style=for-the-badge)        |
+| `studio.lunabee.migration:migration-core`                | ![](https://img.shields.io/maven-central/v/studio.lunabee.migration/migration-core?style=for-the-badge)                |
+| `studio.lunabee.migration:migration-datastore`           | ![](https://img.shields.io/maven-central/v/studio.lunabee.migration/migration-datastore?style=for-the-badge)           |
 | `studio.lunabee.monitoring:monitoring-core`              | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-core?style=for-the-badge)              |
 | `studio.lunabee.monitoring:monitoring-ktor`              | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-ktor?style=for-the-badge)              |
 | `studio.lunabee.monitoring:monitoring-okhttp`            | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-okhttp?style=for-the-badge)            |

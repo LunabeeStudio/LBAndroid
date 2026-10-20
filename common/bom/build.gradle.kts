@@ -42,6 +42,8 @@ dependencies {
         addModule(projects.loadingKoin)
         addJvmModule(projects.loggerKermit)
         addModule(projects.loggerKermitCrashlytics)
+        addJvmModule(projects.migrationCore)
+        addJvmModule(projects.migrationDatastore)
         addModule(projects.testCore)
         addModule(projects.testRoom)
         addModule(projects.monitoringCore)
