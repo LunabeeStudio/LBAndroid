@@ -54,7 +54,7 @@ class ParseModelTest {
 
     @Test
     fun pointerSerializesWithTypeAndClassName() {
-        val encoded = json.encodeToString(ParsePointer(className = "Coach", objectId = "abc"))
+        val encoded = json.encodeToString(ParsePointer(className = "Coach", objectId = ParseObjectId("abc")))
 
         assertEquals("""{"className":"Coach","objectId":"abc","__type":"Pointer"}""", encoded)
     }

@@ -32,7 +32,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ParsePointer(
     val className: String,
-    val objectId: String,
+    val objectId: ParseObjectId,
 ) {
     @EncodeDefault
     @SerialName("__type")

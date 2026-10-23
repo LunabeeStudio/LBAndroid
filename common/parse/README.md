@@ -89,8 +89,8 @@ All helpers are extension functions on `LBParseClient`.
   `logOut` and `me` send it. They return a `ParseUser(objectId, sessionToken)`.
 - `installation`: `createInstallation(fields)` (`POST installations`, returns the objectId) and
   `updateInstallation(objectId, fields)` (`PUT installations/<objectId>`).
-- `model`: `ParsePointer`, `ParseFile`, `ParseAccess` / `ParseACL`, and `ParseDateSerializer`
-  (`{"__type": "Date", "iso": …}`, millisecond precision) for `Instant` fields:
+- `model`: `ParsePointer` (its `objectId` is a `ParseObjectId` value class), `ParseFile`, `ParseAccess` / `ParseACL`,
+  and `ParseDateSerializer` (`{"__type": "Date", "iso": …}`, millisecond precision) for `Instant` fields:
   `@Serializable(with = ParseDateSerializer::class) val startsAt: Instant`. `createdAt` and `updatedAt` are plain ISO
   strings in Parse responses: declare them as `Instant` with the default serializer.
 

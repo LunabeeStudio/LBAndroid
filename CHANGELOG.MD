@@ -20,7 +20,8 @@ bom 4.18.0
   - `LBParseException` (`Network`, `Parse`, `Http`, `Decoding`, `Unexpected`) with `ParseErrorCode` constants, converted
     to the app error type through `LBParseConfig.mapErr`
   - One retry by default on `IOException` for every HTTP method (`maxRetries`, 1 s delay), never on a response
-  - `model`: `ParsePointer`, `ParseDateSerializer`, `ParseFile`, `ParseAccess` / `ParseACL`
+  - `model`: `ParsePointer` with a `ParseObjectId` value class id, `ParseDateSerializer`, `ParseFile`,
+    `ParseAccess` / `ParseACL`
   - `query`: `query`, `pull` with the keyset `PullCursor`, `pullWhere`
   - `function`, `file`, `user`, `installation`: `callFunction`, `uploadFile`, `signUp`, `logIn`, `logInAnonymously`,
     `logOut`, `me`, `requestPasswordReset`, `createInstallation`, `updateInstallation`
