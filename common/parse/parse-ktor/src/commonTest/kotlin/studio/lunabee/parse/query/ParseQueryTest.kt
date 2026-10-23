@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import studio.lunabee.parse.error.LBParseException
 import studio.lunabee.parse.model.ParseObjectId
 import studio.lunabee.parse.test.FakeParseServer
 import studio.lunabee.parse.test.assertQuery
@@ -30,6 +31,8 @@ import studio.lunabee.parse.test.assertRequest
 import studio.lunabee.parse.test.respondParse
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Instant
 
@@ -59,6 +62,104 @@ class ParseQueryTest {
         assertEquals(2, items.size)
         assertRequest(server.lastRequest, HttpMethod.Get, "classes/Coach")
         assertQuery(server.lastRequest, where = """{"name":"Ada"}""", order = "name", limit = 5)
+    }
+
+    @Test
+    fun queryOmitsKeysAndIncludeWhenEmpty() = runTest {
+        val server = FakeParseServer(handler = { respondParse(itemsBody(1)) })
+
+        server.client.query<Item>(className = "Coach", where = JsonObject(emptyMap()), order = null, limit = 5)
+
+        assertNull(server.lastRequest.url.parameters["keys"])
+        assertNull(server.lastRequest.url.parameters["include"])
+    }
+
+    @Test
+    fun queryJoinsKeysAndIncludeWithCommas() = runTest {
+        val server = FakeParseServer(handler = { respondParse(itemsBody(1)) })
+
+        server.client.query<Item>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            order = null,
+            limit = 5,
+            keys = listOf("name", "age"),
+            include = listOf("team", "owner"),
+        )
+
+        assertEquals("name,age", server.lastRequest.url.parameters["keys"])
+        assertEquals("team,owner", server.lastRequest.url.parameters["include"])
+    }
+
+    @Test
+    fun pullForwardsKeysAndIncludeOnEveryPage() = runTest {
+        val server = FakeParseServer(handler = { respondParse(itemsBody(PageSize)) })
+        val first = server.client.pull<Item, String>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = null,
+            keys = listOf("name"),
+            include = listOf("team"),
+        ) { it.objectId?.value }
+        assertEquals("name", server.lastRequest.url.parameters["keys"])
+        assertEquals("team", server.lastRequest.url.parameters["include"])
+
+        server.client.pull<Item, String>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = first.nextCursor,
+            keys = listOf("name"),
+            include = listOf("team"),
+        ) { it.objectId?.value }
+
+        assertEquals("name", server.lastRequest.url.parameters["keys"])
+        assertEquals("team", server.lastRequest.url.parameters["include"])
+    }
+
+    @Test
+    fun serializerOverloadsDecodeLikeReifiedOnes() = runTest {
+        val server = FakeParseServer(handler = { respondParse(itemsBody(3)) })
+
+        val items = server.client.query(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            order = null,
+            limit = 5,
+            serializer = Item.serializer(),
+            keys = listOf("name"),
+        )
+        assertEquals("name", server.lastRequest.url.parameters["keys"])
+        val page = server.client.pull(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = null,
+            serializer = Item.serializer(),
+        ) { it.objectId?.value }
+
+        assertEquals(listOf("o001", "o002", "o003"), items.map { it.objectId?.value })
+        assertEquals(listOf("o001", "o002", "o003"), page.items)
+        assertEquals(Instant.parse("2026-09-21T10:00:00.003Z"), page.maxUpdatedAt)
+    }
+
+    @Test
+    fun serializerOverloadMapsDecodingFailureThroughMapErr() = runTest {
+        class AppError(val source: LBParseException) : Throwable()
+        val server = FakeParseServer(
+            mapErr = { AppError(it) },
+            handler = { respondParse("""{"results":"nope"}""") },
+        )
+
+        val error = assertFailsWith<AppError> {
+            server.client.query(
+                className = "Coach",
+                where = JsonObject(emptyMap()),
+                order = null,
+                limit = 5,
+                serializer = Item.serializer(),
+            )
+        }
+
+        assertIs<LBParseException.Decoding>(error.source)
     }
 
     @Test

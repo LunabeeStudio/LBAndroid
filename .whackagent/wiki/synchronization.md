@@ -22,7 +22,9 @@ All under `common/synchronization/`. Every module's `*_VERSION` aliases `SYNCHRO
 | `synchronization-core-datastore` | KMP: Android + iOS + JVM | DataStore cursor backend (keeps legacy file `com.lunabee.lbsynchronization`) |
 | `synchronization-core-room` | KMP: Android + iOS (Room/KSP) | Room cursor backend (standalone DB, `sync_timestamp` table) |
 | `synchronization-remote` | KMP: JVM + iOS, no Android | Backend-agnostic final managers over two small data-source interfaces |
-| `synchronization-parse-room` | KMP: Android + iOS (managers + LiveQuery in `androidMain` only; iOS gets `commonMain` contract) | Parse↔Room managers + Parse LiveQuery client |
+| `synchronization-core-room` (contract) | ↑ | Also holds `LBRoomSyncModel` + `LBRoomSyncDao` (`roomsyncmanager` package, moved from parse-room in 2.2.0, FQN unchanged) |
+| `synchronization-parse-ktor-room` | KMP: Android + iOS | Parse↔Room on `parse-ktor` (#373), no Parse SDK: `LBParseRoomClass` → `synchronization-remote` managers. Supersedes parse-room |
+| `synchronization-parse-room` | KMP: Android + iOS (managers + LiveQuery in `androidMain` only; iOS gets `commonMain` contract) | Legacy Parse SDK ↔ Room managers + LiveQuery client. Superseded, kept until consumers moved; `api(core-room)` for contract |
 | `checks` (`:synchronization-checks`) | JVM (Android Lint) | `SyncOperatorReentrantCall` lint rule; no publish conventions, ships via `lintPublish` |
 
 Android-target modules use `minSdk 24` (`AndroidConfig.SynchronizationMinSdk`, for `registerDefaultNetworkCallback`). Rest of repo is 23.
@@ -65,7 +67,19 @@ LiveQuery path: `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` does `liveQue
 - `LBRemoteSyncManager` uploads one object at a time, stops at first failure. `markPushed` conditional so edits during upload stay pending.
 - `isProcessing()` is `true` for `DownloadFinishSuccessfully` / `UploadFinishSuccessfully` (mid-pipeline, not terminal).
 - Switching DataStore → Room backend, or upgrading from `Libraries_Android` `lb-synchronization`, **re-syncs once**.
-- Parse-room keeps DAOs/`@Database` in consumer: no KSP in library, abstract `@Upsert` BaseDao pattern (see its `README.md`).
+- Parse-room keeps DAOs/`@Database` in consumer: no KSP in library, abstract `@Upsert` BaseDao pattern (see its `README.md`). Same for parse-ktor-room.
+
+## Parse↔Room on parse-ktor
+
+`synchronization-parse-ktor-room` (`studio.lunabee.synchronization.parsektorroom`). Consumer declares one `LBParseRoomClass<D : ParseObject, R : LBRoomSyncModel>(serializer)` per Parse class: `tableParseName`, `keysToSelect`, `keysToInclude`, `createObjectFrom`, `localIdKey`, `update(from)` (names mirror `LBParseRoomSyncManager` → mechanical port). `pullManager(syncKey, parse, dao)` → `LBRemotePullSyncManager`; `syncManager(...)` → `LBRemoteSyncManager`, needs `localIdKey` (else `IllegalArgumentException`). Usage: module `README.md`.
+
+- **Pull**: parse-ktor serializer `pull` (keyset `updatedAt|objectId`, `updatedAt > cursor`, keys/include). Local side skips pulled rows whose `lbLocalId` is in `notInSync()` → pull never overwrites unpushed edit.
+- **Push**: `findServerId` = `lbServerId`, else `GET classes/<C>` `where {localIdKey: lbLocalId}` `limit 1` `keys=objectId` → `PUT` found / `POST` none. Lookup prevents duplicate on double push or lost create response. Body = `update(row)` encoded with `encodeDefaults = true` (default-valued fields still sent), nulls kept, `objectId`/`createdAt`/`updatedAt` stripped.
+- **Soft delete only**: `lbDeleted` pushed through `update`, tombstones pulled back. Never HTTP `DELETE`.
+- **`keysToSelect` restricted** → must include `localIdKey` + soft-delete field, else pulled row maps to `objectId` local id (duplicate) and tombstones lost.
+- **Known gap**: `markPushed` unconditional (`markInSync(listOf(lbLocalId))`) → edit made during upload marked in sync, waits for next edit.
+- **Carry-over**: pass old parse-room manager class simple name as `syncKey` → same cursor meaning (max `updatedAt`), no full resync at switch.
+- Out of scope: LiveQuery, hard delete, `ParseUser` sync (app-side).
 
 ## `checks` module
 
@@ -78,6 +92,7 @@ LiveQuery path: `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` does `liveQue
 | `synchronization-core/src/commonTest` | `SyncRunnerTest`, `RequestCoalescerTest`, pipeline (`DownloadTest`, `UploadTest`, `ConflictTest`, `SynchronizationRetryTest`, `RefreshEventTest`), group/operator, combined flows; fixture `testfixture/SyncTestFixture.kt` | `:synchronization-core:jvmTest` |
 | `synchronization-remote/src/commonTest` | Managers driven via `LBSyncOperator` with in-memory `Fake*` remote/local/cursor stores | `:synchronization-remote:jvmTest` |
 | `synchronization-core-datastore/src/commonTest` | DataStore round-trip | `:synchronization-core-datastore:jvmTest` / `:testAndroidHostTest` |
+| `synchronization-parse-ktor-room/src/commonTest` | Pull + push over `FakeParseServer` ([[parse]]), in-memory fake `LBRoomSyncDao`, fake cursor store | `:synchronization-parse-ktor-room:testAndroidHostTest` / `:iosSimulatorArm64Test` |
 | `checks/src/test` | Lint detector with source stubs (`libs.lintTests`) | `:synchronization-checks:test` |
 
 `runTest` + virtual time. Internal constructors inject fake `SyncTimestampLocalDataSource` and `TestScope`. `commonTest` is friend source set → calls `internal` entry points directly. Room backend and parse-room have no tests. Demo: `demo-compose/.../demo/synchronization/` (compares `sync` vs `syncOrJoin` bursts).
@@ -99,7 +114,9 @@ Paths relative to `common/synchronization/`; `…` = `src/<sourceSet>/kotlin/stu
 | `DataStoreSyncTimestampLocalDataSource` | `synchronization-core-datastore/…/datastore/` |
 | `RoomSyncTimestampLocalDataSource`, `SyncRoomDatabase` | `synchronization-core-room/…/room/` |
 | `LBRemotePullSyncManager`, `LBRemoteSyncManager`, `RemotePullBuffer`, `LBRemotePage` | `synchronization-remote/…/remote/` |
-| `LBParseRoomSyncManager`, `LBParseLiveQueryManager`, `LBRoomSyncManager`, `LBRoomSyncDao` | `synchronization-parse-room/…/{parseroomsyncmanager,roomsyncmanager}/` |
+| `LBRoomSyncModel`, `LBRoomSyncDao` | `synchronization-core-room/…/roomsyncmanager/` (commonMain) |
+| `LBParseRoomClass`, `LBParseRemoteDataSource`, `LBRoomSyncLocalDataSource` | `synchronization-parse-ktor-room/…/parsektorroom/{,remote,local}/` |
+| `LBParseRoomSyncManager`, `LBParseLiveQueryManager`, `LBRoomSyncManager` | `synchronization-parse-room/…/{parseroomsyncmanager,roomsyncmanager}/` |
 | `SyncOperatorReentrantCallDetector`, `SynchronizationIssueRegistry` | `checks/…/checks/` |
 
-Related: [[architecture]], [[common-libraries]], [[build-and-publishing]], [[presenter]], [[compose-ui]].
+Related: [[architecture]], [[parse]], [[common-libraries]], [[build-and-publishing]], [[presenter]], [[compose-ui]].

@@ -24,6 +24,7 @@ import kotlinx.io.IOException
 import studio.lunabee.ktor.LBKtorExceptionHandler
 import studio.lunabee.ktor.LBKtorJson
 import studio.lunabee.ktor.LBKtorKermit
+import studio.lunabee.parse.error.LBParseException
 import studio.lunabee.parse.error.toParseException
 
 private const val RetryDelayMillis: Long = 1_000
@@ -43,6 +44,8 @@ class LBParseClient(
     config: LBParseConfig,
     configure: HttpClientConfig<*>.() -> Unit = {},
 ) : AutoCloseable {
+    internal val mapErr: suspend (LBParseException) -> Throwable = config.mapErr
+
     /**
      * Client resolving relative paths against [LBParseConfig.serverUrl], for app-specific Parse calls.
      */

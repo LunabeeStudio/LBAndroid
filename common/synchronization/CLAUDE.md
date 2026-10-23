@@ -11,6 +11,7 @@ modules.
 | `:synchronization-core-datastore` | `synchronization-core-datastore/` | KMP (`commonMain`+`androidMain`+`iosMain`, plus a JVM target) | `studio.lunabee.synchronization.datastore` | `SYNCHRONIZATION_CORE_DATASTORE_VERSION` | no — documented below |
 | `:synchronization-core-room` | `synchronization-core-room/` | KMP + Room/KSP (`commonMain`+`androidMain`+`iosMain`) | `studio.lunabee.synchronization.room` | `SYNCHRONIZATION_CORE_ROOM_VERSION` | no — documented below |
 | `:synchronization-parse-room` | `synchronization-parse-room/` | KMP android-library (`commonMain`+`androidMain`) | `studio.lunabee.synchronization.parseroom` | `SYNCHRONIZATION_PARSE_ROOM_VERSION` | **yes — read it first** |
+| `:synchronization-parse-ktor-room` | `synchronization-parse-ktor-room/` | KMP android-library (`commonMain` only, Android + iOS targets) | `studio.lunabee.synchronization.parsektorroom` | `SYNCHRONIZATION_PARSE_KTOR_ROOM_VERSION` | yes — Parse REST (`parse-ktor`) ↔ Room on `:synchronization-remote` |
 | `:synchronization-remote` | `synchronization-remote/` | KMP (`commonMain`, JVM + iOS targets, **no Android target**) | — | `SYNCHRONIZATION_REMOTE_VERSION` | yes — backend-agnostic remote↔local managers |
 
 The engine (`:synchronization-core`) is **storage-agnostic**: it persists sync cursors through the
@@ -22,7 +23,8 @@ store; the app installs it once via `LBSyncStorage.install(...)` (see "Cursor st
 consumed via `LBSyncOperator.registerEventListeners(...)`. Type-safe
 accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`, `projects.synchronizationRemote`, `projects.synchronizationChecks`.
+`projects.synchronizationParseRoom`, `projects.synchronizationParseKtorRoom`, `projects.synchronizationRemote`,
+`projects.synchronizationChecks`.
 
 `:synchronization-parse-room` is a Parse↔Room implementation layered on `:synchronization-core`
 (storage-agnostic — its managers use the no-store `LBSyncManager(logging)` constructor, so the consumer
@@ -35,6 +37,13 @@ implements a remote data source (keyset-paged pull since a cursor, find-by-id th
 source (whole-download write, conditional mark-pushed), and gets the final `LBRemotePullSyncManager` /
 `LBRemoteSyncManager` (both extend `LBSyncManager` directly and share the download buffering through the internal
 `RemotePullBuffer`). Its `README.md` documents the contract.
+
+`:synchronization-parse-ktor-room` supersedes `:synchronization-parse-room` for KMP: a consumer declares each Parse
+class with `LBParseRoomClass<D : ParseObject, R : LBRoomSyncModel>` and gets `pullManager` / `syncManager` built on
+`:synchronization-remote` and `parse-ktor` (keyset paging, never `skip`; a lookup by `localIdKey` before each push
+without server id; soft delete only, never a `DELETE`). Its `README.md` documents the declaration.
+`LBRoomSyncModel` and `LBRoomSyncDao` now live in `:synchronization-core-room` (same package and FQN);
+`:synchronization-parse-room` exposes it as `api`.
 
 Both modules were **moved from `LunabeeStudio/Libraries_Android`** (commits 17d6452, d165c26), so the
 code predates this repo's conventions and version lineage (the migration shim mentions "3.8.0" though
@@ -280,7 +289,7 @@ update the main Changelog"). Per root `AGENTS.MD`, user-visible changes go in th
 `CHANGELOG.MD`; bump the touched module's `*_VERSION` in `buildSrc/.../AndroidConfig.kt`. Reference
 modules with type-safe accessors: `projects.synchronizationCore`, `projects.synchronizationEvents`,
 `projects.synchronizationCoreDatastore`, `projects.synchronizationCoreRoom`,
-`projects.synchronizationParseRoom`, `projects.synchronizationRemote`.
+`projects.synchronizationParseRoom`, `projects.synchronizationParseKtorRoom`, `projects.synchronizationRemote`.
 
 ## Build & verify
 
@@ -289,8 +298,9 @@ Standard repo flow (see root `AGENTS.MD`). Quick reference:
 ```bash
 ./gradlew :synchronization-core:assemble :synchronization-events:assemble \
   :synchronization-core-datastore:assemble :synchronization-core-room:assemble \
-  :synchronization-parse-room:assemble :synchronization-remote:assemble
+  :synchronization-parse-room:assemble :synchronization-parse-ktor-room:assemble :synchronization-remote:assemble
 ./gradlew :synchronization-core:jvmTest                       # engine tests (commonTest) on the JVM target
+./gradlew :synchronization-parse-ktor-room:testAndroidHostTest :synchronization-parse-ktor-room:iosSimulatorArm64Test # Parse<->Room managers over FakeParseServer (commonTest)
 ./gradlew :synchronization-remote:jvmTest                     # remote managers over in-memory fakes (commonTest)
 ./gradlew :synchronization-core-datastore:testAndroidHostTest # DataStore round-trip tests on the JVM host
 ./gradlew detekt -Pstudio.lunabee.detekt.skipDependencySorting   # drop the flag if *.gradle*/*.toml changed

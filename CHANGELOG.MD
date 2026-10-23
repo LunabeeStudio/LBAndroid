@@ -10,6 +10,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ```
 Parse Ktor 1.0.0
 Parse Ktor-Test 1.0.0
+Synchronization Core 2.2.0
+Synchronization Events 2.2.0
+Synchronization Core-Datastore 2.2.0
+Synchronization Core-Room 2.2.0
+Synchronization Parse-Ktor-Room 2.2.0
+Synchronization Parse-Room 2.2.0
+Synchronization Remote 2.2.0
 bom 4.18.0
 ```
 
@@ -22,12 +29,23 @@ bom 4.18.0
   - One retry by default on `IOException` for every HTTP method (`maxRetries`, 1 s delay), never on a response
   - `model`: `ParseObjectId` value class typing every public object id (`ParsePointer`, `ParseUser`, `ParseObject`,
     `createInstallation`, `updateInstallation`), `ParseDateSerializer`, `ParseFile`, `ParseAccess` / `ParseACL`
-  - `query`: `query`, `pull` with the keyset `PullCursor`, `pullWhere`
+  - `query`: `query`, `pull` with the keyset `PullCursor`, `pullWhere`; `keys` / `include` parameters and `KSerializer`
+    overloads for types known only as a type parameter
   - `function`, `file`, `user`, `installation`: `callFunction`, `uploadFile`, `signUp`, `logIn`, `logInAnonymously`,
     `logOut`, `me`, `requestPasswordReset`, `createInstallation`, `updateInstallation`
 - New `parse-ktor-test`: `FakeParseServer` (real `LBParseClient` on a Ktor `MockEngine`, per-request handler) and
   `ParseRequestAssertions`, exposing `ktor-client-mock` as `api`
-- `bom`: constraints for `parse-ktor` and `parse-ktor-test`
+- `bom`: constraints for `parse-ktor`, `parse-ktor-test` and `synchronization-parse-ktor-room`
+- New `synchronization-parse-ktor-room` (Android + iOS): Parse to Room synchronization in common code on `parse-ktor` and
+  `synchronization-remote`, succeeding `synchronization-parse-room`
+  - `LBParseRoomClass<D, R>` declares a Parse class (`tableParseName`, `keysToSelect`, `keysToInclude`,
+    `createObjectFrom`, `localIdKey`, `update`) and builds `pullManager` and `syncManager`
+  - Keyset pull, a lookup by `localIdKey` before pushing a row without server id, soft delete only (no `DELETE` is
+    ever sent), a pulled row is skipped while its local edit is not pushed
+- `LBRoomSyncModel` and `LBRoomSyncDao` moved from `synchronization-parse-room` to `synchronization-core-room`, same
+  package and FQN. `synchronization-parse-room` now exposes `synchronization-core-room` as `api`
+- `synchronization-core-room` exposes the Room runtime as `api`
+- Synchronization family bumped to 2.2.0
 
 ## 2026-10-23
 

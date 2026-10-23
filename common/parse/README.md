@@ -79,8 +79,9 @@ failure surfaces, as `LBParseException.Network`.
 
 All helpers are extension functions on `LBParseClient`.
 
-- `query<T>(className, where, order, limit)`: `GET classes/<className>`.
-- `pull<T : ParseObject, R>(className, where, cursor, transform)`: pages of 100 sorted by `updatedAt,objectId` with a
+- `query<T>(className, where, order, limit, keys, include)`: `GET classes/<className>`; `keys` and `include` are sent
+  comma-joined when not empty. Overloads taking a `serializer` serve types known only as a type parameter.
+- `pull<T : ParseObject, R>(className, where, cursor, keys, include, transform)`: pages of 100 sorted by `updatedAt,objectId` with a
   keyset cursor (`updatedAt|objectId`, never an offset). Pass `ParsePage.nextCursor` back until it is `null`.
   `pullWhere(updatedAfter) { … }` builds the `where`.
 - `callFunction<T, B>(name, body)`: `POST functions/<name>`, returns the unwrapped `result`.

@@ -10,7 +10,7 @@ Living knowledge base for project. Pages link to each other + tasks via `[[wikil
 - [[compose-ui]] — Compose libs under `compose/` (core specs, image, foundation, theme, uifield, crop, haptic, accessibility, glance, test) + demo-compose coverage
 - [[parse]] — KMP Parse REST client (`parse-ktor`, `parse-ktor-test`): `LBParseClient`, headers/providers, `LBParseException` + `mapErr`, plugin order, retry, keyset pull, test harness
 - [[presenter]] — MVI presenter stack: submodules, presenter/reducer roles, reducer-only state/nav/side effects, KSP reducer factories, factory-generation ownership, Hilt (`presenter-hilt`, `presenter-hilt-ksp`) + Koin integrations, v1→v2 migration, navigation link
-- [[synchronization]] — sync engine: `LBSyncOperator`, groups, managers, `syncOrJoin`, `withSyncLock`, DataStore/Room cursor stores, event triggers, remote + Parse↔Room managers, `checks` lint rule
+- [[synchronization]] — sync engine: `LBSyncOperator`, groups, managers, `syncOrJoin`, `withSyncLock`, DataStore/Room cursor stores, event triggers, remote + Parse↔Room managers (SDK-free `synchronization-parse-ktor-room`), `checks` lint rule
 
 ## How to read
 
