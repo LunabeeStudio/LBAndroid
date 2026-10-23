@@ -29,6 +29,15 @@ import studio.lunabee.parse.client.withoutSessionToken
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+private const val UsersPath: String = "users"
+
+private const val UsernameField: String = "username"
+private const val PasswordField: String = "password"
+private const val EmailField: String = "email"
+private const val AuthDataField: String = "authData"
+private const val AnonymousAuthProvider: String = "anonymous"
+private const val AnonymousIdField: String = "id"
+
 /**
  * Creates the user [username], sending no session token. [additionalFields] are sent along with the credentials.
  */
@@ -36,13 +45,13 @@ suspend fun LBParseClient.signUp(
     username: String,
     password: String,
     additionalFields: JsonObject = JsonObject(emptyMap()),
-): ParseUser = httpClient.post("users") {
+): ParseUser = httpClient.post(UsersPath) {
     withoutSessionToken()
     setBody(
         JsonObject(
             additionalFields + buildJsonObject {
-                put(key = "username", value = username)
-                put(key = "password", value = password)
+                put(key = UsernameField, value = username)
+                put(key = PasswordField, value = password)
             },
         ),
     )
@@ -55,8 +64,8 @@ suspend fun LBParseClient.logIn(username: String, password: String): ParseUser =
     withoutSessionToken()
     setBody(
         buildJsonObject {
-            put(key = "username", value = username)
-            put(key = "password", value = password)
+            put(key = UsernameField, value = username)
+            put(key = PasswordField, value = password)
         },
     )
 }.body<ParseUser>()
@@ -67,12 +76,12 @@ suspend fun LBParseClient.logIn(username: String, password: String): ParseUser =
  */
 @OptIn(ExperimentalUuidApi::class)
 suspend fun LBParseClient.logInAnonymously(anonymousId: String = Uuid.random().toString()): ParseUser =
-    httpClient.post("users") {
+    httpClient.post(UsersPath) {
         withoutSessionToken()
         setBody(
             buildJsonObject {
-                putJsonObject(key = "authData") {
-                    putJsonObject(key = "anonymous") { put(key = "id", value = anonymousId) }
+                putJsonObject(key = AuthDataField) {
+                    putJsonObject(key = AnonymousAuthProvider) { put(key = AnonymousIdField, value = anonymousId) }
                 }
             },
         )
@@ -96,6 +105,6 @@ suspend fun LBParseClient.me(): ParseUser = httpClient.get("users/me").body<Pars
 suspend fun LBParseClient.requestPasswordReset(email: String) {
     httpClient.post("requestPasswordReset") {
         withoutSessionToken()
-        setBody(buildJsonObject { put("email", email) })
+        setBody(buildJsonObject { put(key = EmailField, value = email) })
     }
 }

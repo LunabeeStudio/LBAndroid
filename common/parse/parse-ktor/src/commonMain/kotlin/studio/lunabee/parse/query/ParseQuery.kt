@@ -38,6 +38,21 @@ internal const val UpdatedAtField: String = "updatedAt"
 @PublishedApi
 internal const val ObjectIdField: String = "objectId"
 
+@PublishedApi
+internal const val WhereParameter: String = "where"
+
+@PublishedApi
+internal const val OrderParameter: String = "order"
+
+@PublishedApi
+internal const val LimitParameter: String = "limit"
+
+internal const val GreaterThanOperator: String = "\$gt"
+
+internal const val OrOperator: String = "\$or"
+
+internal const val AndOperator: String = "\$and"
+
 /** Order of a pull, by last update then object id, so objects updated at the same time never move between pages. */
 @PublishedApi
 internal const val PullOrder: String = "$UpdatedAtField,$ObjectIdField"
@@ -51,9 +66,9 @@ suspend inline fun <reified T> LBParseClient.query(
     order: String?,
     limit: Int,
 ): List<T> = httpClient.get("classes/$className") {
-    parameter("where", where.toString())
-    order?.let { parameter("order", it) }
-    parameter("limit", limit)
+    parameter(WhereParameter, where.toString())
+    order?.let { parameter(OrderParameter, it) }
+    parameter(LimitParameter, limit)
 }.body<ParseQueryPage<T>>().results
 
 /**
@@ -81,7 +96,7 @@ fun pullWhere(
     updatedAfter?.let { since ->
         put(
             key = UpdatedAtField,
-            element = buildJsonObject { put("\$gt", Json.encodeToJsonElement(ParseDateSerializer, since)) },
+            element = buildJsonObject { put(GreaterThanOperator, Json.encodeToJsonElement(ParseDateSerializer, since)) },
         )
     }
     constraints()

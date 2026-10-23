@@ -41,16 +41,16 @@ internal data class PullCursor(
     fun after(where: JsonObject): JsonObject {
         val date = Json.encodeToJsonElement(ParseDateSerializer, updatedAt)
         val sortedAfter = buildJsonArray {
-            addJsonObject { putJsonObject(UpdatedAtField) { put("\$gt", date) } }
+            addJsonObject { putJsonObject(UpdatedAtField) { put(GreaterThanOperator, date) } }
             addJsonObject {
                 put(UpdatedAtField, date)
-                putJsonObject(ObjectIdField) { put("\$gt", objectId) }
+                putJsonObject(ObjectIdField) { put(GreaterThanOperator, objectId) }
             }
         }
-        val keysetWhere = JsonObject(mapOf("\$or" to sortedAfter))
-        return if ("\$or" in where) {
+        val keysetWhere = JsonObject(mapOf(OrOperator to sortedAfter))
+        return if (OrOperator in where) {
             buildJsonObject {
-                putJsonArray(key = "\$and") {
+                putJsonArray(key = AndOperator) {
                     add(where)
                     add(keysetWhere)
                 }
