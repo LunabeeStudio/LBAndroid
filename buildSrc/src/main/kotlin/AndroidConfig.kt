@@ -73,7 +73,7 @@ object AndroidConfig {
     const val LBCPRESENTER_HILT_KSP_VERSION: String = LBCPRESENTER_KSP_VERSION
     const val LBCNAVIGATION_VERSION: String = "1.1.0"
     const val LBCROBOLECTRICTEST_VERSION: String = "1.1.0"
-    const val LOGGER_KERMIT_VERSION: String = "4.10.0"
+    const val LOGGER_KERMIT_VERSION: String = "4.10.1"
     const val CORE_VERSION: String = "4.11.0"
     const val EXTENSIONS_VERSION: String = "4.11.0"
     const val TEST_CORE_VERSION: String = "4.9.0"
@@ -82,9 +82,9 @@ object AndroidConfig {
     const val LOADING_VERSION: String = "4.10.1"
     const val MIGRATION_CORE_VERSION: String = "1.0.0"
     const val MIGRATION_DATASTORE_VERSION: String = MIGRATION_CORE_VERSION
-    const val PLATFORM_VERSION: String = "4.17.0"
+    const val PLATFORM_VERSION: String = "4.17.1"
     const val EXTENSIONS_ANDROID_VERSION: String = "4.9.0"
-    const val MONITORING_CORE_VERSION: String = "4.9.1"
+    const val MONITORING_CORE_VERSION: String = "4.9.2"
     const val MONITORING_KTOR_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_OKHTTP_VERSION: String = MONITORING_CORE_VERSION
     const val MONITORING_ROOM_VERSION: String = MONITORING_CORE_VERSION

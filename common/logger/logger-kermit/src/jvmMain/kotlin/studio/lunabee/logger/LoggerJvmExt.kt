@@ -21,6 +21,9 @@ import org.jetbrains.annotations.NonNls
 
 /*
  * Timber like extensions
+ *
+ * The `(t, message, args)` overloads must pass a non-null message to Kermit: a `String?` resolves to the
+ * `(message, arg)` extension instead, which formats the message with `t` as argument and throws on any `%` it contains.
  */
 
 /** Log a verbose message with one format arg. */
@@ -37,12 +40,7 @@ fun Logger.v(@NonNls message: String?, vararg args: Any?) {
 
 /** Log a verbose exception and a message with optional format args. */
 fun Logger.v(t: Throwable?, @NonNls message: String?, vararg args: Any?) {
-    val formattedMessage = formatMessage(args, message)
-    if (t == null) {
-        this.v(formattedMessage)
-    } else {
-        this.v(formattedMessage, t)
-    }
+    this.v(formatMessage(args, message).orEmpty(), t)
 }
 
 /** Log a verbose exception. */
@@ -64,12 +62,7 @@ fun Logger.d(@NonNls message: String?, vararg args: Any?) {
 
 /** Log a debug exception and a message with optional format args. */
 fun Logger.d(t: Throwable?, @NonNls message: String?, vararg args: Any?) {
-    val formattedMessage = formatMessage(args, message)
-    if (t == null) {
-        this.d(formattedMessage)
-    } else {
-        this.d(formattedMessage, t)
-    }
+    this.d(formatMessage(args, message).orEmpty(), t)
 }
 
 /** Log a debug exception. */
@@ -91,12 +84,7 @@ fun Logger.i(@NonNls message: String?, vararg args: Any?) {
 
 /** Log an info exception and a message with optional format args. */
 fun Logger.i(t: Throwable?, @NonNls message: String?, vararg args: Any?) {
-    val formattedMessage = formatMessage(args, message)
-    if (t == null) {
-        this.i(formattedMessage)
-    } else {
-        this.i(formattedMessage, t)
-    }
+    this.i(formatMessage(args, message).orEmpty(), t)
 }
 
 /** Log an info exception. */
@@ -118,12 +106,7 @@ fun Logger.w(@NonNls message: String?, vararg args: Any?) {
 
 /** Log a warning exception and a message with optional format args. */
 fun Logger.w(t: Throwable?, @NonNls message: String?, vararg args: Any?) {
-    val formattedMessage = formatMessage(args, message)
-    if (t == null) {
-        this.w(formattedMessage)
-    } else {
-        this.w(formattedMessage, t)
-    }
+    this.w(formatMessage(args, message).orEmpty(), t)
 }
 
 /** Log a warning exception. */
@@ -145,12 +128,7 @@ fun Logger.e(@NonNls message: String?, vararg args: Any?) {
 
 /** Log an error exception and a message with optional format args. */
 fun Logger.e(t: Throwable?, @NonNls message: String?, vararg args: Any?) {
-    val formattedMessage = formatMessage(args, message)
-    if (t == null) {
-        this.e(formattedMessage)
-    } else {
-        this.e(formattedMessage, t)
-    }
+    this.e(formatMessage(args, message).orEmpty(), t)
 }
 
 @Suppress("SpreadOperator")
