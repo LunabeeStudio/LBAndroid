@@ -26,6 +26,7 @@ KMP client for Parse Server REST API under `common/parse/`, shared by Lunabee Pa
 - Headers: app id + client key always; `X-Parse-Session-Token` from `LBParseSessionTokenProvider` (null → absent); `X-Parse-Installation-Id` from optional `LBParseInstallationIdProvider`. `withoutSessionToken()` opts one request out. App owns token + installation id, library never stores them.
 - Helpers = extension functions on `LBParseClient`: `query`, `pull` (keyset cursor `updatedAt|objectId`), `callFunction` (unwraps `result`), `uploadFile`, user auth (`signUp`, `logIn`, `logInAnonymously`, `requestPasswordReset` skip session token; `logOut`, `me` send it), installation create/update.
 - `pull` next-page `where` = caller `where` + keyset `$or`; caller `where` already holding `$or` → both wrapped in `$and`, so caller filter survives page 2+.
+- Every public object id = `ParseObjectId` value class, serialized as plain string (`ParsePointer`, `ParseUser`, `ParseObject`, installation create/update). `ParseACL` keys stay `String`: mix user ids, `*`, `role:` names.
 - `ParseDateSerializer` = `{"__type":"Date","iso":…}`, ms precision, for custom Date fields only. Top-level `createdAt`/`updatedAt` come back as plain ISO strings → default `Instant` serializer.
 
 ## Errors and retry — invariants
