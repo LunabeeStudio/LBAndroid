@@ -23,23 +23,24 @@ import io.ktor.client.request.setBody
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import studio.lunabee.parse.client.LBParseClient
+import studio.lunabee.parse.model.ParseObjectId
 
 @Serializable
 private data class CreatedInstallation(
-    val objectId: String,
+    val objectId: ParseObjectId,
 )
 
 /**
  * Creates an installation from its [fields] (for example `installationId`, `deviceType`, `deviceToken`), and returns
- * its objectId.
+ * its [ParseObjectId].
  */
-suspend fun LBParseClient.createInstallation(fields: JsonObject): String = httpClient.post("installations") {
+suspend fun LBParseClient.createInstallation(fields: JsonObject): ParseObjectId = httpClient.post("installations") {
     setBody(fields)
 }.body<CreatedInstallation>().objectId
 
 /**
  * Updates the installation [objectId] with [fields].
  */
-suspend fun LBParseClient.updateInstallation(objectId: String, fields: JsonObject) {
-    httpClient.put("installations/$objectId") { setBody(fields) }
+suspend fun LBParseClient.updateInstallation(objectId: ParseObjectId, fields: JsonObject) {
+    httpClient.put("installations/${objectId.value}") { setBody(fields) }
 }

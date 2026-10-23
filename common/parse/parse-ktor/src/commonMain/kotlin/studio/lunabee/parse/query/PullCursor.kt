@@ -71,7 +71,7 @@ internal data class PullCursor(
         /** Position of [parseObject], whose missing objectId sorts first on the server, like the empty string. */
         fun of(parseObject: ParseObject): PullCursor = PullCursor(
             updatedAt = checkNotNull(parseObject.updatedAt) { "Pulled Parse object without updatedAt" },
-            objectId = parseObject.objectId.orEmpty(),
+            objectId = parseObject.objectId?.value.orEmpty(),
         )
     }
 }
