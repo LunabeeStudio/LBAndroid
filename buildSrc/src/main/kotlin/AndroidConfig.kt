@@ -79,10 +79,12 @@ object AndroidConfig {
     const val TEST_CORE_VERSION: String = "4.9.0"
     const val TEST_ROOM_VERSION: String = "1.0.0"
     const val KTOR_VERSION: String = "4.10.0"
+    const val PARSE_KTOR_VERSION: String = "1.0.0"
+    const val PARSE_KTOR_TEST_VERSION: String = PARSE_KTOR_VERSION
     const val LOADING_VERSION: String = "4.10.1"
     const val MIGRATION_CORE_VERSION: String = "1.0.0"
     const val MIGRATION_DATASTORE_VERSION: String = MIGRATION_CORE_VERSION
-    const val PLATFORM_VERSION: String = "4.17.1"
+    const val PLATFORM_VERSION: String = "4.18.0"
     const val EXTENSIONS_ANDROID_VERSION: String = "4.9.0"
     const val MONITORING_CORE_VERSION: String = "4.9.2"
     const val MONITORING_KTOR_VERSION: String = MONITORING_CORE_VERSION

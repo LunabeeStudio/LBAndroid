@@ -64,6 +64,7 @@ Move folder → published coordinate changes.
 | `common/migration` | KMP | Versioned app data migration engine + DataStore version store. See [[common-libraries]]. |
 | `common/monitoring` | KMP (+ Android OkHttp) | Network-call monitoring: core, Ktor/OkHttp interceptors, Room store, Compose UI. |
 | `common/synchronization` | KMP (JVM core + remote; Android+iOS adapters) + JVM lint checks | Storage-agnostic sync engine + DataStore/Room/Parse adapters, backend-agnostic remote managers, events, lint rule. See [[synchronization]]. |
+| `common/parse` | KMP | Parse REST client on `ktor-*` + published test harness. See [[parse]]. |
 | `common/test` | KMP + Android | `test-core` (kotlin-test helpers), `test-room`. |
 | `common/bom` | java-platform | Version alignment for `common/*` families (incl. synchronization). |
 
@@ -71,7 +72,7 @@ Move folder → published coordinate changes.
 
 - **KMP iOS + JVM + macOS/Linux/mingw**: `core`, `extension`, `logger-kermit`, `ktor-*`, `loading-core`, `migration-core`.
 - **KMP iOS + JVM + macOS/Linux**: `migration-datastore`.
-- **KMP iOS + JVM**: `monitoring-core`, `monitoring-ktor`, `test-core`, `synchronization-core`, `synchronization-remote`.
+- **KMP iOS + JVM**: `monitoring-core`, `monitoring-ktor`, `test-core`, `synchronization-core`, `synchronization-remote`, `parse-ktor`, `parse-ktor-test`.
 - **KMP iOS + Android + JVM**: `synchronization-core-datastore`.
 - **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,events}`.
 - **Android library**: `core-android`, `extension-android`, `monitoring-okhttp`, `test-room`, `uifield-form`, every Compose module (`compose/*`, `core-compose`, `loading-{compose,hilt,koin}`).

@@ -47,6 +47,8 @@
 | `studio.lunabee.monitoring:monitoring-okhttp`            | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-okhttp?style=for-the-badge)            |
 | `studio.lunabee.monitoring:monitoring-room`              | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-room?style=for-the-badge)              |
 | `studio.lunabee.monitoring:monitoring-ui`                | ![](https://img.shields.io/maven-central/v/studio.lunabee.monitoring/monitoring-ui?style=for-the-badge)                |
+| `studio.lunabee.parse:parse-ktor`                        | ![](https://img.shields.io/maven-central/v/studio.lunabee.parse/parse-ktor?style=for-the-badge)                        |
+| `studio.lunabee.parse:parse-ktor-test`                   | ![](https://img.shields.io/maven-central/v/studio.lunabee.parse/parse-ktor-test?style=for-the-badge)                   |
 | `studio.lunabee.synchronization:synchronization-core`    | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core?style=for-the-badge)    |
 | `studio.lunabee.synchronization:synchronization-core-datastore` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-datastore?style=for-the-badge) |
 | `studio.lunabee.synchronization:synchronization-core-room` | ![](https://img.shields.io/maven-central/v/studio.lunabee.synchronization/synchronization-core-room?style=for-the-badge) |

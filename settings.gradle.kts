@@ -141,6 +141,8 @@ addCommonModule(
     "monitoring/monitoring-okhttp",
     "monitoring/monitoring-room",
     "monitoring/monitoring-ui",
+    "parse/parse-ktor",
+    "parse/parse-ktor-test",
     "synchronization/synchronization-core",
     "synchronization/synchronization-core-datastore",
     "synchronization/synchronization-core-room",

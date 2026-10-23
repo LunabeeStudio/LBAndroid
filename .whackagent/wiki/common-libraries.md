@@ -2,7 +2,7 @@
 
 Non-UI building blocks under `common/` (published as `studio.lunabee.<group>:<module>`): results, logging, global loading, app data migrations, Ktor setup, network monitoring, test helpers.
 
-Out of scope: [[synchronization]] and BOM (see [[build-and-publishing]]). Overall module layout: [[architecture]].
+Out of scope: [[synchronization]], Parse client ([[parse]], built on `ktor-*`) and BOM (see [[build-and-publishing]]). Overall module layout: [[architecture]].
 
 ## Platform at a glance
 
@@ -29,7 +29,7 @@ logger-kermit  (api: Kermit)
   └─ monitoring-okhttp, compose:core
 core ── loading-core ── loading-compose ── loading-hilt / loading-koin (+ core-compose)
 core (api) ── migration-core (api) ── migration-datastore (+ api: datastore-preferences-core)
-ktor-core ── ktor-json, monitoring-ktor
+ktor-core ── ktor-json, monitoring-ktor, parse-ktor (+ ktor-json, ktor-kermit)
 monitoring-core ── monitoring-ktor / -okhttp / -room / -ui
 ```
 

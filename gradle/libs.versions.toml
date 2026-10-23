@@ -177,6 +177,7 @@ kspApi = { group = "com.google.devtools.ksp", name = "symbol-processing-api", ve
 ktorClientAndroid = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktorClientCore = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktorClientIos = { group = "io.ktor", name = "ktor-client-ios", version.ref = "ktor" }
+ktorClientMock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
 ktorContentNegotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktorJsonSerialization = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktorLogging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
