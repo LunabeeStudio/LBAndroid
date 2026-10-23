@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-23
+
+```
+logger-kermit 4.10.1
+monitoring 4.9.2
+bom 4.17.1
+```
+
+- Fix `logger-kermit` `v`/`d`/`i`/`w`/`e(t, message, args)`: the message was formatted again with the throwable as
+  argument, so any `%` left in it (e.g. a logged payload) threw `UnknownFormatConversionException` or
+  `IllegalFormatConversionException`.
+- Fix `OkHttpMonitoringInterceptor` failing the call it intercepts on any non-JSON body containing a `%` (e.g. every
+  image upload), through the logger bug above. It now records only textual bodies (`text/*`, JSON, XML, form), capped at
+  100 kB and read with `peekBody` instead of buffering the whole response; other bodies are stored as a
+  `<body not recorded: content/type>` placeholder. Recording errors are logged, never thrown into the call. The cap also
+  keeps rows under the Android CursorWindow limit, which made the monitoring list empty after one multi-MB response.
+
 ## 2026-10-16
 
 ```
