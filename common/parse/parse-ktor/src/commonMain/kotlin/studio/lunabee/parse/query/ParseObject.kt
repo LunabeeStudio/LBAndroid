@@ -16,6 +16,7 @@
 
 package studio.lunabee.parse.query
 
+import studio.lunabee.parse.model.ParseObjectId
 import kotlin.time.Instant
 
 /**
@@ -24,7 +25,7 @@ import kotlin.time.Instant
  */
 interface ParseObject {
     /** Id given by the server, `null` while unknown. */
-    val objectId: String?
+    val objectId: ParseObjectId?
 
     /** Last update of the object, `null` while unknown. */
     val updatedAt: Instant?

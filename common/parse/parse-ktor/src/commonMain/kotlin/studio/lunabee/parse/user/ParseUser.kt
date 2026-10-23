@@ -17,6 +17,7 @@
 package studio.lunabee.parse.user
 
 import kotlinx.serialization.Serializable
+import studio.lunabee.parse.model.ParseObjectId
 
 /**
  * Parse user returned by the user endpoints. Fields specific to the app are not decoded.
@@ -27,6 +28,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ParseUser(
-    val objectId: String,
+    val objectId: ParseObjectId,
     val sessionToken: String? = null,
 )

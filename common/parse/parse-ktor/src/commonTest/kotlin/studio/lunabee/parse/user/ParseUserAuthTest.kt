@@ -19,6 +19,7 @@ package studio.lunabee.parse.user
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.test.runTest
+import studio.lunabee.parse.model.ParseObjectId
 import studio.lunabee.parse.test.FakeParseServer
 import studio.lunabee.parse.test.assertJsonBody
 import studio.lunabee.parse.test.assertRequest
@@ -38,7 +39,7 @@ class ParseUserAuthTest {
 
         val user = server.client.signUp(username = "ada", password = "secret")
 
-        assertEquals(ParseUser(objectId = "u1", sessionToken = "r:s1"), user)
+        assertEquals(ParseUser(objectId = ParseObjectId("u1"), sessionToken = "r:s1"), user)
         assertRequest(server.lastRequest, HttpMethod.Post, "users", sessionToken = null)
         assertJsonBody(server.lastRequest, """{"username":"ada","password":"secret"}""")
     }
@@ -121,7 +122,7 @@ class ParseUserAuthTest {
 
         assertEquals(null, signedUp.sessionToken)
         assertEquals("r:s1", loggedIn.sessionToken)
-        assertEquals("u1", me.objectId)
+        assertEquals(ParseObjectId("u1"), me.objectId)
         assertEquals(listOf("/parse/users", "/parse/login", "/parse/users/me"), server.requests.map { it.url.encodedPath })
     }
 }

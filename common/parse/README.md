@@ -86,13 +86,14 @@ All helpers are extension functions on `LBParseClient`.
 - `callFunction<T, B>(name, body)`: `POST functions/<name>`, returns the unwrapped `result`.
 - `uploadFile(name, bytes, contentType: ContentType)`: `POST files/<name>`, returns a `ParseFile`.
 - `user`: `signUp`, `logIn`, `logInAnonymously` (`authData.anonymous`), `requestPasswordReset` send no session token;
-  `logOut` and `me` send it. They return a `ParseUser(objectId, sessionToken)`.
-- `installation`: `createInstallation(fields)` (`POST installations`, returns the objectId) and
-  `updateInstallation(objectId, fields)` (`PUT installations/<objectId>`).
-- `model`: `ParsePointer` (its `objectId` is a `ParseObjectId` value class), `ParseFile`, `ParseAccess` / `ParseACL`,
-  and `ParseDateSerializer` (`{"__type": "Date", "iso": …}`, millisecond precision) for `Instant` fields:
-  `@Serializable(with = ParseDateSerializer::class) val startsAt: Instant`. `createdAt` and `updatedAt` are plain ISO
-  strings in Parse responses: declare them as `Instant` with the default serializer.
+  `logOut` and `me` send it. They return a `ParseUser(objectId: ParseObjectId, sessionToken)`.
+- `installation`: `createInstallation(fields)` (`POST installations`, returns its `ParseObjectId`) and
+  `updateInstallation(objectId: ParseObjectId, fields)` (`PUT installations/<objectId>`).
+- `model`: `ParsePointer` (its `objectId` is a `ParseObjectId` value class, as is every public object id),
+  `ParseFile`, `ParseAccess` / `ParseACL`, and `ParseDateSerializer` (`{"__type": "Date", "iso": …}`, millisecond
+  precision) for `Instant` fields: `@Serializable(with = ParseDateSerializer::class) val startsAt: Instant`.
+  `createdAt` and `updatedAt` are plain ISO strings in Parse responses: declare them as `Instant` with the default
+  serializer.
 
 ## parse-ktor-test
 

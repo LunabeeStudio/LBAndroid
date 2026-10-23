@@ -20,6 +20,7 @@ import io.ktor.http.HttpMethod
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import studio.lunabee.parse.model.ParseObjectId
 import studio.lunabee.parse.test.FakeParseServer
 import studio.lunabee.parse.test.assertJsonBody
 import studio.lunabee.parse.test.assertRequest
@@ -39,7 +40,7 @@ class ParseInstallationEndpointsTest {
 
         val objectId = server.client.createInstallation(fields)
 
-        assertEquals("inst1", objectId)
+        assertEquals(ParseObjectId("inst1"), objectId)
         assertRequest(server.lastRequest, HttpMethod.Post, "installations")
         assertJsonBody(server.lastRequest, """{"installationId":"i1","deviceType":"android"}""")
     }
@@ -48,7 +49,7 @@ class ParseInstallationEndpointsTest {
     fun updateInstallationPutsFieldsOnObjectId() = runTest {
         val server = FakeParseServer(handler = { respondParse("""{"updatedAt":"2026-09-21T10:00:00.000Z"}""") })
 
-        server.client.updateInstallation("inst1", fields)
+        server.client.updateInstallation(ParseObjectId("inst1"), fields)
 
         assertRequest(server.lastRequest, HttpMethod.Put, "installations/inst1")
         assertJsonBody(server.lastRequest, """{"installationId":"i1","deviceType":"android"}""")

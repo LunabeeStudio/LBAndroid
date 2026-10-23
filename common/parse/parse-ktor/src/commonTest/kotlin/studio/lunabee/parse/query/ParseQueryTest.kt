@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import studio.lunabee.parse.model.ParseObjectId
 import studio.lunabee.parse.test.FakeParseServer
 import studio.lunabee.parse.test.assertQuery
 import studio.lunabee.parse.test.assertRequest
@@ -35,7 +36,7 @@ import kotlin.time.Instant
 class ParseQueryTest {
     @Serializable
     private data class Item(
-        override val objectId: String? = null,
+        override val objectId: ParseObjectId? = null,
         override val updatedAt: Instant? = null,
     ) : ParseObject
 
@@ -64,7 +65,11 @@ class ParseQueryTest {
     fun pullFirstPageUsesKeysetOrderAndWhereOnly() = runTest {
         val server = FakeParseServer(handler = { respondParse(itemsBody(3)) })
 
-        val page = server.client.pull<Item, String>(className = "Coach", where = JsonObject(emptyMap()), cursor = null) { it.objectId }
+        val page = server.client.pull<Item, String>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = null,
+        ) { it.objectId?.value }
 
         assertQuery(server.lastRequest, where = "{}", order = PullOrder, limit = PageSize)
         assertEquals(listOf("o001", "o002", "o003"), page.items)
@@ -75,9 +80,17 @@ class ParseQueryTest {
     @Test
     fun fullPageGivesCursorAndNextPageCombinesUpdatedAtAndObjectIdWithOr() = runTest {
         val server = FakeParseServer(handler = { respondParse(itemsBody(PageSize)) })
-        val first = server.client.pull<Item, String>(className = "Coach", where = JsonObject(emptyMap()), cursor = null) { it.objectId }
+        val first = server.client.pull<Item, String>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = null,
+        ) { it.objectId?.value }
 
-        server.client.pull<Item, String>(className = "Coach", where = JsonObject(emptyMap()), cursor = first.nextCursor) { it.objectId }
+        server.client.pull<Item, String>(
+            className = "Coach",
+            where = JsonObject(emptyMap()),
+            cursor = first.nextCursor,
+        ) { it.objectId?.value }
 
         assertEquals("2026-09-21T10:00:00.100Z|o100", first.nextCursor)
         assertQuery(
@@ -102,7 +115,7 @@ class ParseQueryTest {
             className = "Coach",
             where = callerWhere,
             cursor = "2026-09-21T10:00:00.100Z|o100",
-        ) { it.objectId }
+        ) { it.objectId?.value }
 
         assertQuery(
             server.lastRequest,
@@ -123,7 +136,7 @@ class ParseQueryTest {
         val server = FakeParseServer(handler = { respondParse(itemsBody(2)) })
 
         val page = server.client.pull<Item, String>(className = "Coach", where = JsonObject(emptyMap()), cursor = null) {
-            it.objectId.takeIf { id -> id == "o001" }
+            it.objectId?.value.takeIf { id -> id == "o001" }
         }
 
         assertEquals(listOf("o001"), page.items)
