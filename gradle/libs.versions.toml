@@ -189,6 +189,7 @@ navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runt
 navigationCompose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
 normalize = { group = "com.doist.x", name = "normalize", version.ref = "normalize" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttpMockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp" }
 parseCoroutines = { group = "com.github.parse-community.Parse-SDK-Android", name = "coroutines", version.ref = "parse" }
 parseLiveQuery = { group = "com.github.parse-community", name = "ParseLiveQuery-Android", version.ref = "parseLiveQuery" }
 parseSdk = { group = "com.github.parse-community.Parse-SDK-Android", name = "parse", version.ref = "parse" }

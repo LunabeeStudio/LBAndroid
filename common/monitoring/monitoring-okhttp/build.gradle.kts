@@ -33,4 +33,6 @@ dependencies {
 
     implementation(projects.loggerKermit)
     implementation(projects.monitoringCore)
+
+    testImplementation(libs.okhttpMockwebserver)
 }
