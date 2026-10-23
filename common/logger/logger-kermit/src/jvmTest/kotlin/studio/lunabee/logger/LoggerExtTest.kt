@@ -16,7 +16,11 @@
 
 package studio.lunabee.logger
 
+import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.loggerConfigInit
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 /**
@@ -63,5 +67,29 @@ class LoggerExtTest {
         logger.e(message = "%d %s", 1, "hello")
         logger.e(Exception("Error text"), message = "%d %s", 1, "hello")
         logger.e(Exception("Error text"))
+    }
+
+    @Test
+    fun throwable_message_is_not_formatted_test() {
+        val writer = RecordingLogWriter()
+        val recordingLogger = Logger(config = loggerConfigInit(writer), tag = "testLogger")
+        val error = Exception("Error text")
+
+        recordingLogger.v(error, message = "100% done")
+        recordingLogger.d(error, message = "100% done")
+        recordingLogger.i(error, message = "100% done")
+        recordingLogger.w(error, message = "100% done")
+        recordingLogger.e(error, message = "100% done")
+
+        val expected = Severity.entries.filter { it != Severity.Assert }.map { severity -> Triple(severity, "100% done", error) }
+        assertEquals(expected, writer.logs)
+    }
+}
+
+private class RecordingLogWriter : LogWriter() {
+    val logs: MutableList<Triple<Severity, String, Throwable?>> = mutableListOf()
+
+    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
+        logs += Triple(severity, message, throwable)
     }
 }
