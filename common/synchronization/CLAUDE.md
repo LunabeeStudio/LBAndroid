@@ -224,7 +224,11 @@ failures aggregate into `LBSyncAggregateException`. App foreground/background is
   `com.lunabee.lbsynchronization`, or the Room `sync_timestamp` table).
   **Renaming a `SyncManager` subclass silently resets its incremental-sync cursor** unless you pin a
   stable `syncKey` — the escape hatch is to **override `syncKey`** so the persisted key survives the
-  rename. Treat `syncKey` as a persisted key.
+  rename. Treat `syncKey` as a persisted key. In minified apps the simple name only holds because the jar
+  ships `src/jvmMain/resources/META-INF/com.android.tools/r8/synchronization-core.pro` (`-keepnames` on
+  `LBSyncManager` subclasses; not under `META-INF/proguard/`, which the root `.gitignore` ignores): without it R8
+  renames managers between releases and merges look-alike ones into a single class, so they share one cursor and
+  skip each other's records (seen in RunMotion 9.4.0, 24 managers merged).
 - `currentSyncStatus` is a **read-only alias** for `status.value`; only the engine mutates state (via
   the `internal setStatusInternal`). Never try to set it from a consumer — collect `status` instead.
 - `FetchPage.maxUpdatedAt` is folded into the cursor with the per-object `updatedAt`: set it when the page holds
