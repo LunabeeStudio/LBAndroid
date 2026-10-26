@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-26
+
+```
+Synchronization Core 2.1.1
+Synchronization Events 2.1.1
+Synchronization Core-Datastore 2.1.1
+Synchronization Core-Room 2.1.1
+Synchronization Parse-Room 2.1.1
+Synchronization Remote 2.1.1
+bom 4.18.1
+```
+
+- Fix `synchronization-core` in R8-minified apps: sync managers could share one incremental-sync cursor and skip records.
+  `syncKey` defaults to the class simple name, and R8 merged look-alike managers into one class (they then shared one
+  key) and renamed them between releases. The jar now ships a consumer rule
+  (`META-INF/com.android.tools/r8/synchronization-core.pro`) that keeps the names of `LBSyncManager` subclasses.
+  Upgrading changes the persisted keys of minified apps once, so their managers run one full download, which also
+  restores the records that were skipped
+
 ## 2026-10-23
 
 ```
