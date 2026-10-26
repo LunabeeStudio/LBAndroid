@@ -82,7 +82,8 @@ abstract class LBSyncManager<ServerData, LocalData, PageInfo> internal construct
     /**
      * Persistence key namespace for this manager's sync cursors. Defaults to the class simple name
      * (persisted as `"${simpleName}lastSyncDate"`); override it to pin a stable key so the
-     * incremental-sync cursor survives a class rename.
+     * incremental-sync cursor survives a class rename. The library ships an R8 rule keeping the names of
+     * [LBSyncManager] subclasses, so minification neither renames nor merges them into one shared key.
      */
     open val syncKey: SyncKey = SyncKey(this::class.simpleName.orEmpty())
 
