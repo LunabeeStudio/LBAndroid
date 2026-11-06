@@ -16,7 +16,7 @@ lbDetekt = { id = "studio.lunabee.plugin.detekt", version.ref = "lbDetekt" }
 
 [versions]
 
-agp = "9.5.0"
+agp = "9.5.1"
 androidToolsDesugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
 androidxAppcompat = "1.8.0"
@@ -42,7 +42,7 @@ composeMultiplatform="1.12.2"
 composeNavigation = "2.10.0"
 core = "1.19.1"
 dagger = "2.60.1"
-dokka = "2.2.0"
+dokka = "2.3.0"
 googleAndroidMaterial = "1.14.0"
 hbb20Countrycodepicker = "2.7.3"
 javapoet = "1.13.0"
