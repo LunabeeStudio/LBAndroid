@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "lunabee-plane": {
+      "source": {
+        "source": "github",
+        "repo": "LunabeeStudio/Lunabee-Plane"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "lb-board@lunabee-plane": true
+  }
+}
