@@ -28,18 +28,26 @@ paths:                         # WHERE whackagent keep each file kind. Skills re
                                # Move path after setup → move files too; no back-fill.
 
 backlog:
-  provider: github             # WHERE tickets live — providers/CONTRACT.md.
+  provider: plane              # WHERE tickets live — providers/CONTRACT.md.
                                #   local  — {backlog} + task files, one agent (default).
                                #   github — GitHub Project + issues, many agents/worktrees.
-                               #     Settings in repo variables (wa-backlog provision), not here.
-                               #     Forces branch.per_task: true, branch.base = close.target
-                               #     (named branch). Ignores close.strategy for tickets:
-                               #     /wa-validate mark PR ready, /wa-close merge on your yes.
+                               #   plane  — Lunabee's Plane, run by the lb-board plugin (internal,
+                               #     LunabeeStudio/Lunabee-Plane): .lunabee/board/lb-board holds board,
+                               #     claims and hooks (Lunabee Plane board App). API key: env PLANE_API_KEY.
+                               #   github, plane: settings in repo variables (wa-backlog provision /
+                               #     /lb-board-setup), not here. Forces branch.per_task: true, branch.base =
+                               #     close.target (named branch). Ignores close.strategy for tickets:
+                               #     /wa-validate marks PR ready, /wa-close merges it on your yes.
   milestones: []               # OPEN release scopes (iteration, version), OLDEST FIRST. Local provider
                                # only — github read repo milestones. New task join LAST
                                # entry → new work never grow current/past scope. You own list:
                                # add entry to open next scope, remove when shipped (tasks keep
                                # their milestone:). Empty → no milestone.
+
+vcs:
+  provider: github             # WHERE code lives (branches, PRs, claims) under a non-local backlog.
+                               #   github — only value (default). Missing → github.
+                               # backlog.provider github implies it; local ignores it.
 
 release:
   doc:                         # WHERE release flow written — `path` or `path#Heading`
