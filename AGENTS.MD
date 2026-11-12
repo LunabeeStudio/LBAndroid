@@ -70,8 +70,10 @@ These are project-specific, not generic dev practice:
 - **KMP modules** (e.g. `common/core/core`, `common/extension/extension`) target `iosArm64` + `iosSimulatorArm64` with **SKIE** (static frameworks). Publication uses `PublishType.Kmp` in `lunabee.library-publish-conventions`, with overrides that skip jar artifacts for the iOS targets (workaround for jreleaser/jreleaser#1746).
 - **BOM** (`common/bom`) pins versions across all published modules and reads its version from `AndroidConfig.bomVersion()` (env override: `EnvConfig.EnvVersionName`).
 
-<!-- board-contract: 2.2 -->
+<!-- lb-board -->
 ## Board
 
-Issues and pull requests in this repository follow [BOARD.md](BOARD.md), whatever tool or work loop you use. Before you work on an issue or open a pull request, read BOARD.md and follow it: claim the ticket first, never move a card yourself, one PR per ticket, a human decides every merge.
-<!-- /board-contract -->
+Tickets live on a Plane board. Before you work on a ticket or open a pull request, read
+[.lunabee/board/BOARD.md](.lunabee/board/BOARD.md) and follow it: name the ticket key (`LBA-12`) in the branch or
+PR title, claim the ticket before changing it, never move a card yourself.
+<!-- /lb-board -->

@@ -1,3 +1,17 @@
+<!-- board-contract: 2.5 · sections BOARD.md → Pull requests requires: keep the three headings -->
+## Ticket
+
+<!-- the card this PR moves, unless the branch or title already names its key: [LBA-12](https://projects.lunabee.ovh/lunabee/browse/LBA-12/) -->
+
+## Acceptance criteria
+
+<!-- the ticket's current criteria: - [x] only what a round proved, - [ ] plus a one-line reason otherwise -->
+- [ ] 
+
+## Status
+
+<!-- one line, what is owed next: "Draft — test it" or "Ready — review, then merge" -->
+
 ## 📜 Description
 
 ## 💡 Motivation and Context
@@ -12,17 +26,3 @@
 ## 🔮 Next steps
 
 ## 📸 Screenshots / GIFs
-
-<!-- board-contract: 2.2 · sections BOARD.md → Pull requests requires: keep the three headings -->
-## Ticket
-
-Closes #
-
-## Acceptance criteria
-
-<!-- the ticket's current criteria: - [x] only what a round proved, - [ ] plus a one-line reason otherwise -->
-- [ ] 
-
-## Status
-
-<!-- one line, what is owed next: "Draft — test it" or "Ready — review, then merge" -->
