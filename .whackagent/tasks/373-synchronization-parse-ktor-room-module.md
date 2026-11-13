@@ -1,6 +1,6 @@
 ---
 issue: 373
-phase: review
+phase: validated
 wiki: "[[synchronization]], [[architecture]], [[build-and-publishing]], [[parse]]"
 note: "Depends on #372 (parse-ktor, parse-ktor-test). Consumers: RunMotion (phase 2/3 of the Shared KMP Data Layer plan), Kokoriko (push of TimeEntry, AiEntry)."
 created: 2026-10-19
@@ -143,6 +143,23 @@ We need a Parse↔Room sync that runs in KMP common code (Android + iOS) on `par
 - Round 3: 1 minor finding: the push-before-pull test now asserts the exact request order (PUT, then the pull GET). Autofixed.
 - Final pass: clean.
 
+### validation — 2026-11-13 (after feedback round 1)
+
+- Scope: the whole ticket range (`git diff d546abe5^ HEAD`, 41 files). The feedback round 1 delta got the closest look, and its two inline hunks were flagged as written without a convention pass.
+- Tool: `./gradlew detekt` (plain run) was clean. No build warnings were open.
+- Lenses: style, elegance, structure and correctness, all four on both rounds.
+- Round 1: 6 minor findings.
+  - 5 were autofixed by the implementer, which confirmed each one and rejected none:
+    - The inline `@throws UnsupportedOperationException` tag on `syncManager` was false, because the failure surfaces as `LBResult.Failure` during the sync run. The tag was replaced by a KDoc body line.
+    - The README "Known gap" bullet was stale.
+    - The POST test ran two syncs and duplicated another test's assertion. It is now one sync, renamed `a_posted_row_stores_the_returned_server_id`.
+    - A test duplicated the `FakeParseServer` handler. `server()` and `answer()` now take a `createdBody` parameter.
+    - In `FakeRoomDao`, the `markInSync` overloads are now grouped.
+  - 1 was fixed by the PM: the `[[synchronization]]` wiki page was stale for round 1. It was synced in this pass.
+  - The inline `ResponseJson` hunk was checked and found clean.
+- Round 2: all 6 findings fixed, none withdrawn, none disputed, no new finding.
+- Verdict: clean.
+
 ## Verification
 
 - Library, `verify.mode: off`, so no runtime check: build and tests are the proof. No live Parse server was called.
@@ -157,7 +174,7 @@ We need a Parse↔Room sync that runs in KMP common code (Android + iOS) on `par
   - `:synchronization-remote:jvmTest`, `:synchronization-core-room:assemble`, `:synchronization-parse-room:assemble`, `:synchronization-parse-ktor-room:testAndroidHostTest`, `:synchronization-parse-ktor-room:iosSimulatorArm64Test` and `:parse-ktor:jvmTest` pass.
   - `detekt -Pstudio.lunabee.detekt.skipDependencySorting` is clean. No Gradle file changed.
   - A throwaway `@Dao` probe compiled `upsertExceptPending` on Android and iosSimulatorArm64, and Room generated a `performInTransactionSuspending` wrapper. The probe was then removed.
-
+- Validation autofix: `:synchronization-parse-ktor-room:testAndroidHostTest`, `:synchronization-parse-ktor-room:iosSimulatorArm64Test` and `detekt -Pstudio.lunabee.detekt.skipDependencySorting` pass. The changes touch only KDoc, the README and tests, with no runtime code.
 ## Feedback
 
 ### Round 1 — 2026-11-13
