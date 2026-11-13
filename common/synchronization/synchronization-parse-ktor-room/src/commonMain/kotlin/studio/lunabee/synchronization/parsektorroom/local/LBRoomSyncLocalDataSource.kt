@@ -26,11 +26,9 @@ import studio.lunabee.synchronization.roomsyncmanager.LBRoomSyncModel
 internal class LBRoomSyncLocalDataSource<R : LBRoomSyncModel>(
     private val dao: LBRoomSyncDao<R>,
 ) : LBSyncLocalDataSource<R> {
-    /** Upserts [objects] except the rows still to push, so a pull never overwrites a local edit. */
+    /** Upserts [objects] except the rows still to push, in one transaction, so a pull never overwrites a local edit. */
     override suspend fun savePulled(objects: List<R>) {
-        val pending = dao.notInSync().mapTo(mutableSetOf()) { it.lbLocalId }
-        val rows = objects.filterNot { it.lbLocalId in pending }
-        if (rows.isNotEmpty()) dao.upsert(rows)
+        dao.upsertExceptPending(objects)
     }
 
     override suspend fun objectsToPush(): List<R> = dao.notInSync()

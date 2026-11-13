@@ -16,6 +16,7 @@
 
 package studio.lunabee.synchronization.roomsyncmanager
 
+import androidx.room.Transaction
 import androidx.room.Upsert
 
 /**
@@ -34,6 +35,17 @@ abstract class LBRoomSyncDao<T : LBRoomSyncModel> {
 
     @Upsert
     abstract suspend fun upsert(rows: List<T>)
+
+    /**
+     * Upserts [rows] except those whose `lbLocalId` is in [notInSync], in one transaction: a local edit made
+     * meanwhile cannot be overwritten by a pulled row.
+     */
+    @Transaction
+    open suspend fun upsertExceptPending(rows: List<T>) {
+        val pending = notInSync().mapTo(mutableSetOf()) { it.lbLocalId }
+        val toUpsert = rows.filterNot { it.lbLocalId in pending }
+        if (toUpsert.isNotEmpty()) upsert(toUpsert)
+    }
 
     abstract suspend fun notInSync(): List<T>
 
