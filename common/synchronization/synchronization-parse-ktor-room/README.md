@@ -119,7 +119,7 @@ skipped.
 - A pulled row whose `lbLocalId` is currently in `notInSync()` is not written, so a pull never overwrites a local edit
   not pushed yet. The other rows of the same pull are. The check and the write run in one transaction
   (`upsertExceptPending`), so an edit made meanwhile is not lost.
-- Known gap: after a push, the row is marked in sync unconditionally (`markInSync(listOf(lbLocalId))`). An edit made
+- Known gap: after a push, the row is marked in sync unconditionally (`markInSync`). An edit made
   while the row was uploading is marked in sync too, and is pushed with the next edit of the row.
 
 ## Moving from `synchronization-parse-room`
