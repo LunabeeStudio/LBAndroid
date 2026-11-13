@@ -64,7 +64,7 @@ LiveQuery path: `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` does `liveQue
 - `syncKey` (default: class simple name) **is persisted key**. Renaming manager silently resets cursor unless `syncKey` overridden. Remote managers take `syncKey` in constructor so instances don't share cursor.
 - Incremental sync needs `fetchRequest` results in **ascending `updatedAt`**. Cursor keeps max seen. `FetchPage.maxUpdatedAt` lets filtered-out records still move cursor.
 - Remote pull must page by **keyset cursor, never offset** (update mid-download shifts rows, skips one). `LBRemotePullSyncManager` buffers all pages, writes once, moves cursor only after write. Hence `supportIncrementalSync() = false`.
-- `LBRemoteSyncManager` uploads one object at a time, stops at first failure. `markPushed` conditional so edits during upload stay pending.
+- `LBRemoteSyncManager` uploads one object at a time, stops at first failure. `markPushed` conditional so edits during upload stay pending. `create` returns backend id (`String?`), `markPushed(pushed, serverId)` gets id from lookup or create → local side can store it, next push skips lookup (2.2.0 **break** for implementers).
 - `isProcessing()` is `true` for `DownloadFinishSuccessfully` / `UploadFinishSuccessfully` (mid-pipeline, not terminal).
 - Switching DataStore → Room backend, or upgrading from `Libraries_Android` `lb-synchronization`, **re-syncs once**.
 - Parse-room keeps DAOs/`@Database` in consumer: no KSP in library, abstract `@Upsert` BaseDao pattern (see its `README.md`). Same for parse-ktor-room.
@@ -73,11 +73,11 @@ LiveQuery path: `LBParseRoomSyncManager.onLiveQueryCreateOrUpdate` does `liveQue
 
 `synchronization-parse-ktor-room` (`studio.lunabee.synchronization.parsektorroom`). Consumer declares one `LBParseRoomClass<D : ParseObject, R : LBRoomSyncModel>(serializer)` per Parse class: `tableParseName`, `keysToSelect`, `keysToInclude`, `createObjectFrom`, `localIdKey`, `update(from)` (names mirror `LBParseRoomSyncManager` → mechanical port). `pullManager(syncKey, parse, dao)` → `LBRemotePullSyncManager`; `syncManager(...)` → `LBRemoteSyncManager`, needs `localIdKey` (else `IllegalArgumentException`). Usage: module `README.md`.
 
-- **Pull**: parse-ktor serializer `pull` (keyset `updatedAt|objectId`, `updatedAt > cursor`, keys/include). Local side skips pulled rows whose `lbLocalId` is in `notInSync()` → pull never overwrites unpushed edit.
-- **Push**: `findServerId` = `lbServerId`, else `GET classes/<C>` `where {localIdKey: lbLocalId}` `limit 1` `keys=objectId` → `PUT` found / `POST` none. Lookup prevents duplicate on double push or lost create response. Body = `update(row)` encoded with `encodeDefaults = true` (default-valued fields still sent), nulls kept, `objectId`/`createdAt`/`updatedAt` stripped.
+- **Pull**: parse-ktor serializer `pull` (keyset `updatedAt|objectId`, `updatedAt > cursor`, keys/include). Local side skips pulled rows whose `lbLocalId` is in `notInSync()` → pull never overwrites unpushed edit. Check + upsert in **one transaction** (`LBRoomSyncDao.upsertExceptPending`, `@Transaction`): two separate calls let app write slip between, edit lost.
+- **Push**: `findServerId` = `lbServerId`, else `GET classes/<C>` `where {localIdKey: lbLocalId}` `limit 1` `keys=objectId` → `PUT` found / `POST` none. Lookup prevents duplicate on double push or lost create response. `POST` response `objectId` handed to DAO `markInSync(localId, serverId)`: open, default = mark in sync only (old behavior); DAO overrides with table-literal `@Query` setting `lbServerId` → next push direct `PUT`, no lookup. Body = `update(row)` encoded with `encodeDefaults = true` (default-valued fields still sent), nulls kept, `objectId`/`createdAt`/`updatedAt` stripped.
 - **Soft delete only**: `lbDeleted` pushed through `update`, tombstones pulled back. Never HTTP `DELETE`.
 - **`keysToSelect` restricted** → must include `localIdKey` + soft-delete field, else pulled row maps to `objectId` local id (duplicate) and tombstones lost.
-- **Known gap**: `markPushed` unconditional (`markInSync(listOf(lbLocalId))`) → edit made during upload marked in sync, waits for next edit.
+- **Known gap**: `markPushed` marks in sync unconditionally (`markInSync`) → edit made during upload marked in sync, waits for next edit.
 - **Carry-over**: pass old parse-room manager class simple name as `syncKey` → same cursor meaning (max `updatedAt`), no full resync at switch.
 - Out of scope: LiveQuery, hard delete, `ParseUser` sync (app-side).
 
