@@ -31,17 +31,17 @@ internal class FakeRoomDao(rows: List<TestRow> = emptyList()) : LBRoomSyncDao<Te
         }
     }
 
-    override suspend fun markInSync(localId: String, serverId: String) {
-        rows.indices.forEach { index ->
-            if (rows[index].lbLocalId == localId) rows[index] = rows[index].copy(lbInSync = true, lbServerId = serverId)
-        }
-    }
-
     override suspend fun notInSync(): List<TestRow> = rows.filterNot { it.lbInSync }
 
     override suspend fun markInSync(localIds: List<String>) {
         rows.indices.forEach { index ->
             if (rows[index].lbLocalId in localIds) rows[index] = rows[index].copy(lbInSync = true)
+        }
+    }
+
+    override suspend fun markInSync(localId: String, serverId: String) {
+        rows.indices.forEach { index ->
+            if (rows[index].lbLocalId == localId) rows[index] = rows[index].copy(lbInSync = true, lbServerId = serverId)
         }
     }
 
