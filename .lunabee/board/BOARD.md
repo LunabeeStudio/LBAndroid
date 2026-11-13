@@ -123,12 +123,10 @@ A spec written in the card description moves nothing: GitHub events are the only
 - Humans drag cards. `move LBA-12 --top|--bottom|--before LBA-3|--after LBA-3` does the same.
 
 **Sprints**
-- A sprint is a parent card labeled `lb-sprint`, plus a Plane cycle of the same name.
+- A sprint is a parent card labeled `lb-sprint`. Plane cycles are not used.
 - Its tickets are the parent's children.
 - Turn a ticket into a sprint with `split LBA-12`. Add tickets with `create --sprint <name>` or
   `set-field LBA-12 sprint <name>`.
-- The parent decides membership: a card dragged into the cycle without the parent is not in the sprint. `get`
-  names it as `stray_sprint`, and `check` reports it.
 - The sprint root moves to `Done` on its own when the sprint lands:
   - if sprints have a branch (`PLANE_SPRINT_PREFIX`), when that branch's PR merges;
   - otherwise, when its last ticket lands.
@@ -171,4 +169,4 @@ A spec written in the card description moves nothing: GitHub events are the only
   Deliveries are listed at https://hooks.lunabee.ovh/ (Lunabee sign-in), and a missed one can be redelivered.
 - **No double writer:** Plane's own GitHub integration must stay off, or it would move the same cards too.
 - **Drift:** `check` reports cards out of step with the repository, such as a merged PR whose card isn't `done`,
-  acceptance criteria in a `todo` card's description, or a card in a sprint's cycle without the sprint parent.
+  or acceptance criteria in a `todo` card's description.
