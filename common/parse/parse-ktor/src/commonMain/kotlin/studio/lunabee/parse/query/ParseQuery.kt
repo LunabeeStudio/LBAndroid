@@ -27,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
+import studio.lunabee.ktor.LBKtorJson
 import studio.lunabee.parse.client.LBParseClient
 import studio.lunabee.parse.error.LBParseException
 import studio.lunabee.parse.model.ParseDateSerializer
@@ -188,8 +189,10 @@ private fun HttpRequestBuilder.queryParameters(
 }
 
 /** Decodes query responses like the Json of the client, built by `LBKtorJson`. */
-private val ResponseJson = Json {
-    ignoreUnknownKeys = true
-    explicitNulls = false
-    isLenient = true
+private val ResponseJson = LBKtorJson.Config().let { clientConfig ->
+    Json {
+        ignoreUnknownKeys = clientConfig.ignoreUnknownKeys
+        explicitNulls = clientConfig.explicitNulls
+        isLenient = clientConfig.isLenient
+    }
 }
