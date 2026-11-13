@@ -100,6 +100,7 @@ abstract class LBParseRoomClass<D : ParseObject, R : LBRoomSyncModel>(
      * @param pushBeforePull `true` to push before pulling.
      * @param logging enables the manager logs.
      * @throws IllegalArgumentException when [localIdKey] is `null`.
+     * @throws UnsupportedOperationException at the first push when [update] is not overridden.
      */
     fun syncManager(
         syncKey: SyncKey,
