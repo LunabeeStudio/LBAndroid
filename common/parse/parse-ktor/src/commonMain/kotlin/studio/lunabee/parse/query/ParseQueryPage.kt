@@ -18,7 +18,6 @@ package studio.lunabee.parse.query
 
 import kotlinx.serialization.Serializable
 
-@PublishedApi
 @Serializable
 internal data class ParseQueryPage<T>(
     val results: List<T> = emptyList(),

@@ -146,6 +146,7 @@ addCommonModule(
     "synchronization/synchronization-core",
     "synchronization/synchronization-core-datastore",
     "synchronization/synchronization-core-room",
+    "synchronization/synchronization-parse-ktor-room",
     "synchronization/synchronization-parse-room",
     "synchronization/synchronization-events",
     "synchronization/synchronization-remote",

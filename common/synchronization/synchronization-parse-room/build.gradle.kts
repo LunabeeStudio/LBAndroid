@@ -35,6 +35,8 @@ kotlin {
 
         commonMain.dependencies {
             api(libs.androidxRoomRuntime)
+
+            api(projects.synchronizationCoreRoom)
         }
 
         androidMain.dependencies {

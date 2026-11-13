@@ -74,7 +74,7 @@ Move folder → published coordinate changes.
 - **KMP iOS + JVM + macOS/Linux**: `migration-datastore`.
 - **KMP iOS + JVM**: `monitoring-core`, `monitoring-ktor`, `test-core`, `synchronization-core`, `synchronization-remote`, `parse-ktor`, `parse-ktor-test`.
 - **KMP iOS + Android + JVM**: `synchronization-core-datastore`.
-- **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,events}`.
+- **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,parse-ktor-room,events}`.
 - **Android library**: `core-android`, `extension-android`, `monitoring-okhttp`, `test-room`, `uifield-form`, every Compose module (`compose/*`, `core-compose`, `loading-{compose,hilt,koin}`).
 - **JVM (`java-library`)**: `material-color-utilities`, `presenter-annotations`, `presenter-ksp`, `presenter-hilt-ksp`, `presenter-koin-ksp`, `loading-checks`, `synchronization-checks`.
 
@@ -87,7 +87,7 @@ Layered, leaf-to-root:
 - `logger-kermit` ← `core`, `extension`, `ktor-kermit`, `compose:core`, `synchronization-events`, …
 - `core` ← `core-android` ← `core-compose` ← `loading-compose` ← `loading-{hilt,koin}`; `core` ← `loading-core`, `synchronization-core`.
 - `ktor-core` ← `ktor-json`, `monitoring-ktor`; `monitoring-core` ← every other `monitoring-*`.
-- `synchronization-core` ← all `synchronization-*` adapters + `synchronization-remote`; `synchronization-checks` → `lintPublish` of both cursor backends.
+- `synchronization-core` ← all `synchronization-*` adapters + `synchronization-remote`; `parse-ktor` + `synchronization-remote` + `synchronization-core-room` ← `synchronization-parse-ktor-room`; `synchronization-core-room` ← `synchronization-parse-room` (Room sync contract); `synchronization-checks` → `lintPublish` of both cursor backends.
 - `compose:core` ← `image` ← `uifield-*`.
 - `presenter-annotations` ← `presenter`, `presenter-ksp` ← `presenter-{hilt,koin}-ksp`; `presenter` ← `presenter-{hilt,koin}`. `presenter` depends on no Lunabee module beyond `presenter-annotations` (no `compose:core` / `image`).
 

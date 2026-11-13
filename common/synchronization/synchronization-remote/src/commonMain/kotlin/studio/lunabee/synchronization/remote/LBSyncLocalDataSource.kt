@@ -28,6 +28,9 @@ interface LBSyncLocalDataSource<T> : LBPullLocalDataSource<T> {
     /**
      * Records that [pushed] reached the backend, unless the object changed on the device since [pushed] was read
      * from [objectsToPush]. That later change stays to upload.
+     *
+     * @param serverId the backend id of [pushed], found on the backend or returned by its creation, or `null` when
+     * the backend gave none. Storing it lets the next upload of the object skip the lookup.
      */
-    suspend fun markPushed(pushed: T)
+    suspend fun markPushed(pushed: T, serverId: String?)
 }

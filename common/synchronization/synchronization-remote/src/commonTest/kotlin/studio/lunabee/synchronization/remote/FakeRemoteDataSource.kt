@@ -27,12 +27,14 @@ internal data class FetchCall(val cursor: String?, val updatedAfter: Instant?)
  * and recording every call in [calls].
  *
  * @param serverIds backend id of each item the backend already holds, by item id.
+ * @param createdServerIds backend id returned when creating an item, by item id.
  * @param failingCursor cursor whose fetch throws.
  * @param failingPushId item whose create or update throws.
  */
 internal class FakeRemoteDataSource(
     private val pages: List<LBRemotePage<Item>> = listOf(LBRemotePage(objects = emptyList(), maxUpdatedAt = null, nextCursor = null)),
     private val serverIds: Map<String, String> = emptyMap(),
+    private val createdServerIds: Map<String, String> = emptyMap(),
     private val failingCursor: String? = null,
     private val failingPushId: String? = null,
 ) : LBSyncRemoteDataSource<Item> {
@@ -54,9 +56,10 @@ internal class FakeRemoteDataSource(
         return serverIds[obj.id]
     }
 
-    override suspend fun create(obj: Item) {
+    override suspend fun create(obj: Item): String? {
         calls += "create ${obj.id}"
         if (obj.id == failingPushId) throw RemoteException(message = "create ${obj.id}")
+        return createdServerIds[obj.id]
     }
 
     override suspend fun update(serverId: String, obj: Item) {

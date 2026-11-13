@@ -16,6 +16,7 @@
 
 package studio.lunabee.synchronization.roomsyncmanager
 
+import androidx.room.Transaction
 import androidx.room.Upsert
 
 /**
@@ -29,15 +30,37 @@ import androidx.room.Upsert
  *
  * [notInSync] returns dirty rows **including** soft-deleted ones (a pending deletion must still be
  * pushed); the `WHERE lbDeleted = 0` filtering is the subclass's app-facing read queries, not here.
+ *
+ * [markInSync] with a server id is open: by default it marks the row in sync without storing the id, so each push of
+ * a row created on the backend looks it up again until a pull brings it back. Override it with a table-literal
+ * `@Query` that also sets `lbServerId` to skip that lookup.
  */
 abstract class LBRoomSyncDao<T : LBRoomSyncModel> {
 
     @Upsert
     abstract suspend fun upsert(rows: List<T>)
 
+    /**
+     * Upserts [rows] except those whose `lbLocalId` is in [notInSync], in one transaction: a local edit made
+     * meanwhile cannot be overwritten by a pulled row.
+     */
+    @Transaction
+    open suspend fun upsertExceptPending(rows: List<T>) {
+        val pending = notInSync().mapTo(mutableSetOf()) { it.lbLocalId }
+        val toUpsert = rows.filterNot { it.lbLocalId in pending }
+        if (toUpsert.isNotEmpty()) upsert(toUpsert)
+    }
+
     abstract suspend fun notInSync(): List<T>
 
     abstract suspend fun markInSync(localIds: List<String>)
+
+    /**
+     * Marks the row [localId] in sync and stores its backend [serverId]. Default: [markInSync] alone.
+     */
+    open suspend fun markInSync(localId: String, serverId: String) {
+        markInSync(listOf(localId))
+    }
 
     abstract suspend fun deleteAll()
 }

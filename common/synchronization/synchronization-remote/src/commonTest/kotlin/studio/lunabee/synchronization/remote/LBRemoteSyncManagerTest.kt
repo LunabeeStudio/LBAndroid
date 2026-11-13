@@ -44,6 +44,35 @@ class LBRemoteSyncManagerTest {
     }
 
     @Test
+    fun the_backend_id_returned_by_create_is_handed_to_mark_pushed() = runTest {
+        val remote = FakeRemoteDataSource(createdServerIds = mapOf("a" to "server-a"))
+        val local = FakeLocalDataSource(toPush = listOf(Item("a")))
+
+        LBSyncOperator.sync(manager = manager(remote = remote, local = local))
+
+        assertEquals(expected = mapOf<String, String?>("a" to "server-a"), actual = local.pushedServerIds)
+    }
+
+    @Test
+    fun a_create_without_backend_id_marks_pushed_without_server_id() = runTest {
+        val local = FakeLocalDataSource(toPush = listOf(Item("a")))
+
+        LBSyncOperator.sync(manager = manager(remote = FakeRemoteDataSource(), local = local))
+
+        assertEquals(expected = mapOf<String, String?>("a" to null), actual = local.pushedServerIds)
+    }
+
+    @Test
+    fun the_backend_id_found_by_the_lookup_is_handed_to_mark_pushed() = runTest {
+        val remote = FakeRemoteDataSource(serverIds = mapOf("a" to "server-a"))
+        val local = FakeLocalDataSource(toPush = listOf(Item("a")))
+
+        LBSyncOperator.sync(manager = manager(remote = remote, local = local))
+
+        assertEquals(expected = mapOf<String, String?>("a" to "server-a"), actual = local.pushedServerIds)
+    }
+
+    @Test
     fun an_object_known_to_the_backend_is_updated_by_its_backend_id() = runTest {
         val remote = FakeRemoteDataSource(serverIds = mapOf("a" to "server-a"))
 
