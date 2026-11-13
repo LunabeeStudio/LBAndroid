@@ -19,14 +19,16 @@ Ktor, Parse or Room dependency.
   download moves to the end and shifts the later ones back one slot, so an offset skips the one on the page
   boundary. The implementation maps the remote records to the local model `T`.
 - `LBSyncRemoteDataSource<T>` — adds the upload of one object: `findServerId(obj)` (e.g. by external id), then
-  `update(serverId, obj)` or `create(obj)`.
+  `update(serverId, obj)` or `create(obj)`, which returns the backend id of the created object (`null` when the backend
+  gives none).
 - `LBRemotePage<T>` — the page objects, the `nextCursor` of the following page (`null` on the last page), and a
   page-level `maxUpdatedAt` that also counts the records left out of `objects` (they still move the cursor, through
   `FetchPage.maxUpdatedAt`). `maxUpdatedAt` is the only source of the cursor, so a page holding objects must set it
   (the constructor throws otherwise).
 - `LBPullLocalDataSource<T>` / `LBSyncLocalDataSource<T>` — the local store: `savePulled` (a whole download in one
   call, leaving out the objects still to upload), `clear`, and for two-way managers `objectsToPush` and
-  `markPushed` (conditional: a change made during the upload stays to upload).
+  `markPushed(pushed, serverId)` (conditional: a change made during the upload stays to upload; `serverId` is the backend
+  id found by `findServerId` or returned by `create`, to store so the next upload skips the lookup).
 - `LBRemotePullSyncManager<T>` — download-only manager. Pages are buffered and saved once the last page is read, so a
   failure while paging writes nothing and the store can dedupe across pages; the cursor moves after that write, only
   when something came back. `supportIncrementalSync()` is `false`: a mid-paging checkpoint would save a cursor

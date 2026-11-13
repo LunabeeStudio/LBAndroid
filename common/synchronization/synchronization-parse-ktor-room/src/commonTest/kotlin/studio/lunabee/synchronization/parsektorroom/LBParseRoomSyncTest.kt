@@ -95,6 +95,41 @@ class LBParseRoomSyncTest {
     }
 
     @Test
+    fun a_posted_row_stores_the_returned_server_id_and_the_next_push_is_a_put_without_lookup() = runTest {
+        val server = server()
+        val dao = FakeRoomDao(rows = listOf(TestRow(lbLocalId = "a", name = "x")))
+
+        LBSyncOperator.sync(manager = manager(server, dao))
+
+        assertEquals("created", dao.rows.single().lbServerId)
+        dao.rows[0] = dao.rows[0].copy(lbInSync = false, name = "y")
+        val requestsBefore = server.requests.size
+        LBSyncOperator.sync(manager = manager(server, dao))
+
+        val secondPush = server.requests.drop(requestsBefore).filterNot { it.isPull() }
+        assertEquals(listOf(HttpMethod.Put), secondPush.map { it.method })
+        assertRequest(secondPush.single(), HttpMethod.Put, "classes/Item/created")
+    }
+
+    @Test
+    fun a_post_response_without_object_id_marks_the_row_in_sync_without_server_id() = runTest {
+        val server = FakeParseServer(
+            handler = { request ->
+                when {
+                    request.isPull() -> respondParse(resultsBody(IntRange.EMPTY))
+                    request.isLookup() -> respondParse("""{"results":[]}""")
+                    else -> respondParse("{}")
+                }
+            },
+        )
+        val dao = FakeRoomDao(rows = listOf(TestRow(lbLocalId = "a")))
+
+        LBSyncOperator.sync(manager = manager(server, dao))
+
+        assertEquals(TestRow(lbLocalId = "a", lbInSync = true), dao.rows.single())
+    }
+
+    @Test
     fun a_field_set_to_its_default_value_is_present_in_the_body() = runTest {
         val server = server()
         val dao = FakeRoomDao(rows = listOf(TestRow(lbLocalId = "a", lbServerId = "srv-a")))

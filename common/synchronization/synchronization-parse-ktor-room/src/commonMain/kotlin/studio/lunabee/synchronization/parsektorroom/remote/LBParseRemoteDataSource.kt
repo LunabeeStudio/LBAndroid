@@ -16,6 +16,7 @@
 
 package studio.lunabee.synchronization.parsektorroom.remote
 
+import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -71,9 +72,8 @@ internal class LBParseRemoteDataSource<D : ParseObject, R : LBRoomSyncModel>(
         ).firstOrNull()?.objectId
     }
 
-    override suspend fun create(obj: R) {
-        parse.httpClient.post("classes/$className") { setBody(body(obj)) }
-    }
+    override suspend fun create(obj: R): String? =
+        parse.httpClient.post("classes/$className") { setBody(body(obj)) }.body<Created>().objectId
 
     override suspend fun update(serverId: String, obj: R) {
         parse.httpClient.put("classes/$className/$serverId") { setBody(body(obj)) }
@@ -83,6 +83,9 @@ internal class LBParseRemoteDataSource<D : ParseObject, R : LBRoomSyncModel>(
         val encoded = PushJson.encodeToJsonElement(declaration.serializer, declaration.update(obj)).jsonObject
         return JsonObject(encoded.filterKeys { it !in ReservedKeys })
     }
+
+    @Serializable
+    private data class Created(val objectId: String? = null)
 
     @Serializable
     private data class ServerId(val objectId: String)

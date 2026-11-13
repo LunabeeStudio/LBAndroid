@@ -26,7 +26,7 @@ import kotlin.time.Instant
  * device.
  *
  * Objects are uploaded one by one, in [LBSyncLocalDataSource.objectsToPush] order: each one is looked up on the
- * backend ([LBSyncRemoteDataSource.findServerId]), then updated when found or created otherwise, then marked pushed
+ * backend ([LBSyncRemoteDataSource.findServerId]), then updated when found or created otherwise, then marked pushed with its backend id
  * ([LBSyncLocalDataSource.markPushed]). The first failure stops the upload and fails the run: the objects already
  * uploaded stay marked, the others stay to upload.
  *
@@ -73,13 +73,14 @@ class LBRemoteSyncManager<T>(
 
     override suspend fun pushObjectsToServer(objects: List<T>) {
         objects.forEach { obj ->
-            val serverId = remoteDataSource.findServerId(obj)
-            if (serverId == null) {
+            val foundServerId = remoteDataSource.findServerId(obj)
+            val serverId = if (foundServerId == null) {
                 remoteDataSource.create(obj)
             } else {
-                remoteDataSource.update(serverId = serverId, obj = obj)
+                remoteDataSource.update(serverId = foundServerId, obj = obj)
+                foundServerId
             }
-            localDataSource.markPushed(obj)
+            localDataSource.markPushed(pushed = obj, serverId = serverId)
         }
     }
 

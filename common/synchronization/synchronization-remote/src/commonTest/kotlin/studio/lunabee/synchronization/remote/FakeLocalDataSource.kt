@@ -24,6 +24,7 @@ internal class FakeLocalDataSource(
 ) : LBSyncLocalDataSource<Item> {
     val savedDownloads: MutableList<List<Item>> = mutableListOf()
     val pushed: MutableList<Item> = mutableListOf()
+    val pushedServerIds: MutableMap<String, String?> = mutableMapOf()
     var clearCount: Int = 0
         private set
 
@@ -37,7 +38,8 @@ internal class FakeLocalDataSource(
 
     override suspend fun objectsToPush(): List<Item> = toPush - pushed.toSet()
 
-    override suspend fun markPushed(pushed: Item) {
+    override suspend fun markPushed(pushed: Item, serverId: String?) {
         this.pushed += pushed
+        pushedServerIds[pushed.id] = serverId
     }
 }

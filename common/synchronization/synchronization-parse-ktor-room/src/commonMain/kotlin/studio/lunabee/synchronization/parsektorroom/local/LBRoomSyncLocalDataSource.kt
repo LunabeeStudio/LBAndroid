@@ -37,8 +37,12 @@ internal class LBRoomSyncLocalDataSource<R : LBRoomSyncModel>(
      * Marks the row in sync unconditionally. Known gap: an edit made while the row was uploading is marked in sync
      * too, and is pushed with the next edit of the row.
      */
-    override suspend fun markPushed(pushed: R) {
-        dao.markInSync(listOf(pushed.lbLocalId))
+    override suspend fun markPushed(pushed: R, serverId: String?) {
+        if (serverId == null) {
+            dao.markInSync(listOf(pushed.lbLocalId))
+        } else {
+            dao.markInSync(localId = pushed.lbLocalId, serverId = serverId)
+        }
     }
 
     override suspend fun clear() {

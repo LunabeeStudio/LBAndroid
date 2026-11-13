@@ -33,15 +33,16 @@ BaseDao `@Upsert` trick, why no KSP lives there, the `api`-vs-`implementation` l
 duplicate it here — read it before touching that module.
 
 `:synchronization-remote` is the backend-agnostic counterpart (commonMain only, no Ktor/Parse/Room): the consumer
-implements a remote data source (keyset-paged pull since a cursor, find-by-id then create or update) and a local data
-source (whole-download write, conditional mark-pushed), and gets the final `LBRemotePullSyncManager` /
+implements a remote data source (keyset-paged pull since a cursor, find-by-id then create or update, `create` returning
+the backend id) and a local data source (whole-download write, conditional mark-pushed receiving the backend id), and gets the final `LBRemotePullSyncManager` /
 `LBRemoteSyncManager` (both extend `LBSyncManager` directly and share the download buffering through the internal
 `RemotePullBuffer`). Its `README.md` documents the contract.
 
 `:synchronization-parse-ktor-room` supersedes `:synchronization-parse-room` for KMP: a consumer declares each Parse
 class with `LBParseRoomClass<D : ParseObject, R : LBRoomSyncModel>` and gets `pullManager` / `syncManager` built on
 `:synchronization-remote` and `parse-ktor` (keyset paging, never `skip`; a lookup by `localIdKey` before each push
-without server id; soft delete only, never a `DELETE`). Its `README.md` documents the declaration.
+without server id, skipped once the DAO overrides `markInSync(localId, serverId)` to store the id returned by the
+`POST`; soft delete only, never a `DELETE`). Its `README.md` documents the declaration.
 `LBRoomSyncModel` and `LBRoomSyncDao` now live in `:synchronization-core-room` (same package and FQN);
 `:synchronization-parse-room` exposes it as `api`.
 

@@ -49,6 +49,9 @@ abstract class CoachDao : LBRoomSyncDao<CoachEntity>() {
     @Query("UPDATE CoachEntity SET lbInSync = 1 WHERE lbLocalId IN (:localIds)")
     abstract override suspend fun markInSync(localIds: List<String>)
 
+    @Query("UPDATE CoachEntity SET lbInSync = 1, lbServerId = :serverId WHERE lbLocalId = :localId")
+    abstract override suspend fun markInSync(localId: String, serverId: String)
+
     @Query("DELETE FROM CoachEntity")
     abstract override suspend fun deleteAll()
 }
@@ -98,9 +101,12 @@ skipped.
 
 - `localIdKey` is the Parse column storing the local id. `update` must write it. A row without `lbServerId` is first
   looked up with `GET classes/<C>` on `where {<localIdKey>: lbLocalId}` and `limit 1`: when found it is sent as `PUT`
-  to that `objectId`, otherwise as `POST`. The lookup prevents a duplicate when a row is pushed twice before it is
+  to that `objectId`, otherwise as `POST`, whose response `objectId` is handed back to be stored. The lookup prevents a duplicate when a row is pushed twice before it is
   pulled back, or when a create succeeded but its response was lost. A row with `lbServerId` is sent as `PUT` with no
   lookup.
+- To store the `objectId` after a `POST` or a lookup, override `markInSync(localId, serverId)` in the DAO with a
+  `@Query` that sets `lbServerId` and `lbInSync = 1` (see the DAO above). Left as is, the row is marked in sync
+  without its server id and each push costs one lookup `GET` until a pull brings the row back.
 - The body is the JSON of `update(row)` without the reserved `objectId`, `createdAt` and `updatedAt`. Fields equal to
   their default value and `null` fields are sent, so a field can be reset or cleared.
 - Soft delete only: `update` maps `lbDeleted` to the app's own Parse field, and a deleted row is pushed as any other.
@@ -111,7 +117,8 @@ skipped.
 ## Local edits
 
 - A pulled row whose `lbLocalId` is currently in `notInSync()` is not written, so a pull never overwrites a local edit
-  not pushed yet. The other rows of the same pull are.
+  not pushed yet. The other rows of the same pull are. The check and the write run in one transaction
+  (`upsertExceptPending`), so an edit made meanwhile is not lost.
 - Known gap: after a push, the row is marked in sync unconditionally (`markInSync(listOf(lbLocalId))`). An edit made
   while the row was uploading is marked in sync too, and is pushed with the next edit of the row.
 

@@ -34,6 +34,11 @@ bom 4.19.0
   package and FQN. `synchronization-parse-room` now exposes `synchronization-core-room` as `api`
 - `synchronization-core-room` exposes the Room runtime as `api`
 - `bom`: constraint for `synchronization-parse-ktor-room`
+- **break:** `synchronization-remote`: `LBSyncRemoteDataSource.create` returns the backend id (`String?`) and
+  `LBSyncLocalDataSource.markPushed` takes it as `serverId: String?`, so a push can store it and skip the lookup on the
+  next one. Implementers must adapt
+- `LBRoomSyncDao`: `upsertExceptPending` (pull write in one transaction, so a local edit made meanwhile is not lost) and
+  an open `markInSync(localId, serverId)` that DAOs override to store the backend id
 
 ## 2026-10-26
 

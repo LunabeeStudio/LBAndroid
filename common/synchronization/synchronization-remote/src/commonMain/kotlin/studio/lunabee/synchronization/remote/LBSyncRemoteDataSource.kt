@@ -27,8 +27,12 @@ interface LBSyncRemoteDataSource<T> : LBPullRemoteDataSource<T> {
      */
     suspend fun findServerId(obj: T): String?
 
-    /** Creates [obj] on the backend. */
-    suspend fun create(obj: T)
+    /**
+     * Creates [obj] on the backend.
+     *
+     * @return the backend id of the created object, or `null` when the backend does not return one.
+     */
+    suspend fun create(obj: T): String?
 
     /** Overwrites the backend object [serverId] with [obj]. */
     suspend fun update(serverId: String, obj: T)
