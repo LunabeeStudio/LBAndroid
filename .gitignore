@@ -105,5 +105,5 @@ lint/tmp/
 *.xcuserdatad
 
 # whackagent run reports
-.whackagent/reports/*
-!.whackagent/reports/.gitkeep
+.lunabee/agents/reports/*
+!.lunabee/agents/reports/.gitkeep

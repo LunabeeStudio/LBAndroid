@@ -14,11 +14,11 @@ paths:                         # WHERE whackagent keep each file kind. Skills re
                                # Team share folder → point at committed, human-browsable one —
                                # `docs/wiki` read on GitHub, `.whackagent/wiki` no.
                                # Missing key → default below, old config still work.
-  backlog: .whackagent/BACKLOG.md
+  backlog: .lunabee/agents/BACKLOG.md
   tasks: .whackagent/tasks
-  wiki: .whackagent/wiki
-  reports: .whackagent/reports          # run reports — local, gitignored by /wa-setup
-  conventions: .whackagent/conventions  # convention modules copied here by /wa-setup
+  wiki: .lunabee/agents/wiki
+  reports: .lunabee/agents/reports          # run reports — local, gitignored by /wa-setup
+  conventions: .lunabee/agents/conventions  # convention modules copied here by /wa-setup
   worktrees: ../LBAndroid-worktrees  # task worktrees (branch.worktree, /wa-autopilot). <repo> = repo
                                # folder name. Resolve from MAIN checkout root, even when setup run
                                # from worktree — keep relative. MUST sit OUTSIDE repo: nested
