@@ -1,6 +1,6 @@
 # Kotlin — Architecture (global)
 
-> whackagent convention module · lens: **structure**. Platform-agnostic principles; the kind module (`architecture-app.md` / `architecture-package.md`) carries layers + file tree.
+> Convention module · lens: **structure**. Platform-agnostic principles; the kind module (`architecture-app.md` / `architecture-package.md`) carries layers + file tree.
 
 Architecture here = how feature **decomposed, made testable, kept modular** — not how code reads (that elegance module).
 

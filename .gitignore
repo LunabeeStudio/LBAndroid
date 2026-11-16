@@ -104,6 +104,6 @@ lint/tmp/
 # iOS
 *.xcuserdatad
 
-# whackagent run reports
+# agents run reports
 .lunabee/agents/reports/*
 !.lunabee/agents/reports/.gitkeep

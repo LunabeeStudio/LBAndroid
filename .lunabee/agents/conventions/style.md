@@ -1,6 +1,6 @@
 # Kotlin — Coding style
 
-> whackagent convention module · lens: **style**. `wa-implementer` obeys it too. Base: official Kotlin coding conventions.
+> Convention module · lens: **style**. The implementer obeys it too. Base: official Kotlin coding conventions.
 
 ## One top-level class per file
 

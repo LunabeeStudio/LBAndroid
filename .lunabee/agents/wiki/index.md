@@ -1,6 +1,6 @@
 # Wiki — Index
 
-Living knowledge base for project. Pages link to each other + tasks via `[[wikilink]]` syntax (Obsidian-compatible). Keep current via `/wa-wiki`.
+Living knowledge base for project. Pages link to each other + tasks via `[[wikilink]]` syntax (Obsidian-compatible). Keep current via wiki step.
 
 ## Pages
 
