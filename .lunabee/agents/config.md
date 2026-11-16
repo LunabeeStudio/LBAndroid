@@ -74,7 +74,8 @@ review:
                                # false → every change go through implementer, whatever size.
   autofix: true                # wa-code verify phase re-dispatch implementer until clean
   public_doc: true             # require doc on public API — flip false per company
-  modules: [style.md, elegance.md, testing.md, architecture-global.md, architecture-package.md, compose.md]        # what single verifier load before judging. Setup write
+  modules: [skill:lunabee-android:android-development, style.md, elegance.md, testing.md, architecture-global.md, architecture-package.md, compose.md]
+                               # what single verifier load before judging. Setup write
                                # only relevant ones: UI module (swiftui.md, compose.md)
                                # only if project use that toolkit,
                                # architecture-package.md for non-app kinds, single <lang>.md for
@@ -95,6 +96,25 @@ review:
                                # opt into: `focus` below.
                                # Legacy `categories: {conventions: [...], correctness: []}` read as
                                # union of its lists.
+  focus:
+    - name: concurrency
+      modules: [skill:lunabee-android:kotlin-concurrency-review]
+      when: 'suspend|Flow\b|Channel\b|\blaunch|\basync\b|Deferred|CoroutineScope|Dispatchers|withContext|flowOn|Mutex|Semaphore|stateIn|shareIn|collect|runBlocking|runInterruptible|runCatching|withTimeout|GlobalScope|launchWhen|LaunchedEffect|rememberCoroutineScope|produceState|snapshotFlow|runTest'
+    - name: recomposition
+      modules: [skill:lunabee-android:compose-recomposition-review]
+      when: '@Composable|UiState|Presenter|Reducer|Mapper|remember|derivedStateOf|computedStateOf|Lazy(Column|Row|Vertical|Horizontal)|CompositionLocal|@Stable|@Immutable|onSizeChanged|onGloballyPositioned'
+                               # FOCUSED verifiers — topic the single verifier keep missing
+                               # (concurrency, recomposition…): long rulebook dilute attention.
+                               # Each entry = one more verifier, own context, that topic only,
+                               # its own modules only, spawned beside main one ONLY when `when`
+                               # regex match diff's changed lines or file paths. Main one then
+                               # leave topic to it. ~50k tokens per spawn — list only topics
+                               # worth it. Entry:
+                               #   - name: concurrency      # topic = finding tag
+                               #     modules: [skill:lunabee-android:kotlin-concurrency-review]
+                               #     when: 'suspend |Flow\b|launch|Dispatchers|Mutex'
+                               # `modules` resolve like `modules` above (reference/paths.md).
+                               # [] → single verifier, as before.
 
 build:                         # how THIS project build — project win over plugin default
   command: ""                  # e.g. "make build", "./scripts/build.sh", "./gradlew assembleDebug".
@@ -176,6 +196,14 @@ branch:
   checkout_next: true          # after close step commit, hop onto next task branch (worktree mode:
                                #   create its worktree)
                                # (only when per_task AND commit.auto_commit_after_validation)
+  test_branch: false           # with per_task: ≥2 coded tasks waiting your test on one base
+                               #   (sprint branch or trunk) → merged into LOCAL throwaway branch
+                               #   lb-test/<base> (worktree mode: own worktree; else checked out at end
+                               #   of attended round, clean tree only), so you test them
+                               #   in one launch. Rebuilt after each delivery. Never pushed, never
+                               #   landed; conflicting task skipped. Rules: reference/test-branch.md.
+                               #   false or missing → no test branch, test each task branch.
+                               #   per_task off → ignored (setup writes false then).
 
 close:                         # WHERE work land when close step finish a task. Task in a sprint
                                # always merge into its sprint branch first — this block say what
