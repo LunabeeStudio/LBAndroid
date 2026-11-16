@@ -1,6 +1,6 @@
 # Kotlin — Elegance (idiomatic Kotlin)
 
-> whackagent convention module · lens: **elegance**. The "real Kotlin, not Java written in Kotlin" gate.
+> Convention module · lens: **elegance**. The "real Kotlin, not Java written in Kotlin" gate.
 
 ## Code speaks for itself
 

@@ -1,6 +1,6 @@
 # Kotlin — Compose
 
-> whackagent convention module · lens: **style**. Only present when the project actually uses Jetpack Compose or Compose Multiplatform.
+> Convention module · lens: **style**. Only present when the project actually uses Jetpack Compose or Compose Multiplatform.
 
 ## Stateless screen, stateful route
 
@@ -44,7 +44,7 @@ Order: required params, then `modifier: Modifier = Modifier` as **first optional
 
 ## Test tags (targetable UI)
 
-Every **interactive** or **asserted** element carries a stable `Modifier.testTag(...)` (plus `testTagsAsResourceId` at root when UI Automator / runtime tooling needs resource IDs). `wa-implementer` drives the built app by the UI tree; without tags it falls back to raw coordinates — brittle, breaks on layout change. Missing tag on an interactive element = style finding.
+Every **interactive** or **asserted** element carries a stable `Modifier.testTag(...)` (plus `testTagsAsResourceId` at root when UI Automator / runtime tooling needs resource IDs). The implementer drives the built app by the UI tree; without tags it falls back to raw coordinates — brittle, breaks on layout change. Missing tag on an interactive element = style finding.
 
 Rules:
 - Tag **stable and semantic**, not positional: `"login.submitButton"`, not `"button2"`. Namespace by screen/feature.

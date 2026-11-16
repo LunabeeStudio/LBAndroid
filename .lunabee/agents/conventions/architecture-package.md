@@ -1,6 +1,6 @@
 # Kotlin — Architecture (package / non-app)
 
-> whackagent convention module · lens: **structure**. JVM server / library / CLI: module + package rules. Pair with `architecture-global.md` (platform-agnostic principles). Freer than app — not free-for-all.
+> Convention module · lens: **structure**. JVM server / library / CLI: module + package rules. Pair with `architecture-global.md` (platform-agnostic principles). Freer than app — not free-for-all.
 
 No UI-layer mandate here (app-only). Surviving discipline:
 
@@ -45,4 +45,4 @@ src/test/kotlin/<package>/        # mirrors src/main/kotlin/
 - `public` intentional and minimal; internals `internal`.
 - Tests mirror source structure.
 
-> **Project override.** This default for non-app Kotlin. If repo has own structural rules, edit this file in project's conventions dir (`paths.conventions`, default `.whackagent/conventions/`) to match — reviewer read project copy.
+> **Project override.** This default for non-app Kotlin. If repo has own structural rules, edit this file in project's conventions dir (`paths.conventions`, default `.lunabee/agents/conventions/`) to match — reviewer read project copy.
