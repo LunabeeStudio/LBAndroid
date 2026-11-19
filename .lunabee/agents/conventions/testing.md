@@ -37,6 +37,7 @@ class UserRepositoryTest {
 - Hand-written fakes implementing the interface (`FakeUserRepository`) — in-memory, observable state, deterministic.
 - Mock libraries (MockK, Mockito) only at true external boundaries you can't fake cheaply, or when project already standardizes on them.
 - Reused fakes live in shared test fixtures (`testFixtures`, `:core:testing` module) — not copy-pasted per test.
+- Test doubles (fakes, in-memory stores, fixtures) never ship in a published module's main source set, not even as a convenience for consumers — test sources or an unpublished test-fixtures module only.
 
 ## Model fakes
 
