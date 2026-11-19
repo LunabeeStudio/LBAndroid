@@ -23,7 +23,7 @@ import kotlin.time.Instant
 
 class LBFeedbackAttachmentTest {
     @Test
-    fun screenshotName_is_utc_and_filename_safe() {
+    fun screenshotNameIsUtcAndFileNameSafe() {
         val clock = object : Clock {
             override fun now(): Instant = Instant.parse("2026-11-19T13:47:39.123456Z")
         }
@@ -32,7 +32,7 @@ class LBFeedbackAttachmentTest {
     }
 
     @Test
-    fun screenshotName_without_fraction() {
+    fun screenshotNameWithoutFraction() {
         val clock = object : Clock {
             override fun now(): Instant = Instant.parse("2026-01-02T03:04:05Z")
         }

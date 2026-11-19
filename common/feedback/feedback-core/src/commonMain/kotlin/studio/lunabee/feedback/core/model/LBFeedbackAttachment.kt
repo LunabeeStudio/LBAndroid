@@ -16,7 +16,22 @@
 
 package studio.lunabee.feedback.core.model
 
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format
+import kotlinx.datetime.format.char
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+
+private val ScreenshotTimeFormat = LocalDateTime.Format {
+    year()
+    monthNumber()
+    day()
+    char('-')
+    hour()
+    minute()
+    second()
+}
 
 /**
  * File sent with a feedback, held in memory only. It reaches the remote queue as it is: it must never carry user data.
@@ -38,7 +53,7 @@ class LBFeedbackAttachment(
          * File name of a screenshot taken at the time of [clock], like `screenshot-20261119-134739.jpg` (UTC).
          */
         fun screenshotName(clock: Clock = Clock.System): String {
-            val stamp = clock.now().toString().substringBefore('.').removeSuffix("Z").replace("-", "").replace(":", "").replace('T', '-')
+            val stamp = clock.now().toLocalDateTime(TimeZone.UTC).format(ScreenshotTimeFormat)
             return "screenshot-$stamp.jpg"
         }
     }
