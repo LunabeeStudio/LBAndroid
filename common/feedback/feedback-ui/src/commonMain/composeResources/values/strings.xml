@@ -1,0 +1,60 @@
+<!--
+  ~ Copyright (c) 2026 Lunabee Studio
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~   http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<resources>
+    <string name="feedback_form_title">Send feedback</string>
+    <string name="feedback_form_edit_title">Edit feedback</string>
+    <string name="feedback_list_title">My feedback</string>
+    <string name="feedback_back">Back</string>
+    <string name="feedback_type_bug">Bug</string>
+    <string name="feedback_type_idea">Idea</string>
+    <string name="feedback_type_other">Other</string>
+    <string name="feedback_field_title">Title</string>
+    <string name="feedback_field_body">Description</string>
+    <string name="feedback_field_reporter">Your name (optional)</string>
+    <string name="feedback_attach_screenshot">Attach screenshot</string>
+    <string name="feedback_pick_gallery">Pick from gallery</string>
+    <string name="feedback_attachments">Attachments</string>
+    <string name="feedback_screenshot_preview">Screenshot preview</string>
+    <string name="feedback_screenshot_redact">Redact</string>
+    <string name="feedback_screenshot_remove">Remove</string>
+    <string name="feedback_send">Send</string>
+    <string name="feedback_save">Save</string>
+    <string name="feedback_sending">Sending…</string>
+    <string name="feedback_retry">Retry</string>
+    <string name="feedback_retry_attachments">Retry attachments</string>
+    <string name="feedback_close">Close</string>
+    <string name="feedback_attachments_failed">Your feedback was sent, but some attachments could not be uploaded.</string>
+    <string name="feedback_error_unauthorized">Access refused. The feedback token is invalid or expired.</string>
+    <string name="feedback_error_rate_limited">Too many requests. Try again in a minute.</string>
+    <string name="feedback_error_network">Network error. Check your connection and try again.</string>
+    <string name="feedback_error_too_large">A file is too large to upload (5 MB maximum).</string>
+    <string name="feedback_error_server">The server failed to handle the request.</string>
+    <string name="feedback_error_attachment_rejected">A file was refused by the server, its type may not be accepted.</string>
+    <string name="feedback_error_not_editable">This feedback was already handled and can no longer be changed.</string>
+    <string name="feedback_error_not_found">This feedback no longer exists.</string>
+    <string name="feedback_list_empty">You have not sent any feedback yet.</string>
+    <string name="feedback_list_edit">Edit</string>
+    <string name="feedback_list_delete">Delete</string>
+    <string name="feedback_status_pending">Pending</string>
+    <string name="feedback_status_declined">Declined</string>
+    <string name="feedback_status_snoozed">Snoozed</string>
+    <string name="feedback_status_accepted">Accepted</string>
+    <string name="feedback_status_duplicate">Duplicate</string>
+    <string name="feedback_redact_title">Redact screenshot</string>
+    <string name="feedback_redact_hint">Drag to cover sensitive areas with black boxes.</string>
+    <string name="feedback_redact_undo">Undo</string>
+    <string name="feedback_redact_done">Done</string>
+</resources>
