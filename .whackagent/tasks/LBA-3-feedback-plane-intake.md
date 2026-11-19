@@ -1,6 +1,6 @@
 ---
 issue: LBA-3
-phase: review
+phase: validated
 type: feature
 wiki: [feedback, architecture, build-and-publishing]
 note: First consumer oneSafe 6 devBeta (separate PR in oneSafe6).
@@ -310,3 +310,10 @@ correctness ✓ · focus recomposition ✓ · concurrency not spawned (no corout
   `implementation` in feedback-core); V3 snake_case test names → camelCase.
 - Re-verify: clean. Withdrawn 0 · disputed 0 · open 0 → **verdict clean**. Autofix touched code after the user's test:
   `LBFeedbackFormScreen.kt`, `LBFeedbackAttachment.kt`, `feedback-core/build.gradle.kts`.
+
+### validation — 2026-11-19 (after feedback round 4)
+
+Scope: delta `ee29beb..HEAD` = one `inline` hunk (`demo-compose/src/main/AndroidManifest.xml`, `POST_NOTIFICATIONS`),
+judged as written without convention pass. Lenses: main style ✓ elegance ✓ structure ✓ correctness ✓. Focused
+verifiers: no `when` match. Tools: detekt clean. Library keeps leaving the permission to the app (manifest, KDoc,
+README agree); demo request flow now works on API 33+. Findings 0 → **verdict clean**, autofix changed nothing.
