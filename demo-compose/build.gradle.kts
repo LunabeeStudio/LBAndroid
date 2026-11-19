@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id(libs.plugins.composePlugin.get().pluginId)
@@ -24,6 +26,13 @@ plugins {
 }
 
 private val moduleNamespace: String = "studio.lunabee.compose"
+
+private val localProperties: Properties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+}
+
+private fun feedbackProperty(name: String): String =
+    providers.gradleProperty(name).orNull ?: localProperties.getProperty(name).orEmpty()
 
 android {
     namespace = moduleNamespace
@@ -39,6 +48,15 @@ android {
 
         versionCode = System.getenv(EnvConfig.EnvVersionCode)?.toInt() ?: AndroidConfig.VersionCode
         versionName = System.getenv(EnvConfig.EnvVersionName) ?: AndroidConfig.VersionName
+
+        buildConfigField("String", "FEEDBACK_PLANE_TOKEN", "\"${feedbackProperty("feedback.plane.token")}\"")
+        buildConfigField("String", "FEEDBACK_PLANE_BASE_URL", "\"${feedbackProperty("feedback.plane.baseUrl")}\"")
+        buildConfigField("String", "FEEDBACK_PLANE_WORKSPACE", "\"${feedbackProperty("feedback.plane.workspace")}\"")
+        buildConfigField("String", "FEEDBACK_PLANE_PROJECT_ID", "\"${feedbackProperty("feedback.plane.projectId")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -137,6 +155,8 @@ dependencies {
     implementation(projects.compose.uifieldCountrypicker)
     implementation(projects.compose.uifieldPhonepicker)
     implementation(projects.coreAndroid)
+    implementation(projects.feedbackPlane)
+    implementation(projects.feedbackUi)
     implementation(projects.ktorCore)
     implementation(projects.ktorJson)
     implementation(projects.ktorKermit)

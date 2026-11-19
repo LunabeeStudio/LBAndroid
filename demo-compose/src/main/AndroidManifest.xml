@@ -43,6 +43,10 @@
             android:name=".demo.monitoring.NetworkLogActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".demo.feedback.FlagSecureActivity"
+            android:exported="false" />
+
         <!-- Widget declaration -->
         <receiver
             android:name=".demo.glance.GlanceWidgetDemoReceiver"

@@ -80,4 +80,8 @@ class Directions(navController: NavHostController) {
     val navigateToSynchronization: ToDirection = {
         navController.navigate(route = Destinations.SynchronizationRoute)
     }
+
+    val navigateToFeedback: ToDirection = {
+        navController.navigate(route = Destinations.FeedbackRoute)
+    }
 }

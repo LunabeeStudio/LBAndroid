@@ -88,6 +88,11 @@ fun MainScreen(
                 subtitle = LbcTextSpec.Raw("Sync a local DB with a fake remote server"),
                 direction = directions.navigateToSynchronization,
             ),
+            MenuDescription(
+                title = LbcTextSpec.Raw("Feedback"),
+                subtitle = LbcTextSpec.Raw("In-app feedback sent to a fake or Plane intake"),
+                direction = directions.navigateToFeedback,
+            ),
         ),
     )
 }
