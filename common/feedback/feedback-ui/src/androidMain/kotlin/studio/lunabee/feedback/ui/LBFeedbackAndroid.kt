@@ -26,6 +26,7 @@ import studio.lunabee.feedback.core.capture.LBFeedbackScreenCapture
 import studio.lunabee.feedback.core.config.LBFeedbackConfig
 import studio.lunabee.feedback.core.store.LBFeedbackStore
 import studio.lunabee.feedback.core.transport.LBFeedbackTransport
+import studio.lunabee.feedback.ui.theme.LBFeedbackTheme
 
 /**
  * Same as [LBFeedback.install], and also tracks the resumed activity so [open] can capture it. Call it once, from
@@ -36,7 +37,7 @@ fun LBFeedback.install(
     config: LBFeedbackConfig,
     transport: LBFeedbackTransport,
     store: LBFeedbackStore,
-    themeWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
+    themeWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { LBFeedbackTheme(it) },
 ) {
     install(config = config, transport = transport, store = store, themeWrapper = themeWrapper)
     LBFeedbackScreenCapture.install(application)

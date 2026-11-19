@@ -48,7 +48,7 @@ class App : Application() {
                 httpClient = HttpClient(Android),
             ),
             store = lbFeedbackStore(),
-            themeWrapper = { content -> MyAppTheme(content) }, // optional, applied in LBFeedbackActivity
+            themeWrapper = { content -> MyAppTheme(content) }, // optional, replaces LBFeedbackTheme in LBFeedbackActivity
         )
     }
 }
@@ -117,6 +117,14 @@ present(controller, animated: true)
 The controller is modal in presentation: a swipe down does not dismiss it, so a feedback being sent is never cut off. Dismiss it in `onClose`.
 
 iOS v1 has no gallery picker, shake trigger or notification.
+
+## Theming
+
+The screens read `MaterialTheme`, so they follow your app when you embed them. The ones the library hosts itself
+(`LBFeedbackActivity`, `LBFeedbackController`) use `LBFeedbackTheme` by default: Material 3 light or dark colors following
+the system mode. On Android the activity is edge-to-edge with auto light or dark system bar icons, and its window
+background matches the mode before Compose draws. Pass a `themeWrapper` to `LBFeedback.install` to use your own theme
+instead.
 
 ## Headless API
 

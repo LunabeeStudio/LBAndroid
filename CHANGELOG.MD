@@ -31,7 +31,8 @@ bom 4.20.0
   `LBFeedbackError.AttachmentRejected`. No HTTP engine is bundled
 - New `feedback-ui` (Android + iOS, Compose Multiplatform): `LBFeedback.install`, form, "My feedback" list and screenshot
   redact screens (EN and FR). Android: `LBFeedbackActivity` (`FLAG_SECURE`), `LBFeedback.open`, screen capture, photo
-  picker, opt-in `LBFeedbackNotification` and `LBFeedbackShakeTrigger`. iOS: `LBFeedbackController`
+  picker, opt-in `LBFeedbackNotification` and `LBFeedbackShakeTrigger`. iOS: `LBFeedbackController`. Screens hosted by the
+  library follow the system dark mode with `LBFeedbackTheme`, unless the app passes its own `themeWrapper`
   - `LBFeedback.addAttachment` / `removeAttachment` / `clearAttachments` attach any file, listed in the form with a remove
     action. `LBFeedback.client` exposes the headless API. Image decoding, encoding and redaction run off the main thread
     (`setScreenshot` is `suspend`)

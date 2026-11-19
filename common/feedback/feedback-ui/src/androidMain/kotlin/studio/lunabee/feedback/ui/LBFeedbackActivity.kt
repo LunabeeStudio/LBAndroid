@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import studio.lunabee.feedback.core.capture.LBFeedbackCaptureExcluded
 
 /**
@@ -33,6 +34,7 @@ import studio.lunabee.feedback.core.capture.LBFeedbackCaptureExcluded
 class LBFeedbackActivity : ComponentActivity(), LBFeedbackCaptureExcluded {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         if (savedInstanceState == null && intent.getBooleanExtra(ExtraCapture, false)) {
             captureResumedActivity()

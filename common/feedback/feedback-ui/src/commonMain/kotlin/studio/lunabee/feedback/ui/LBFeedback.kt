@@ -24,6 +24,7 @@ import studio.lunabee.feedback.core.config.LBFeedbackConfig
 import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 import studio.lunabee.feedback.core.store.LBFeedbackStore
 import studio.lunabee.feedback.core.transport.LBFeedbackTransport
+import studio.lunabee.feedback.ui.theme.LBFeedbackTheme
 
 /**
  * Entry point of the in-app feedback library. Call [install] once at app start, before showing any feedback screen.
@@ -40,7 +41,7 @@ object LBFeedback {
         get() = graph().client
 
     /**
-     * Wires the library, screens inherit the surrounding `MaterialTheme`.
+     * Wires the library. Screens hosted by the library use [LBFeedbackTheme], light or dark with the system.
      *
      * @param config app version, build variant and metadata extras
      * @param transport where feedback is sent, for example the Plane transport of `feedback-plane`
@@ -51,7 +52,7 @@ object LBFeedback {
         transport: LBFeedbackTransport,
         store: LBFeedbackStore,
     ) {
-        install(config = config, transport = transport, store = store, themeWrapper = { it() })
+        install(config = config, transport = transport, store = store, themeWrapper = { LBFeedbackTheme(it) })
     }
 
     /**
@@ -60,7 +61,7 @@ object LBFeedback {
      * @param config app version, build variant and metadata extras
      * @param transport where feedback is sent, for example the Plane transport of `feedback-plane`
      * @param store local memory of sent items, see `lbFeedbackStore` of each platform
-     * @param themeWrapper wraps the content of screens hosted by the library, to apply the app theme
+     * @param themeWrapper wraps the content of screens hosted by the library, to apply the app theme instead of [LBFeedbackTheme]
      */
     fun install(
         config: LBFeedbackConfig,

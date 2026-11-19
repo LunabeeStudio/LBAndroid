@@ -20,6 +20,7 @@
         <activity
             android:name="studio.lunabee.feedback.ui.LBFeedbackActivity"
             android:exported="false"
+            android:theme="@style/Theme.LBFeedback"
             android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
