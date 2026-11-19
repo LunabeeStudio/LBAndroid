@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-19
+
+```
+Feedback Core 1.0.0
+Feedback Plane 1.0.0
+Feedback UI 1.0.0
+bom 4.20.0
+```
+
+- New `feedback-core` (Android + iOS): models (`LBFeedbackDraft`, `LBFeedbackItem`, `LBFeedbackStatus`,
+  `LBFeedbackMetadata`), `LBFeedbackConfig`, the `LBFeedbackTransport` contract with `LBFeedbackError`, and
+  `LBFeedbackStore`, a DataStore memory of the sent items and of the reporter name (`Context.lbFeedbackStore()` on Android,
+  `lbFeedbackStore()` on iOS). `LBFeedbackMetadataProvider` collects device, OS, locale, app and library info
+  - `LBFeedbackClient`: headless API for apps with their own UI (send with attachments, retry failed attachments, sent
+    items with live status, edit, delete, reporter name). `LBFeedbackDraft.attachments` takes any files, each under 5 MB.
+    Editing or deleting a triaged item fails with `LBFeedbackError.NotEditable`
+  - `LBFeedbackScreenCapture.capture()` returns a capture of the screen as a JPEG attachment (Android and iOS), without
+    Compose. `LBFeedbackMetadataProvider` is a `fun interface`, `LBFeedbackDefaultMetadataProvider` the standard one,
+    `InMemoryLBFeedbackStore` a store for tests and previews. `LBFeedbackStore.update` takes a transform applied
+    atomically. The iOS store lives in the application support directory
+- New `feedback-plane` (Android + iOS): `LBPlaneFeedbackTransport` sends feedback to the Intake queue of a Plane project
+  (create, status, edit, delete, 3-step screenshot upload), maps HTTP and network failures to `LBFeedbackError`, and builds
+  the escaped `description_html`. Each attachment is one Plane upload, a refused file type gives
+  `LBFeedbackError.AttachmentRejected`. No HTTP engine is bundled
+- New `feedback-ui` (Android + iOS, Compose Multiplatform): `LBFeedback.install`, form, "My feedback" list and screenshot
+  redact screens (EN and FR). Android: `LBFeedbackActivity` (`FLAG_SECURE`), `LBFeedback.open`, screen capture, photo
+  picker, opt-in `LBFeedbackNotification` and `LBFeedbackShakeTrigger`. iOS: `LBFeedbackController`
+  - `LBFeedback.addAttachment` / `removeAttachment` / `clearAttachments` attach any file, listed in the form with a remove
+    action. `LBFeedback.client` exposes the headless API. Image decoding, encoding and redaction run off the main thread
+    (`setScreenshot` is `suspend`)
+- `bom`: constraints for `feedback-core`, `feedback-plane` and `feedback-ui`
+
 ## 2026-11-13
 
 ```

@@ -2,7 +2,7 @@
 
 Non-UI building blocks under `common/` (published as `studio.lunabee.<group>:<module>`): results, logging, global loading, app data migrations, Ktor setup, network monitoring, test helpers.
 
-Out of scope: [[synchronization]], Parse client ([[parse]], built on `ktor-*`) and BOM (see [[build-and-publishing]]). Overall module layout: [[architecture]].
+Out of scope: [[synchronization]], Parse client ([[parse]], built on `ktor-*`), in-app feedback ([[feedback]]) and BOM (see [[build-and-publishing]]). Overall module layout: [[architecture]].
 
 ## Platform at a glance
 

@@ -2,7 +2,7 @@
 
 How modules built (convention plugins, per-module versions, KMP/SKIE), checked (detekt), shipped to Maven Central via JReleaser.
 
-Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchronization]] · [[compose-ui]]
+Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchronization]] · [[compose-ui]] · [[feedback]]
 
 ## Toolchain
 
@@ -36,9 +36,10 @@ Related: [[architecture]] · [[common-libraries]] · [[presenter]] · [[synchron
 
 - Each module sets `version = AndroidConfig.<CONST>` in its `build.gradle.kts`; constants in `buildSrc/src/main/kotlin/AndroidConfig.kt`.
 - Naming rule (comment in file): module name `UPPER_CASE`, `-` → `_`, suffix `_VERSION`. Compose modules get `LBC` prefix (`LBCCORE_VERSION`, `LBCPRESENTER_KSP_VERSION`).
-- Families share version via aliasing or reuse: `LBCUIFIELD_{PHONE,COUNTRY}PICKER_VERSION = LBCUIFIELD_CORE_VERSION`, `MONITORING_* = MONITORING_CORE_VERSION`, `LBCPRESENTER_{KOIN,HILT}_KSP_VERSION = LBCPRESENTER_KSP_VERSION`, `SYNCHRONIZATION_{EVENTS,CORE_DATASTORE,CORE_ROOM,PARSE_ROOM,PARSE_KTOR_ROOM,REMOTE}_VERSION = SYNCHRONIZATION_CORE_VERSION`; `CORE_VERSION`, `KTOR_VERSION`, `LOADING_VERSION`, `LOGGER_KERMIT_VERSION` used by several modules; `:synchronization-checks` uses `SYNCHRONIZATION_CORE_VERSION` directly.
+- Families share version via aliasing or reuse: `LBCUIFIELD_{PHONE,COUNTRY}PICKER_VERSION = LBCUIFIELD_CORE_VERSION`, `MONITORING_* = MONITORING_CORE_VERSION`, `LBCPRESENTER_{KOIN,HILT}_KSP_VERSION = LBCPRESENTER_KSP_VERSION`, `SYNCHRONIZATION_{EVENTS,CORE_DATASTORE,CORE_ROOM,PARSE_ROOM,PARSE_KTOR_ROOM,REMOTE}_VERSION = SYNCHRONIZATION_CORE_VERSION`, `FEEDBACK_{PLANE,UI}_VERSION = FEEDBACK_CORE_VERSION` (`feedback-test` unpublished, no version); `CORE_VERSION`, `KTOR_VERSION`, `LOADING_VERSION`, `LOGGER_KERMIT_VERSION` used by several modules; `:synchronization-checks` uses `SYNCHRONIZATION_CORE_VERSION` directly.
 - Presenter modules versioned independently: `LBCPRESENTER_VERSION`, `LBCPRESENTER_ANNOTATIONS_VERSION`, `LBCPRESENTER_HILT_VERSION`, `LBCPRESENTER_KOIN_VERSION`, `LBCPRESENTER_KSP_VERSION` (KSP processors alias it).
 - Gotcha: `compose/crop` currently uses `LBCHAPTIC_VERSION`.
+- Library version read at runtime → generate it, don't hand-sync: `feedback-core` task `generateFeedbackVersion` writes `FeedbackCoreVersion` from `AndroidConfig.FEEDBACK_CORE_VERSION` into `build/generated/feedbackVersion`, added as `commonMain` srcDir (sent in feedback metadata, see [[feedback]]).
 - Rule matters for `setAllSnapshotVersion` (below), which derives constant names from project names.
 
 ## Versioning and changelog rules (AGENTS.MD)

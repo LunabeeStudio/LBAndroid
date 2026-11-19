@@ -8,6 +8,7 @@ Living knowledge base for project. Pages link to each other + tasks via `[[wikil
 - [[build-and-publishing]] — `buildSrc` vs `build-logic` plugins, `*_VERSION` constants, changelog/semver rules, SKIE iOS frameworks, JReleaser → Maven Central, detekt, TeamCity, snapshot tasks
 - [[common-libraries]] — non-UI `common/` libs (logger, core, extension, loading, migration, ktor, monitoring, test): platforms, entry points, invariants, inter-group deps; Parse client in [[parse]]
 - [[compose-ui]] — Compose libs under `compose/` (core specs, image, foundation, theme, uifield, crop, haptic, accessibility, glance, test) + demo-compose coverage
+- [[feedback]] — in-app feedback to Plane Intake (`feedback-{core,plane,ui}` + unpublished `feedback-test`): `LBFeedbackClient` headless API, `LBFeedbackTransport` relay seam, Plane endpoints + work-item id + 3-step attach, `LBFeedbackError`, DataStore store, screen capture, UI host, Android triggers + FLAG_SECURE, iOS controller, security invariants
 - [[glossary]] — one word per thing, same in UI, code, tasks, PRs
 - [[parse]] — KMP Parse REST client (`parse-ktor`, `parse-ktor-test`): `LBParseClient`, headers/providers, `LBParseException` + `mapErr`, plugin order, retry, keyset pull, test harness
 - [[presenter]] — MVI presenter stack: submodules, presenter/reducer roles, reducer-only state/nav/side effects, KSP reducer factories, factory-generation ownership, Hilt (`presenter-hilt`, `presenter-hilt-ksp`) + Koin integrations, v1→v2 migration, navigation link
