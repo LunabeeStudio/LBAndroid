@@ -1,6 +1,6 @@
 ---
 issue: LBA-3
-phase: validated
+phase: review
 type: feature
 wiki: [feedback, architecture, build-and-publishing]
 note: First consumer oneSafe 6 devBeta (separate PR in oneSafe6).
@@ -155,6 +155,9 @@ KDoc says it must never carry user data. The library has no log API and attaches
 - [ ] An app can build its own feedback UI on a public headless API in `feedback-core` (send with attachments, list
       sent items with live status, edit, delete, retry failed attachments) and an Android screen capture that returns
       bytes. The `feedback-ui` screens use that same API.
+- [ ] Dark theme: the screens follow the app's `MaterialTheme` when the app wraps them. `LBFeedbackActivity` and
+      `LBFeedbackController` follow the system light or dark mode when the app passes no theme wrapper, system
+      bars included.
 - [ ] The UI matches the approved design mockup (https://claude.ai/artifact/Ks7E2Da28x5AWA7V4i4xD3), and the redact
       screen keeps Undo and Done visible with a portrait screenshot.
 - [ ] `./gradlew detekt` and `./gradlew test` pass.
@@ -182,6 +185,22 @@ KDoc says it must never carry user data. The library has no log API and attaches
   - The headless API lives in `feedback-core`, so an app with its own UI never depends on Compose
     (autopilot assumption).
   - The README warns that attached files go to Plane as they are and must never carry user data.
+
+### Round 2 — 2026-11-19
+
+- Asked: "Handle dark theme"
+- Triage: adjustment. Screens hosted by the library (`LBFeedbackActivity`, `LBFeedbackController`) with the default
+  `themeWrapper = { it() }` had no `MaterialTheme`, so they showed light M3 colors on a dark phone. New criterion
+  "Dark theme" added to `## Acceptance criteria`.
+- Route: implementer.
+- Changed: new public `LBFeedbackTheme` (M3 `lightColorScheme` / `darkColorScheme` by `isSystemInDarkTheme()`) is
+  the default wrapper of every `install` overload; `LBFeedbackActivity` calls `enableEdgeToEdge()` and uses
+  `Theme.LBFeedback` (platform theme, `values-night` window background = M3 baseline background) so the window
+  matches before Compose draws; README "Theming" section; CHANGELOG `feedback-ui` bullet. iOS gets the default
+  through `LBFeedback.Themed`. Redaction black stays black on purpose.
+- Build: `:feedback-ui:testAndroidHostTest`, iosArm64 + iosSimulatorArm64 compile, `:demo-compose:assembleDebug`,
+  detekt ✅. WARNINGS: none new.
+- Review: deferred (`review.when: on_validation`). Verify: round 2: manual validation — not run by agent.
 
 ## Implementation
 
