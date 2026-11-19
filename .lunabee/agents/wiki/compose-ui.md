@@ -108,5 +108,6 @@ One menu-driven app (`MainScreen` lists `MenuSection`s, routes in `demo-compose/
 | `uifield/UiFieldsScreen.kt` | text/password/date/time/country/phone fields |
 | `glance/` | `GlanceWidgetDemo` widget + pin helper |
 | `monitoring/` | Ktor plugins + monitoring UI ([[common-libraries]]) |
+| `feedback/` | feedback form / list, fake or Plane transport, `FLAG_SECURE` capture, notification + shake triggers ([[feedback]]) |
 
 `common/AppDemoTheme.kt` picks custom scheme, else Material You dynamic colors, else default light/dark. `demo-compose/src/androidTest` uses `compose:androidtest` (e.g. `PrintRuleDemoTest`). `compose:accessibility`, `uifield-form`, `robolectrictest` have no demo screen. Presenter and navigation demos: [[presenter]]; sync demo: [[synchronization]].

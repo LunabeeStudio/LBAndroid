@@ -27,6 +27,7 @@ import studio.lunabee.compose.demo.foundation.TextScreen
 import studio.lunabee.compose.demo.glance.GlanceScreen
 import studio.lunabee.compose.demo.haptic.HapticScreen
 import studio.lunabee.compose.demo.image.ImageScreen
+import studio.lunabee.compose.demo.feedback.FeedbackDemoScreen
 import studio.lunabee.compose.demo.monitoring.KtorDemoScreen
 import studio.lunabee.compose.demo.navigation.LbcNavigationDemoScreen
 import studio.lunabee.compose.demo.presenter.multistate.MultiStateDestination
@@ -130,6 +131,12 @@ fun MainNavGraph(
             route = Destinations.SynchronizationRoute,
         ) {
             SyncDemoScreen()
+        }
+
+        composable(
+            route = Destinations.FeedbackRoute,
+        ) {
+            FeedbackDemoScreen()
         }
 
         SimpleExampleDestination.composable(this, object : SimpleExampleNavScope {})

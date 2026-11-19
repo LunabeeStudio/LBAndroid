@@ -1,8 +1,8 @@
 # Architecture
 
-Overall shape of LBAndroid: 58 Gradle projects (23 `compose`, 32 `common` incl. 2 lint-check projects, 3 demos) — layout, wiring, Maven coordinate grouping, demo apps.
+Overall shape of LBAndroid: 62 Gradle projects (23 `compose`, 36 `common` incl. 2 lint-check projects and unpublished `feedback-test`, 3 demos) — layout, wiring, Maven coordinate grouping, demo apps.
 
-Related: [[build-and-publishing]] · [[presenter]] · [[synchronization]] · [[common-libraries]] · [[compose-ui]]
+Related: [[build-and-publishing]] · [[presenter]] · [[synchronization]] · [[common-libraries]] · [[compose-ui]] · [[feedback]]
 
 ## Top-level layout
 
@@ -59,6 +59,7 @@ Move folder → published coordinate changes.
 | `common/logger` | KMP | Kermit-based logger (+ Crashlytics writer, KMP android+iOS). Root of most dependency chains. |
 | `common/core` | KMP + Android + Compose | `core` (KMP), `core-android`, `core-compose`. See [[common-libraries]]. |
 | `common/extension` | KMP + Android | Kotlin / Android extension functions. |
+| `common/feedback` | KMP Android + iOS (`feedback-ui` Compose Multiplatform) | In-app feedback to Plane Intake: core contract + headless client, Plane transport, screens; `feedback-test` unpublished fakes. See [[feedback]]. |
 | `common/ktor` | KMP | Ktor client setup, JSON negotiation, Kermit logging. |
 | `common/loading` | KMP core + Android Compose | Global blocking loading manager, Hilt + Koin bindings. |
 | `common/migration` | KMP | Versioned app data migration engine + DataStore version store. See [[common-libraries]]. |
@@ -74,7 +75,7 @@ Move folder → published coordinate changes.
 - **KMP iOS + JVM + macOS/Linux**: `migration-datastore`.
 - **KMP iOS + JVM**: `monitoring-core`, `monitoring-ktor`, `test-core`, `synchronization-core`, `synchronization-remote`, `parse-ktor`, `parse-ktor-test`.
 - **KMP iOS + Android + JVM**: `synchronization-core-datastore`.
-- **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,parse-ktor-room,events}`.
+- **KMP iOS + Android**: `logger-kermit-crashlytics`, `monitoring-room`, `monitoring-ui`, `synchronization-{core-room,parse-room,parse-ktor-room,events}`, `feedback-{core,plane,ui,test}`.
 - **Android library**: `core-android`, `extension-android`, `monitoring-okhttp`, `test-room`, `uifield-form`, every Compose module (`compose/*`, `core-compose`, `loading-{compose,hilt,koin}`).
 - **JVM (`java-library`)**: `material-color-utilities`, `presenter-annotations`, `presenter-ksp`, `presenter-hilt-ksp`, `presenter-koin-ksp`, `loading-checks`, `synchronization-checks`.
 
@@ -88,6 +89,7 @@ Layered, leaf-to-root:
 - `core` ← `core-android` ← `core-compose` ← `loading-compose` ← `loading-{hilt,koin}`; `core` ← `loading-core`, `synchronization-core`.
 - `ktor-core` ← `ktor-json`, `monitoring-ktor`; `monitoring-core` ← every other `monitoring-*`.
 - `synchronization-core` ← all `synchronization-*` adapters + `synchronization-remote`; `parse-ktor` + `synchronization-remote` + `synchronization-core-room` ← `synchronization-parse-ktor-room`; `synchronization-core-room` ← `synchronization-parse-room` (Room sync contract); `synchronization-checks` → `lintPublish` of both cursor backends.
+- `feedback-core` ← `feedback-plane` (+ `ktor-client-core`), `feedback-ui`, `feedback-test`; `feedback-ui` never depends on `feedback-plane` (app picks transport).
 - `compose:core` ← `image` ← `uifield-*`.
 - `presenter-annotations` ← `presenter`, `presenter-ksp` ← `presenter-{hilt,koin}-ksp`; `presenter` ← `presenter-{hilt,koin}`. `presenter` depends on no Lunabee module beyond `presenter-annotations` (no `compose:core` / `image`).
 
@@ -95,12 +97,12 @@ Compose modules depend on `common/*`, never reverse.
 
 ## BOM
 
-`common/bom/build.gradle.kts` = `java-platform` declaring `constraints` on `core`, `extension`, `ktor`, `loading`, `logger`, `test`, `monitoring`, `synchronization` families (not `synchronization-checks`). KMP modules with JVM target also pin `<name>-jvm` artifact (`addJvmModule`) — but `synchronization-core-datastore` (has `jvm()`) added via plain `addModule`, so its `-jvm` artifact unpinned. `compose/*` **not** in BOM. Versioning: [[build-and-publishing]].
+`common/bom/build.gradle.kts` = `java-platform` declaring `constraints` on `core`, `extension`, `ktor`, `loading`, `logger`, `test`, `monitoring`, `synchronization`, `feedback` families (not `synchronization-checks`, not unpublished `feedback-test`). `feedback-*` have no JVM target → plain `addModule`. KMP modules with JVM target also pin `<name>-jvm` artifact (`addJvmModule`) — but `synchronization-core-datastore` (has `jvm()`) added via plain `addModule`, so its `-jvm` artifact unpinned. `compose/*` **not** in BOM. Versioning: [[build-and-publishing]].
 
 ## Demo apps
 
-- `demo-compose` — `com.android.application` with Hilt, Koin, Room, KSP (`presenter-hilt-ksp` + `presenter-koin-ksp`); one package per feature under `demo-compose/src/main/kotlin/studio/lunabee/compose/demo/` (core, presenter, monitoring, synchronization, uifield, …). Instrumented tests use `compose:androidtest`.
+- `demo-compose` — `com.android.application` with Hilt, Koin, Room, KSP (`presenter-hilt-ksp` + `presenter-koin-ksp`); one package per feature under `demo-compose/src/main/kotlin/studio/lunabee/compose/demo/` (core, presenter, monitoring, synchronization, feedback, uifield, …). Instrumented tests use `compose:androidtest`.
 - `demo-cli` — proves KMP `core` on desktop native targets; pass args with `-Pargs="…"`.
 - `ios-demo` — exports `monitoring-{core,ui,room}` into `iosDemo` framework; `libsIosDemo` (SwiftUI) runs framework's `embedAndSignAppleFrameworkForXcode` task. Note: Xcode script calls `:iosDemo:`, Gradle project is `:ios-demo`.
 
-Demos not published (no `lunabee.library-publish-conventions`).
+Demos not published (no `lunabee.library-publish-conventions`); same for test-fakes module `feedback-test`.

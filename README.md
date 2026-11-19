@@ -31,6 +31,9 @@
 | `studio.lunabee.core:core-compose`                       | ![](https://img.shields.io/maven-central/v/studio.lunabee.core/core-compose?style=for-the-badge)                       |
 | `studio.lunabee.extension:extension`                     | ![](https://img.shields.io/maven-central/v/studio.lunabee.extension/extension?style=for-the-badge)                     |
 | `studio.lunabee.extension:extension-android`             | ![](https://img.shields.io/maven-central/v/studio.lunabee.extension/extension-android?style=for-the-badge)             |
+| `studio.lunabee.feedback:feedback-core`                  | ![](https://img.shields.io/maven-central/v/studio.lunabee.feedback/feedback-core?style=for-the-badge) |
+| `studio.lunabee.feedback:feedback-plane`                 | ![](https://img.shields.io/maven-central/v/studio.lunabee.feedback/feedback-plane?style=for-the-badge) |
+| `studio.lunabee.feedback:feedback-ui`                    | ![](https://img.shields.io/maven-central/v/studio.lunabee.feedback/feedback-ui?style=for-the-badge) |
 | `studio.lunabee.ktor:ktor-core`                          | ![](https://img.shields.io/maven-central/v/studio.lunabee.ktor/ktor-core?style=for-the-badge)                          |
 | `studio.lunabee.ktor:ktor-json`                          | ![](https://img.shields.io/maven-central/v/studio.lunabee.ktor/ktor-json?style=for-the-badge)                          |
 | `studio.lunabee.ktor:ktor-kermit`                        | ![](https://img.shields.io/maven-central/v/studio.lunabee.ktor/ktor-kermit?style=for-the-badge)                        |

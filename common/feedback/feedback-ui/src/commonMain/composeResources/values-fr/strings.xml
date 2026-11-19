@@ -1,0 +1,60 @@
+<!--
+  ~ Copyright (c) 2026 Lunabee Studio
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~   http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<resources>
+    <string name="feedback_form_title">Envoyer un retour</string>
+    <string name="feedback_form_edit_title">Modifier le retour</string>
+    <string name="feedback_list_title">Mes retours</string>
+    <string name="feedback_back">Retour</string>
+    <string name="feedback_type_bug">Bug</string>
+    <string name="feedback_type_idea">Idée</string>
+    <string name="feedback_type_other">Autre</string>
+    <string name="feedback_field_title">Titre</string>
+    <string name="feedback_field_body">Description</string>
+    <string name="feedback_field_reporter">Votre nom (facultatif)</string>
+    <string name="feedback_attach_screenshot">Joindre une capture d\'écran</string>
+    <string name="feedback_pick_gallery">Choisir dans la galerie</string>
+    <string name="feedback_attachments">Pièces jointes</string>
+    <string name="feedback_screenshot_preview">Aperçu de la capture</string>
+    <string name="feedback_screenshot_redact">Masquer</string>
+    <string name="feedback_screenshot_remove">Retirer</string>
+    <string name="feedback_send">Envoyer</string>
+    <string name="feedback_save">Enregistrer</string>
+    <string name="feedback_sending">Envoi…</string>
+    <string name="feedback_retry">Réessayer</string>
+    <string name="feedback_retry_attachments">Réessayer les pièces jointes</string>
+    <string name="feedback_close">Fermer</string>
+    <string name="feedback_attachments_failed">Votre retour a été envoyé, mais certaines pièces jointes n\'ont pas pu être téléversées.</string>
+    <string name="feedback_error_unauthorized">Accès refusé. Le jeton de retour est invalide ou expiré.</string>
+    <string name="feedback_error_rate_limited">Trop de requêtes. Réessayez dans une minute.</string>
+    <string name="feedback_error_network">Erreur réseau. Vérifiez votre connexion et réessayez.</string>
+    <string name="feedback_error_too_large">Un fichier est trop volumineux pour être envoyé (5 Mo maximum).</string>
+    <string name="feedback_error_server">Le serveur n\'a pas pu traiter la demande.</string>
+    <string name="feedback_error_attachment_rejected">Un fichier a été refusé par le serveur, son type n\'est peut-être pas accepté.</string>
+    <string name="feedback_error_not_editable">Ce retour a déjà été traité et ne peut plus être modifié.</string>
+    <string name="feedback_error_not_found">Ce retour n\'existe plus.</string>
+    <string name="feedback_list_empty">Vous n\'avez pas encore envoyé de retour.</string>
+    <string name="feedback_list_edit">Modifier</string>
+    <string name="feedback_list_delete">Supprimer</string>
+    <string name="feedback_status_pending">En attente</string>
+    <string name="feedback_status_declined">Refusé</string>
+    <string name="feedback_status_snoozed">Reporté</string>
+    <string name="feedback_status_accepted">Accepté</string>
+    <string name="feedback_status_duplicate">Doublon</string>
+    <string name="feedback_redact_title">Masquer la capture</string>
+    <string name="feedback_redact_hint">Faites glisser pour couvrir les zones sensibles avec des rectangles noirs.</string>
+    <string name="feedback_redact_undo">Annuler</string>
+    <string name="feedback_redact_done">Terminé</string>
+</resources>
