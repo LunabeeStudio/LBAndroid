@@ -60,9 +60,9 @@ In-app feedback for Android + iOS under `common/feedback/`, group `studio.lunabe
 
 ## UI — `feedback-ui`
 
-- Compose Multiplatform (like `monitoring-ui`), EN + FR compose resources (`publicResClass = false`). Screens inherit app `MaterialTheme`; library-hosted screens wrap in `themeWrapper` from `install`.
+- Compose Multiplatform (like `monitoring-ui`), EN + FR compose resources (`publicResClass = false`). Screens inherit app `MaterialTheme`; library-hosted screens wrap in `themeWrapper` from `install`, default `LBFeedbackTheme` (M3 light / dark scheme from `isSystemInDarkTheme()`), so hosted screens follow system dark mode unless app passes own theme.
 - `LBFeedback` object: `install(config, transport, store[, themeWrapper])` — two overloads instead of default arg (Swift can't see defaults). `client` exposes headless API.
-- Pending draft data in memory only (`LBFeedbackPending`): screenshot slot + app files. `setScreenshot` is `suspend` (decode / encode off main), `addAttachment` replaces same-name file, `removeAttachment`, `clearAttachments`. Cleared after send.
+- Pending draft data in memory only (`LBFeedbackPending`): screenshot slot + app files. `setScreenshot` is `suspend` (decode / encode off main), `addAttachment` replaces same-name file, `removeAttachment`, `clearAttachments`. Cleared after send. Screenshot named `screenshot-yyyyMMdd-HHmmss.jpg` (UTC, capture / pick time) by `LBFeedbackAttachment.screenshotName()` in core — one builder for Android capture, iOS capture, gallery pick; redaction keeps name.
 - Public composables `LBFeedbackFormScreen`, `LBFeedbackListScreen`, `LBFeedbackRedactScreen` → embed in app NavHost; ViewModels internal; `LBFeedbackTestTags`.
 - **Host** (`LBFeedbackHost`, used by Activity + iOS controller): own small back stack, no navigation library. `LBFeedbackHostViewModel` holds stack of entries; route = sealed `LBFeedbackRoute` (`Form`, `Redact`, `List`, `Edit(remoteId)`). Each entry = own `ViewModelStoreOwner`, provided via `LocalViewModelStoreOwner`, store cleared on pop / host clear → each visit gets fresh ViewModels (two edits never share state).
 - Form: failure → no queue, draft (files included) kept in memory, user taps Retry; partial send → "Retry attachments" for failed files only. Screenshot switch **off by default**, preview, redact. Redact = opaque boxes as 0..1 fractions, flattened into bitmap, re-encoded JPEG < 4.5 MB, common Compose.
@@ -72,7 +72,7 @@ In-app feedback for Android + iOS under `common/feedback/`, group `studio.lunabe
 
 - `LBFeedback.install(application, …)` = `install` + `LBFeedbackScreenCapture.install`.
 - `LBFeedback.open(context, startOnList)`: draw resumed activity on main thread, encode async (form shows it when ready), start `LBFeedbackActivity` (`NEW_TASK` when context not an Activity). No tracked activity / failed draw → opens without screenshot.
-- `LBFeedbackActivity`: library manifest, not exported, `adjustResize`, `FLAG_SECURE` set before `setContent`, `LBFeedbackCaptureExcluded`.
+- `LBFeedbackActivity`: library manifest, not exported, `adjustResize`, `enableEdgeToEdge()` (bar icons follow system mode), `Theme.LBFeedback` (platform theme, `values-night` window background = M3 baseline background, no white flash before Compose), `FLAG_SECURE` set before `setContent`, `LBFeedbackCaptureExcluded`. Form column `consumeWindowInsets(padding).imePadding()` — nav-bar inset not counted twice above keyboard.
 - **FLAG_SECURE rationale**: `drawToBitmap` draws app's own views → capture **works on FLAG_SECURE screens** (demo `FlagSecureActivity` proves it). So form may display secure content → form window itself secure (hidden in recents, not screen-capturable). Capture misses `SurfaceView`, video, separate windows (dialogs, popups).
 - Opt-in triggers, both off unless app calls them:
   - `LBFeedbackNotification.show/hide`: ongoing notification, own channel, IMMUTABLE PendingIntent with capture extra → Activity captures in first `onCreate`. App must hold `POST_NOTIFICATIONS` on API 33+; library never asks, shows nothing otherwise. Tap while app backgrounded → tracked activity stopped, capture may be blank / skipped.
@@ -96,6 +96,6 @@ In-app feedback for Android + iOS under `common/feedback/`, group `studio.lunabe
 
 ## Testing and demo
 
-- `feedback-test` (unpublished, `api(feedback-core)`): `FakeLBFeedbackTransport` (records calls; configurable send / delete errors, failing attachment names, remote statuses) + fixtures `fakeMetadata`, `fakeItem`, `fakeFile`, `fakeClient`. `commonTest` dep of core, plane, ui. Not shipped → consumers fake `LBFeedbackTransport` themselves.
+- `feedback-test` (unpublished, `api(feedback-core)`): `FakeLBFeedbackTransport` (records calls; configurable send / delete errors, failing attachment names, remote statuses), `FakeLBFeedbackStore` (in-memory store) + fixtures `fakeMetadata`, `fakeItem`, `fakeFile`, `fakeClient`. `commonTest` dep of core, plane, ui. Not shipped → consumers fake `LBFeedbackTransport` themselves. Rule (`testing.md`): test doubles never in a production module's main sources — test sources or dedicated `<module>-test` module.
 - Tests: client + store (core), description escaping + transport + attachments on `ktor-client-mock` (plane), form + list ViewModels (ui). No live Plane test.
 - `demo-compose` `demo/feedback/`: `LBFeedbackDemo.install` (from `DemoApp`) uses Plane transport when `feedback.plane.{token,baseUrl,workspace,projectId}` all set (Gradle property or `local.properties` → `BuildConfig`), else demo `FakeFeedbackTransport` (600 ms delay, network-error switch, triage cycle). `FeedbackDemoScreen`: open form / list, attach sample file, `FlagSecureActivity`, notification, shake.
