@@ -1,6 +1,6 @@
 ---
 issue: LBA-3
-phase: validated
+phase: review
 type: feature
 wiki: [feedback, architecture, build-and-publishing]
 note: First consumer oneSafe 6 devBeta (separate PR in oneSafe6).
@@ -220,6 +220,22 @@ KDoc says it must never carry user data. The library has no log API and attaches
 - Build: 3 modules host tests, core/ui iosArm64 + ui iosSimulatorArm64, `:demo-compose:assembleDebug`, detekt ✅.
   WARNINGS: none new.
 - Review: deferred (`review.when: on_validation`). Verify: round 3: manual validation — not run by agent.
+
+### Round 4 — 2026-11-19
+
+- Asked: "Fix danger feedback CI"
+- Triage: defect. TeamCity PR build 54118, step Run Danger, 1 error (Android lint `NotificationPermission`):
+  `demo-compose/src/main/AndroidManifest.xml`: posting a notification requires holding `POST_NOTIFICATIONS`
+  (usage from `LBFeedbackNotification`). The demo requested the permission at runtime without declaring it, so on API
+  33+ the request was a no-op. Library unchanged: the app declares and requests it (README). The 16 Danger warnings
+  are pre-existing, in files this ticket never touched (`compose/navigation`, `core-android` resources,
+  demo `drawable-v24`) → out of scope.
+- Route: inline (1 file, 1 line). `inline` hunk: `demo-compose/src/main/AndroidManifest.xml` +
+  `<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />`.
+- Build: `:demo-compose:assembleDebug`, `:demo-compose:lintDebug` (no `NotificationPermission` left), detekt ✅.
+  WARNINGS: none new.
+- Review: deferred (`review.when: on_validation`); inline hunk to flag at `/wa-validate`. Verify: round 4: manual
+  validation — not run by agent.
 
 ## Implementation
 
