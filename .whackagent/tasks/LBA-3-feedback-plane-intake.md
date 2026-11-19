@@ -214,7 +214,8 @@ KDoc says it must never carry user data. The library has no log API and attaches
   Android capture, iOS capture and the ui codec (gallery pick); redaction keeps the incoming name.
   `InMemoryLBFeedbackStore` left feedback-core and is now `FakeLBFeedbackStore` in the unpublished `feedback-test`;
   README, CHANGELOG and wiki no longer list it. New `LBFeedbackAttachmentTest` (name format).
-- Rule captured: `testing.md` → "Fakes over mocks": test doubles never ship in a published module's main source set.
+- Rule captured: `testing.md` → "Fakes over mocks": test doubles never ship in a production module's main source set —
+  test sources, or a dedicated `<module>-test` module (published or not).
   Same rule proposed upstream in ai-guidelines (`lunabee-engineering` baseline).
 - Build: 3 modules host tests, core/ui iosArm64 + ui iosSimulatorArm64, `:demo-compose:assembleDebug`, detekt ✅.
   WARNINGS: none new.
