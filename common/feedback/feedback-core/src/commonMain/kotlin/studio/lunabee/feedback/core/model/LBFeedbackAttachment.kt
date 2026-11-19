@@ -16,6 +16,8 @@
 
 package studio.lunabee.feedback.core.model
 
+import kotlin.time.Clock
+
 /**
  * File sent with a feedback, held in memory only. It reaches the remote queue as it is: it must never carry user data.
  *
@@ -31,5 +33,13 @@ class LBFeedbackAttachment(
     companion object {
         /** Largest size of one attachment, in bytes. */
         const val MaxBytes: Int = 5 * 1024 * 1024
+
+        /**
+         * File name of a screenshot taken at the time of [clock], like `screenshot-20261119-134739.jpg` (UTC).
+         */
+        fun screenshotName(clock: Clock = Clock.System): String {
+            val stamp = clock.now().toString().substringBefore('.').removeSuffix("Z").replace("-", "").replace(":", "").replace('T', '-')
+            return "screenshot-$stamp.jpg"
+        }
     }
 }

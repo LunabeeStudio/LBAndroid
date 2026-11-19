@@ -27,7 +27,6 @@ import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 
 internal const val ScreenshotMaxBytes: Int = 4_500_000
 internal const val ScreenshotMimeType: String = "image/jpeg"
-internal const val ScreenshotFileName: String = "screenshot.jpg"
 private const val JpegQuality: Int = 85
 private const val ScaleStep: Float = 0.75f
 
@@ -35,14 +34,18 @@ private const val ScaleStep: Float = 0.75f
  * In-memory image work: encodes a bitmap under the upload limit and burns opaque boxes into it.
  */
 internal object LBFeedbackImageCodec {
-    fun encode(bitmap: ImageBitmap, maxBytes: Int = ScreenshotMaxBytes): LBFeedbackAttachment {
+    fun encode(
+        bitmap: ImageBitmap,
+        name: String = LBFeedbackAttachment.screenshotName(),
+        maxBytes: Int = ScreenshotMaxBytes,
+    ): LBFeedbackAttachment {
         var current = bitmap
         var bytes = encodeJpeg(current, JpegQuality)
         while (bytes.size > maxBytes && current.width > 1 && current.height > 1) {
             current = scale(current, ScaleStep)
             bytes = encodeJpeg(current, JpegQuality)
         }
-        return LBFeedbackAttachment(bytes = bytes, name = ScreenshotFileName, mimeType = ScreenshotMimeType)
+        return LBFeedbackAttachment(bytes = bytes, name = name, mimeType = ScreenshotMimeType)
     }
 
     fun encode(encoded: ByteArray): LBFeedbackAttachment = encode(decodeOrThrow(encoded))
@@ -62,7 +65,7 @@ internal object LBFeedbackImageCodec {
                 paint = black,
             )
         }
-        return encode(target)
+        return encode(target, name = source.name)
     }
 
     private fun decodeOrThrow(encoded: ByteArray): ImageBitmap =

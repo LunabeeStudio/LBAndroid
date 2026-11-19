@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream
 private const val JpegQuality: Int = 85
 private const val ScaleStep: Float = 0.75f
 private const val TargetMaxBytes: Int = 4_500_000
-private const val FileName: String = "screenshot.jpg"
 private const val MimeType: String = "image/jpeg"
 
 internal class LBFeedbackBitmapDataSource(
@@ -44,7 +43,7 @@ internal class LBFeedbackBitmapDataSource(
             )
             bytes = compress(scaled)
         }
-        LBFeedbackAttachment(bytes = bytes, name = FileName, mimeType = MimeType)
+        LBFeedbackAttachment(bytes = bytes, name = LBFeedbackAttachment.screenshotName(), mimeType = MimeType)
     }
 
     private fun compress(bitmap: Bitmap): ByteArray {

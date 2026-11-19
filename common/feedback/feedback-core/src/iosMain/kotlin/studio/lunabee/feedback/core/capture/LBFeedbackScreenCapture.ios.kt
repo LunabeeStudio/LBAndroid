@@ -28,14 +28,13 @@ import platform.posix.memcpy
 import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 
 private const val JpegQuality: Double = 0.9
-private const val FileName: String = "screenshot.jpg"
 private const val MimeType: String = "image/jpeg"
 
 actual object LBFeedbackScreenCapture {
     actual suspend fun capture(): LBFeedbackAttachment? {
         val window = UIApplication.sharedApplication.keyWindow ?: return null
         val bytes = renderJpeg(window)?.takeIf { it.size <= LBFeedbackAttachment.MaxBytes } ?: return null
-        return LBFeedbackAttachment(bytes = bytes, name = FileName, mimeType = MimeType)
+        return LBFeedbackAttachment(bytes = bytes, name = LBFeedbackAttachment.screenshotName(), mimeType = MimeType)
     }
 
     @OptIn(ExperimentalForeignApi::class)
