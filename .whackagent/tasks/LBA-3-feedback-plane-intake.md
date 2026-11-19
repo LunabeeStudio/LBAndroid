@@ -132,7 +132,7 @@ KDoc says it must never carry user data. The library has no log API and attaches
 - [ ] `LBPlaneFeedbackTransport.send` creates a pending intake item whose title is `[<Type>] <title>`. Its
       description contains the escaped user text, the reporter if set, and the metadata table.
 - [ ] With a screenshot, the item carries one uploaded attachment under 5 MB (presigned POST, upload, then
-      `is_uploaded`).
+      `is_uploaded`), named `screenshot-<yyyyMMdd-HHmmss UTC>.jpg` from its capture or pick time.
 - [ ] If the attachment fails after the item was created, the form keeps the item and offers a retry of the
       screenshot only.
 - [ ] 401, 429, network and 5xx errors map to `LBFeedbackError` and show a localized message. The draft is kept, and
@@ -201,6 +201,24 @@ KDoc says it must never carry user data. The library has no log API and attaches
 - Build: `:feedback-ui:testAndroidHostTest`, iosArm64 + iosSimulatorArm64 compile, `:demo-compose:assembleDebug`,
   detekt ✅. WARNINGS: none new.
 - Review: deferred (`review.when: on_validation`). Verify: round 2: manual validation — not run by agent.
+
+### Round 3 — 2026-11-19
+
+- Asked (PR #400 review 5972248526):
+  - `4626600404` on `LBFeedbackBitmapDataSource.kt`: "add timestamp in name"
+  - `4629716985` on `InMemoryLBFeedbackStore.kt`: "Don't provide tes stuff in prod code"
+- Triage: adjustment (screenshot name; screenshot criterion now names the format) · rule + adjustment (test double in a
+  published module).
+- Route: implementer (both).
+- Changed: `LBFeedbackAttachment.screenshotName(clock)` builds `screenshot-yyyyMMdd-HHmmss.jpg` (UTC) once, used by
+  Android capture, iOS capture and the ui codec (gallery pick); redaction keeps the incoming name.
+  `InMemoryLBFeedbackStore` left feedback-core and is now `FakeLBFeedbackStore` in the unpublished `feedback-test`;
+  README, CHANGELOG and wiki no longer list it. New `LBFeedbackAttachmentTest` (name format).
+- Rule captured: `testing.md` → "Fakes over mocks": test doubles never ship in a published module's main source set.
+  Same rule proposed upstream in ai-guidelines (`lunabee-engineering` baseline).
+- Build: 3 modules host tests, core/ui iosArm64 + ui iosSimulatorArm64, `:demo-compose:assembleDebug`, detekt ✅.
+  WARNINGS: none new.
+- Review: deferred (`review.when: on_validation`). Verify: round 3: manual validation — not run by agent.
 
 ## Implementation
 
