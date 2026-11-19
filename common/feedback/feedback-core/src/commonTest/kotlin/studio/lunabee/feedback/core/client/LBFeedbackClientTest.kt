@@ -23,8 +23,8 @@ import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 import studio.lunabee.feedback.core.model.LBFeedbackDraft
 import studio.lunabee.feedback.core.model.LBFeedbackStatus
 import studio.lunabee.feedback.core.model.LBFeedbackType
-import studio.lunabee.feedback.core.store.InMemoryLBFeedbackStore
 import studio.lunabee.feedback.core.transport.LBFeedbackError
+import studio.lunabee.feedback.test.FakeLBFeedbackStore
 import studio.lunabee.feedback.test.FakeLBFeedbackTransport
 import studio.lunabee.feedback.test.fakeFile
 import studio.lunabee.feedback.test.fakeItem
@@ -37,7 +37,7 @@ import kotlin.test.assertTrue
 
 class LBFeedbackClientTest {
     private val transport = FakeLBFeedbackTransport()
-    private val store = InMemoryLBFeedbackStore()
+    private val store = FakeLBFeedbackStore()
     private val client = LBFeedbackClient(
         transport = transport,
         store = store,

@@ -22,9 +22,8 @@ bom 4.20.0
     items with live status, edit, delete, reporter name). `LBFeedbackDraft.attachments` takes any files, each under 5 MB.
     Editing or deleting a triaged item fails with `LBFeedbackError.NotEditable`
   - `LBFeedbackScreenCapture.capture()` returns a capture of the screen as a JPEG attachment (Android and iOS), without
-    Compose. `LBFeedbackMetadataProvider` is a `fun interface`, `LBFeedbackDefaultMetadataProvider` the standard one,
-    `InMemoryLBFeedbackStore` a store for tests and previews. `LBFeedbackStore.update` takes a transform applied
-    atomically. The iOS store lives in the application support directory
+    Compose. `LBFeedbackMetadataProvider` is a `fun interface`, `LBFeedbackDefaultMetadataProvider` the standard one.
+    `LBFeedbackStore.update` takes a transform applied atomically. The iOS store lives in the application support directory
 - New `feedback-plane` (Android + iOS): `LBPlaneFeedbackTransport` sends feedback to the Intake queue of a Plane project
   (create, status, edit, delete, 3-step screenshot upload), maps HTTP and network failures to `LBFeedbackError`, and builds
   the escaped `description_html`. Each attachment is one Plane upload, a refused file type gives

@@ -22,13 +22,14 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import studio.lunabee.feedback.core.store.InMemoryLBFeedbackStore
+import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 import studio.lunabee.feedback.core.transport.LBFeedbackError
-import studio.lunabee.feedback.ui.LBFeedbackPending
+import studio.lunabee.feedback.test.FakeLBFeedbackStore
 import studio.lunabee.feedback.test.FakeLBFeedbackTransport
 import studio.lunabee.feedback.test.fakeClient
 import studio.lunabee.feedback.test.fakeFile
 import studio.lunabee.feedback.test.fakeItem
+import studio.lunabee.feedback.ui.LBFeedbackPending
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -49,7 +50,7 @@ class LBFeedbackFormViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun newViewModel(): LBFeedbackFormViewModel = LBFeedbackFormViewModel(
-        client = fakeClient(transport, InMemoryLBFeedbackStore()),
+        client = fakeClient(transport, FakeLBFeedbackStore()),
         pending = pending,
         editRemoteId = null,
     )
@@ -74,7 +75,7 @@ class LBFeedbackFormViewModelTest {
 
     @Test
     fun screenshotIsSentOnlyWhenSwitchIsOn() = runTest {
-        pending.screenshot.value = fakeFile("screenshot.jpg")
+        pending.screenshot.value = fakeFile(LBFeedbackAttachment.screenshotName())
         val viewModel = newViewModel()
         viewModel.fill()
 
@@ -136,7 +137,7 @@ class LBFeedbackFormViewModelTest {
     fun leaveClearsPendingOnlyForNewFeedback() = runTest {
         pending.files.value = listOf(fakeFile("a"))
         val creating = newViewModel()
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem()))
+        val store = FakeLBFeedbackStore(listOf(fakeItem()))
         val editing = LBFeedbackFormViewModel(fakeClient(transport, store), pending, editRemoteId = "remote-1")
 
         editing.leave()

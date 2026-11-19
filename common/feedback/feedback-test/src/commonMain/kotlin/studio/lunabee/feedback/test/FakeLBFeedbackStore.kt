@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package studio.lunabee.feedback.core.store
+package studio.lunabee.feedback.test
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import studio.lunabee.feedback.core.model.LBFeedbackItem
+import studio.lunabee.feedback.core.store.LBFeedbackStore
 
 /**
- * [LBFeedbackStore] that keeps everything in memory and forgets it with the process. For tests and previews.
+ * [LBFeedbackStore] that keeps everything in memory and forgets it with the process.
  *
  * @param initial items present at the start, newest first
  */
-class InMemoryLBFeedbackStore(initial: List<LBFeedbackItem> = emptyList()) : LBFeedbackStore {
+class FakeLBFeedbackStore(initial: List<LBFeedbackItem> = emptyList()) : LBFeedbackStore {
     private val state = MutableStateFlow(initial)
     private val reporter = MutableStateFlow<String?>(null)
 

@@ -30,7 +30,7 @@ import studio.lunabee.feedback.core.metadata.LBFeedbackMetadataProvider
 import studio.lunabee.feedback.core.model.LBFeedbackAttachment
 import studio.lunabee.feedback.core.model.LBFeedbackDraft
 import studio.lunabee.feedback.core.model.LBFeedbackType
-import studio.lunabee.feedback.core.store.InMemoryLBFeedbackStore
+import studio.lunabee.feedback.test.FakeLBFeedbackStore
 import studio.lunabee.feedback.test.fakeMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,7 +64,7 @@ class LBPlaneAttachmentsTest {
                 },
             ),
         ),
-        store = InMemoryLBFeedbackStore(),
+        store = FakeLBFeedbackStore(),
         metadataProvider = LBFeedbackMetadataProvider { fakeMetadata() },
     )
 

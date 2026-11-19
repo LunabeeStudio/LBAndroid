@@ -25,7 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import studio.lunabee.feedback.core.model.LBFeedbackStatus
 import studio.lunabee.feedback.core.transport.LBFeedbackError
-import studio.lunabee.feedback.core.store.InMemoryLBFeedbackStore
+import studio.lunabee.feedback.test.FakeLBFeedbackStore
 import studio.lunabee.feedback.test.FakeLBFeedbackTransport
 import studio.lunabee.feedback.test.fakeClient
 import studio.lunabee.feedback.test.fakeItem
@@ -50,7 +50,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun editableOnlyWhilePending() = runTest {
-        val store = InMemoryLBFeedbackStore(
+        val store = FakeLBFeedbackStore(
             listOf(fakeItem("a", LBFeedbackStatus.Pending), fakeItem("b", LBFeedbackStatus.Accepted)),
         )
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Pending, "b" to LBFeedbackStatus.Accepted)
@@ -62,7 +62,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun refreshUpdatesStatusAndKeepsLastKnownOnFailure() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("a"), fakeItem("b")))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("a"), fakeItem("b")))
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Declined)
 
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
@@ -73,7 +73,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun deleteRemovesPendingItem() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("a")))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("a")))
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Pending)
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
 
@@ -85,7 +85,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun deleteNotFoundRemovesLocally() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("a")))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("a")))
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Pending)
         transport.deleteError = LBFeedbackError.NotFound()
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
@@ -98,7 +98,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun deleteOtherErrorKeepsItemAndExposesError() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("a")))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("a")))
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Pending)
         transport.deleteError = LBFeedbackError.Network()
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
@@ -111,7 +111,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun deleteOfItemTriagedMeanwhileExposesNotEditable() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("a")))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("a")))
         transport.remoteStatuses = mapOf("a" to LBFeedbackStatus.Pending)
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
         store.update("a") { it.copy(status = LBFeedbackStatus.Accepted) }
@@ -124,7 +124,7 @@ class LBFeedbackListViewModelTest {
 
     @Test
     fun deleteIgnoredWhenNotPending() = runTest {
-        val store = InMemoryLBFeedbackStore(listOf(fakeItem("b", LBFeedbackStatus.Accepted)))
+        val store = FakeLBFeedbackStore(listOf(fakeItem("b", LBFeedbackStatus.Accepted)))
         transport.remoteStatuses = mapOf("b" to LBFeedbackStatus.Accepted)
         val viewModel = LBFeedbackListViewModel(fakeClient(transport, store))
 

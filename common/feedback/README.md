@@ -162,7 +162,6 @@ when (result) {
 | `update(remoteId, draft)` / `delete(remoteId)` | pending items only (`canEdit(item)`, else `LBFeedbackError.NotEditable`), `delete` also removes locally when remote says NotFound |
 | `reporterName` / `setReporterName(name)`     | name remembered for the next feedback                                                   |
 
-For tests and previews, `InMemoryLBFeedbackStore` is a `LBFeedbackStore` that keeps everything in memory, and
 `LBFeedbackMetadataProvider` is a `fun interface` you can replace (`LBFeedbackDefaultMetadataProvider` is the standard one).
 
 Swift (with `feedback-ui` or the core framework):
