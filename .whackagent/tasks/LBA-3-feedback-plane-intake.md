@@ -1,7 +1,8 @@
 ---
 issue: LBA-3
-phase: grilled
+phase: validated
 type: feature
+wiki: [feedback, architecture, build-and-publishing]
 note: First consumer oneSafe 6 devBeta (separate PR in oneSafe6).
 created: 2026-11-18
 ---
@@ -61,6 +62,10 @@ Assumptions to confirm (not grilled):
 - **Partial success:** if the intake item is created but the screenshot upload fails, the item is kept. The form
   offers "Retry screenshot", which repeats only the attachment upload.
 - **Strings:** EN + FR as Compose resources.
+- **Draft model name (autopilot assumption):** the core draft class is `LBFeedbackDraft`, not `LBFeedback`.
+  `LBFeedback` stays the entry point object (`install`, `open`), so one name never means two things. Sent items are
+  `LBFeedbackItem`, intake status is `LBFeedbackStatus`.
+- **BOM bump (autopilot assumption):** new modules are a minor BOM bump, `4.19.0` (released) → `4.20.0`.
 
 ## Architecture
 
@@ -143,6 +148,15 @@ KDoc says it must never carry user data. The library has no log API and attaches
       description builder (HTML escaping) and the store.
 - [ ] README documents the Plane bot setup: Guest role, `guest_view_all_features` off, intake on, and the security
       caveats.
+- [ ] An app can attach any files to a feedback (name, MIME type, bytes; each under 5 MB) through the public API,
+      before or while the form is open. The form lists them and the user can remove each one. Each file is uploaded
+      as one Plane attachment. If some uploads fail after the item was created, the item is kept and only the failed
+      files are retried.
+- [ ] An app can build its own feedback UI on a public headless API in `feedback-core` (send with attachments, list
+      sent items with live status, edit, delete, retry failed attachments) and an Android screen capture that returns
+      bytes. The `feedback-ui` screens use that same API.
+- [ ] The UI matches the approved design mockup (https://claude.ai/artifact/Ks7E2Da28x5AWA7V4i4xD3), and the redact
+      screen keeps Undo and Done visible with a portrait screenshot.
 - [ ] `./gradlew detekt` and `./gradlew test` pass.
 
 ## Risks to verify while coding
@@ -152,3 +166,81 @@ KDoc says it must never carry user data. The library has no log API and attaches
 - `guest_cannot_view_issue` must let the bot read its own intake items when `guest_view_all_features` is off.
 - Capturing the previous activity when the notification opens the form: it is paused, but its decor view is still
   attached.
+
+## Feedback
+
+### Round 1 — 2026-11-19 (during autopilot, before delivery)
+
+- Use the design of the mockup artifact (https://claude.ai/artifact/Ks7E2Da28x5AWA7V4i4xD3).
+- Add a way for the client app to attach any files, and make sure apps can implement their own UI.
+- Decisions taken by autopilot on these notes (to confirm):
+  - "Client app" means the integrating app: it attaches files by API (for example logs it chose to share). The
+    built-in form lists them with a remove action. The built-in form gets no generic file picker; the gallery
+    picker stays (autopilot assumption).
+  - `LBFeedbackDraft.attachment` becomes `attachments: List<LBFeedbackAttachment>`. The screenshot is one of them.
+    Files stay in memory only (autopilot assumption).
+  - The headless API lives in `feedback-core`, so an app with its own UI never depends on Compose
+    (autopilot assumption).
+  - The README warns that attached files go to Plane as they are and must never carry user data.
+
+## Implementation
+
+- **Brick 1 — feedback-core** ✅ build (android + iosArm64 + iosSimulatorArm64) · 5 store tests (`:feedback-core:testAndroidHostTest`) · detekt ✅
+  - `settings.gradle.kts`, `AndroidConfig.kt` (`FEEDBACK_CORE_VERSION = "1.0.0"`), BOM constraint (`addModule`, no jvm target)
+  - `model/` (`LBFeedbackDraft`, `LBFeedbackType`, `LBFeedbackItem`, `LBFeedbackStatus`, `LBFeedbackAttachment`, `LBFeedbackMetadata`, `LBFeedbackRemoteState`), `config/LBFeedbackConfig`, `transport/` (`LBFeedbackTransport`, `LBFeedbackError` thrown, like `LBParseException`), `store/` (`LBFeedbackStore`, DataStore JSON list + reporter key; `Context.lbFeedbackStore()` / iOS `lbFeedbackStore()`), `metadata/` (`LBFeedbackMetadataProvider`, expect/actual platform info)
+  - `send` creates the item only; `attach` is the separate retryable upload; `update` takes full draft + original metadata
+  - WARNINGS: K/N "Cannot infer a bundle ID" (shared framework convention, pre-existing kind)
+- **Brick 2 — feedback-plane** ✅ build · 13 tests (5 description, 8 transport, `ktor-client-mock`) · detekt ✅ · BOM `PLATFORM_VERSION` → `4.20.0`
+  - `transport/LBPlaneFeedbackTransport` (depends on `ktor-client-core` only, consumer passes `HttpClient`, no retries), `description/LBPlaneDescriptionBuilder` (public object, escaped body, reporter, metadata table)
+  - Plane v1.5.0 source checked (`intake.py`, `issue.py`, serializers): create returns intake row, `issue` = work item id used for GET/PATCH/DELETE + attachments; status int + `issue_detail.name`; attachment POST → `{upload_data, asset_id, …}`. Unverified: `upload_data` S3 `{url, fields}` shape, PATCH `is_uploaded` body, presigned URL reachable from device
+  - Errors: 401/403 Unauthorized · 404 NotFound · 413 TooLarge · 429 RateLimited · other non-2xx `Server(code)` · `kotlinx.io.IOException` Network; >5 MB rejected before any call
+  - WARNINGS: SKIE `Ktor_httpHttpStatusCode.description renamed` (from `api(ktor-client-core)`, same as parse-ktor)
+- **Brick 3 — feedback-ui common** ✅ build (android + iosSimulatorArm64) · 11 tests (5 form VM, 6 list VM) · detekt ✅
+  - `LBFeedback.install(config, transport, store, themeWrapper)` builds `LBFeedbackGraph` by hand; pending screenshot = in-memory `MutableStateFlow<LBFeedbackAttachment?>` (JPEG bytes); `setScreenshot(ImageBitmap | ByteArray)`, `clearScreenshot()`, `Themed {}`
+  - Public composables `LBFeedbackFormScreen`, `LBFeedbackListScreen`, `LBFeedbackRedactScreen`; internal ViewModels; `LBFeedbackTestTags`; EN + FR strings (41)
+  - Form phases Editing / Sending / Failed / ScreenshotFailed(remoteId) / Done; screenshot switch off by default; edit mode = `update` with stored metadata, no screenshot
+  - List refreshes status via `get` on open; edit/delete Pending only; NotFound on delete removes locally
+  - Redact in common Compose (boxes as 0..1 fractions, flattened, JPEG re-encode < 4.5 MB); `expect encodeJpeg` filled Android + iOS
+  - NOTES: encode/decode on caller (main) thread — detekt `DispatcherSwitchOutsideDataLayer`; no `@Preview` (no tooling in catalog)
+  - WARNINGS: 5 × K/N `KLIB loader: same unique_name … found in more than one library` (annotation, collection, navigationevent-compose, savedstate via compose/lifecycle deps) on `compileTestKotlinIosSimulatorArm64`
+- **Brick 4 — feedback-ui platforms** ✅ build (android + iosArm64 + iosSimulatorArm64) · 11 tests unchanged · detekt ✅
+  - Common: `LBFeedbackHost` (state back stack: form, redact, list, edit:<id>), expect `LBFeedbackBackHandler`, expect `rememberLBFeedbackImagePicker` (null on iOS), form `onListClick` + "Pick from gallery"
+  - Android: `LBFeedback.install(application, …)` + `ActivityLifecycleCallbacks` tracker (WeakReference, ignores `LBFeedbackActivity`), `LBFeedback.open(context, startOnList)` (`drawToBitmap`, fallback no screenshot), `LBFeedbackActivity` (`FLAG_SECURE` before `setContent`, not exported), `LBFeedbackNotification.show/hide` (own channel, IMMUTABLE PendingIntent with "capture" extra, silent when `POST_NOTIFICATIONS` missing), `LBFeedbackShakeTrigger.enable/disable` (`ProcessLifecycleOwner`, 2.7 g, 1 s debounce), `PickVisualMedia` picker
+  - iOS: `LBFeedbackController.get(startOnList, onClose)` + `captureScreen()` (key window, `UIGraphicsImageRenderer`), object like monitoring-ui (Swift can't see default args, detekt `FunctionNaming`)
+  - NOTES: notification tap while app in background → tracked activity may be stopped, capture blank or skipped; iOS has no back gesture (top-bar Back only); `./gradlew detekt` exit 0 even with `e:` lines — output read
+- **Brick 5 — demo, docs, release files** ✅ `:demo-compose:assembleDebug` · tests core 5 / plane 13 / ui 11 · iosArm64 + iosSimulatorArm64 · detekt ✅
+  - Redact fix: image in `weight(1f)` box with `aspectRatio`, Undo/Done always below (device: y=2256 of 2424 px). Form already scrolls
+  - `LBFeedback.install(config, transport, store)` overload for Swift (no default on `themeWrapper` variant)
+  - demo-compose `demo/feedback/`: `FakeFeedbackTransport` (600 ms, network error switch, triage cycle), `FeedbackDemoScreen`, `FlagSecureActivity`, `LBFeedbackDemo.install` (Plane transport when `feedback.plane.token/baseUrl/workspace/projectId` set in gradle or `local.properties`)
+  - `common/feedback/README.md` (Plane bot setup, security caveats), root README table, `CHANGELOG.MD` 2026-11-19 block
+  - Library version const stays hand-synced "1.0.0" (KDoc points to `AndroidConfig.FEEDBACK_CORE_VERSION`)
+  - Device notes (not proof, `emulator-5564` via berth): capture from FLAG_SECURE screen ✅; Send tap after typing title did not leave form (keyboard likely covered button) — unconfirmed
+- **Brick 6 — feedback round 1** ✅ tests core / plane / ui · iosArm64 + iosSimulatorArm64 · demo assembleDebug · detekt ✅
+  - Headless `client/LBFeedbackClient` (send → `LBFeedbackSendResult.Sent | PartiallySent`, `retryAttachments`, `items`, `refreshStatuses`, `update`, `delete`, `canEdit`, reporter name); ViewModels delegate to it; `LBFeedback.client`
+  - `LBFeedbackDraft.attachments: List<LBFeedbackAttachment>`, `LBFeedbackAttachment.MaxBytes`; uploads sequential, stop at first failure, rest returned as failed
+  - `LBFeedback.addAttachment / removeAttachment / clearAttachments` (internal `LBFeedbackPending`: screenshot slot + files); form Attachments section (name · size, Remove); phase `AttachmentsFailed(remoteId, failed, error)`
+  - `LBFeedbackError.AttachmentRejected` (Plane 400 on attach step 1); MIME list from Plane v1.5.0 `settings/common.py` in KDoc + README
+  - `LBFeedback.captureScreen(): LBFeedbackAttachment?` (Android), `LBFeedbackController.captureScreen()` / `captureScreenAsPending()` (iOS)
+  - Mockup read as layout: existing UI already matched; only new Attachments section added
+  - Device notes (not proof): attach sample file → listed; Send closes form (brick 5 issue = keyboard); list Pending → Edit → Save → Delete OK; no crash
+  - NOTES: `update` racing a status change surfaces as `Failed(NotFound)` ("no longer exists"), wording slightly off
+- **Autofix** (3 rounds + 1 micro): see `## Review`. New since brick 6: `LBFeedbackError.NotEditable`, `LBFeedbackStore.update(remoteId) { }` (atomic), `LBFeedbackMetadataProvider` fun interface + `LBFeedbackDefaultMetadataProvider`, `LBFeedbackScreenCapture` in feedback-core (Android tracker + `LBFeedbackCaptureExcluded`, iOS key window), `InMemoryLBFeedbackStore`, `PlaneJson`, `LBFeedbackImageDataSource` / `LBFeedbackUriDataSource` / `LBFeedbackBitmapDataSource` (injected dispatchers), sealed `LBFeedbackRoute` + `LBFeedbackHostViewModel` (per-entry `ViewModelStoreOwner`), `generateFeedbackVersion` Gradle task, unpublished `common/feedback/feedback-test` (shared fakes), iOS controller `modalInPresentation = true`
+
+## Verification
+
+- Build + tests (by PM, final): `./gradlew detekt` clean · host tests core 21 / plane 16 / ui 15 green · core/plane/ui `compileKotlinIosArm64` + ui `compileKotlinIosSimulatorArm64` · `:demo-compose:assembleDebug`
+- Runtime check: `verify.mode: off` — not owed. Implementer sanity drives on emulator (berth), not proof: capture from a FLAG_SECURE screen ✅, redact Undo/Done visible ✅, attach sample file → listed ✅, send → list Pending → edit → save → edit again → delete ✅, shake enable/disable ✅, Send reachable with keyboard open (by scrolling) ✅
+- Not run: iOS on simulator/device, Plane transport against the real server (no token), notification tap from background
+
+## Review
+
+### validation (autopilot) — 2026-11-19
+
+Lenses: main style ✓ elegance ✓ structure ✓ correctness ✓ · focus concurrency ✓ · focus recomposition ✓. Tools: detekt clean.
+
+- Round 1: 33 findings (3 🔴 · 9 🟠 · 21 🟡). 32 fixed; S4 half (store fakes merged, transport fakes rejected).
+  - 🔴 send cancelled when leaving the form → back blocked while Sending · 🔴 shake listener leak → unregister in `disable()` · 🔴 delete crash on triaged item → `NotEditable`
+  - 🟠 transport shape errors escape `LBFeedbackError` → `PlaneJson` · lost update refresh vs edit → atomic `store.update { }` · image IO/encode on main → data sources with injected dispatchers · redact VM/edit VM survived pop → per-entry stores · edit Back wiped pending files → `leave()` · list rows recomposed on every emission → stable row fields
+- Round 2: 9 findings (1 🟠 · 8 🟡), all fixed: iOS swipe-down cancelled send → modal in presentation; Android undecodable pick NPE → `decodeImage` returns null; S4 transport part (verifier's new evidence: copies identical, unpublished module = no artifact) → `feedback-test`; redact apply + picker survive rotation; injected dispatcher in capture encode; README/KDoc `NotEditable`; `load()` early returns
+- Round 3: concurrency clean, recomposition clean, main 1 🟡 (KVC string for `modalInPresentation`) → typed property, fixed past the cap (mechanical, compile-checked)
+- Withdrawn: 0 · disputed: 0 · open: 0 → **verdict clean**
