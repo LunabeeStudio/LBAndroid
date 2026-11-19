@@ -1,6 +1,6 @@
 ---
 issue: LBA-3
-phase: review
+phase: validated
 type: feature
 wiki: [feedback, architecture, build-and-publishing]
 note: First consumer oneSafe 6 devBeta (separate PR in oneSafe6).
@@ -282,3 +282,15 @@ Lenses: main style ✓ elegance ✓ structure ✓ correctness ✓ · focus concu
 - Round 2: 9 findings (1 🟠 · 8 🟡), all fixed: iOS swipe-down cancelled send → modal in presentation; Android undecodable pick NPE → `decodeImage` returns null; S4 transport part (verifier's new evidence: copies identical, unpublished module = no artifact) → `feedback-test`; redact apply + picker survive rotation; injected dispatcher in capture encode; README/KDoc `NotEditable`; `load()` early returns
 - Round 3: concurrency clean, recomposition clean, main 1 🟡 (KVC string for `modalInPresentation`) → typed property, fixed past the cap (mechanical, compile-checked)
 - Withdrawn: 0 · disputed: 0 · open: 0 → **verdict clean**
+
+### validation — 2026-11-19 (after feedback rounds 2–3)
+
+Scope: delta `2d9e249..HEAD` (rest reviewed clean in the autopilot validation). Lenses: main style ✓ elegance ✓ structure ✓
+correctness ✓ · focus recomposition ✓ · concurrency not spawned (no coroutine code in delta). Tools: detekt clean.
+
+- Dark theme and screenshot-name criteria met; new `testing.md` rule applied to all feedback code: clean.
+- Round 1: 3 🟡, all fixed — V1 IME gap (nav-bar inset counted twice since edge-to-edge) → `consumeWindowInsets`;
+  V2 `screenshotName` edited `Instant.toString()` text → `LocalDateTime.Format` in UTC (`kotlinx-datetime` now
+  `implementation` in feedback-core); V3 snake_case test names → camelCase.
+- Re-verify: clean. Withdrawn 0 · disputed 0 · open 0 → **verdict clean**. Autofix touched code after the user's test:
+  `LBFeedbackFormScreen.kt`, `LBFeedbackAttachment.kt`, `feedback-core/build.gradle.kts`.
