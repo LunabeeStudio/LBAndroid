@@ -44,6 +44,7 @@ object AndroidConfig {
     const val VersionName: String = BuildConfigs.LunabeeCompose
 
     const val CompileSdk: Int = BuildConfigs.CompileSdk
+    const val CompileSdkMinor: Int = 2
     const val TargetSdk: Int = CompileSdk
     const val MinSdk: Int = BuildConfigs.MinSdk
 

@@ -21,7 +21,11 @@ plugins {
 
 kotlin {
     android {
-        compileSdk = AndroidConfig.CompileSdk
+        compileSdk {
+            version = release(AndroidConfig.CompileSdk) {
+                minorApiLevel = AndroidConfig.CompileSdkMinor
+            }
+        }
         minSdk = AndroidConfig.MinSdk
     }
 }

@@ -27,7 +27,11 @@ val libs = extensions
     .named("libs")
 
 android {
-    compileSdk = AndroidConfig.CompileSdk
+    compileSdk {
+        version = release(AndroidConfig.CompileSdk) {
+            minorApiLevel = AndroidConfig.CompileSdkMinor
+        }
+    }
 
     defaultConfig {
         minSdk = AndroidConfig.MinSdk
