@@ -42,9 +42,7 @@ android {
         version = release(AndroidConfig.CompileSdk) {
 
             minorApiLevel = AndroidConfig.CompileSdkMinor
-
         }
-
     }
 
     defaultConfig {
