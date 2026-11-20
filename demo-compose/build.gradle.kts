@@ -37,7 +37,13 @@ private fun feedbackProperty(name: String): String =
 android {
     namespace = moduleNamespace
 
-    compileSdk = AndroidConfig.CompileSdk
+    compileSdk {
+
+        version = release(AndroidConfig.CompileSdk) {
+
+            minorApiLevel = AndroidConfig.CompileSdkMinor
+        }
+    }
 
     defaultConfig {
         // The demo ships the synchronization demo, whose modules require API 24.
