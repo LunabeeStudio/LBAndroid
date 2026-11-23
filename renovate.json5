@@ -9,16 +9,16 @@
   "packageRules": [
     {
       "groupName": "Kotlin dependencies",
-      "matchPackagePatterns": [
-        "^org\\.jetbrains\\.kotlin"
+      "matchPackageNames": [
+        "/^org\\.jetbrains\\.kotlin/"
       ],
       "matchUpdateTypes": ["major", "minor", "patch"]
     },
     {
       "groupName": "All other non-major dependencies",
       "matchUpdateTypes": ["minor", "patch"],
-      "excludePackagePatterns": [
-        "^org\\.jetbrains\\.kotlin"
+      "matchPackageNames": [
+        "!/^org\\.jetbrains\\.kotlin/"
       ]
     },
     {
