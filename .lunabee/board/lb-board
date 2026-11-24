@@ -205,6 +205,10 @@ PLANE_FEATURES = {"modules": "module_view", "guests": "guest_view_all_features"}
 PLANE_NEW_PROJECT_FEATURES = {**PLANE_FEATURES, "views": "issue_views_view", "intake": "intake_view"}
 PLANE_NEW_PROJECT_OFF = {"cycles": "cycle_view"}
 PLANE_NAME_FORBIDDEN = r"[&+,:;$^}{*=?@#|'<>.()%!-]"  # Plane's FORBIDDEN_IDENTIFIER_CHARS_PATTERN, for names too
+# The receiver's Plane user (its API key runs the hooks), by display name: its email is internal. Outside the project,
+# every hook call answers 403, and Plane's members page hides bots, so provision adds it as a member (role 15).
+PLANE_BOT = "board-keeper"
+PLANE_MEMBER_ROLE = 15
 
 
 def plane_call(url, method, path, body=None, missing=()):
@@ -571,6 +575,23 @@ def ensure_plane_labels(url, base):
             plane_api(url, "POST", f"{base}/labels/", {"name": name, "color": color}, missing=(409,))
             created.append(name)
     return created
+
+
+def ensure_plane_bot(url, slug, base):
+    """Make the hooks' bot (PLANE_BOT) a project member: added, member, or missing (not in the workspace, e.g. the
+    local rig). Adding takes a project admin's key."""
+    bot = next((m for m in plane_all(url, f"workspaces/{slug}/members/") if m.get("display_name") == PLANE_BOT), None)
+    if not bot:
+        note(f"no workspace member named {PLANE_BOT}: the hooks can't reach this project until it is a member")
+        return "missing"
+    if any(m["id"] == bot["id"] for m in plane_all(url, f"{base}/members/")):
+        return "member"
+    try:
+        plane_api(url, "POST", f"{base}/members/", {"member": bot["id"], "role": PLANE_MEMBER_ROLE})
+    except Failure as error:
+        raise Failure(f"{error} — a project admin must run provision: {PLANE_BOT} has to be a project member, "
+                      "and Plane's members page hides bots")
+    return "added"
 
 
 def rename_labels(url, base, pairs):
@@ -987,12 +1008,13 @@ class Board:
         return max(opened, key=milestone_rank) if opened else None
 
     def module(self, title):
-        """Modules are made and closed by humans in Plane: an unknown title is an error, never created. "" = none."""
+        """A human decides which modules exist (in Plane, or create-milestone on their word): an unknown title is an
+        error, never created on the fly. "" = none."""
         if not title:
             return None
         found = [m for m in self.modules() if m["title"] == title]
         if not found:
-            raise Failure(f"no milestone {title!r} — create the module in Plane first", EXIT_USAGE)
+            raise Failure(f"no milestone {title!r} — create it first (create-milestone, or a module in Plane)", EXIT_USAGE)
         return found[0]
 
     def milestones(self):
@@ -1001,6 +1023,19 @@ class Board:
         rows = highest_first([m for m in self.modules() if m["open"]])
         rows += [m for m in highest_first([m for m in self.modules() if not m["open"]]) if m["tickets"] > m["done"]]
         return [{"title": m["title"], "open": m["open"], "tickets": m["tickets"], "done": m["done"]} for m in rows]
+
+    def create_milestone(self, title):
+        """New module, Plane status planned. Idempotent on the title, closed modules included, so a retry never makes a
+        twin and a shipped milestone is never reopened. Returns {title, open, created}."""
+        title = title.strip()
+        if not title:
+            raise Failure("milestone title required", EXIT_USAGE)
+        found = [m for m in self.modules() if m["title"] == title]
+        if found:
+            return {"title": title, "open": found[0]["open"], "created": False}
+        self.api("POST", f"{self.base()}/modules/", {"name": title})
+        self.module_rows = None
+        return {"title": title, "open": True, "created": True}
 
     def close_milestone(self, title):
         """Module status → completed (Plane CE's closed status; archive stays a human's call)."""
@@ -1190,6 +1225,7 @@ class Board:
         state_ids, report = ensure_plane_states(url, base, names, args.prune_status, adopt, fresh=fresh)
         labels_renamed = rename_labels(url, base, args.rename_label or [])
         labels_created = ensure_plane_labels(url, base)
+        bot_member = ensure_plane_bot(url, slug, base)
         # A PR based on a ticket branch retargets only when that branch is deleted on merge.
         rest("PATCH", f"repos/{repo}", {"delete_branch_on_merge": True})
         variables = {
@@ -1218,6 +1254,7 @@ class Board:
             "labels_created": labels_created,
             "labels_renamed": labels_renamed,
             "features_enabled": features,
+            "bot_member": bot_member,
             "state_ids": state_ids,
             "variables": variables,
             "api_rate_limit_remaining": int(remaining) if (remaining or "").isdigit() else None,
@@ -1565,6 +1602,10 @@ def op_set_field(args):
 
 def op_milestones(args):
     emit(open_board().milestones())
+
+
+def op_create_milestone(args):
+    emit(open_board().create_milestone(args.title))
 
 
 def op_close_milestone(args):
@@ -2143,6 +2184,10 @@ def parser():
 
     s = sub.add_parser("milestones", help="modules, highest first")
     s.set_defaults(func=op_milestones)
+
+    s = sub.add_parser("create-milestone", help="new module, on a human's word (no-op when the title exists)")
+    s.add_argument("title")
+    s.set_defaults(func=op_create_milestone)
 
     s = sub.add_parser("close-milestone", help="close a shipped module")
     s.add_argument("title")

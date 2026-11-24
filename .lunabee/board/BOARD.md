@@ -137,7 +137,8 @@ A spec written in the card description moves nothing: GitHub events are the only
 - A milestone is a Plane module.
 - A ticket sits in one module at most. `set-field LBA-12 milestone <name>` moves it there.
 - `create` puts new cards in the highest open module, unless that module is listed in `PLANE_TRACKS`.
-- Humans create and close modules. `close-milestone <name>` closes one.
+- Humans decide when a module opens and closes. `create-milestone <name>` creates one, and does nothing when that
+  name exists. `close-milestone <name>` closes one.
 
 **Dependencies**
 - A dependency is a Plane relation ("blocked by"): `depend LBA-12 --on LBA-3,LBA-4`.
@@ -154,7 +155,7 @@ A spec written in the card description moves nothing: GitHub events are the only
 | read one ticket | `get LBA-12` |
 | create a card | `create --title "…" --summary "…" [--priority high] [--assignee <name>] [--sprint <name>] [--milestone <name>]` |
 | reorder | `move LBA-12 --top\|--bottom\|--before LBA-3\|--after LBA-3` |
-| sprint, milestone | `split LBA-12` · `set-field LBA-12 sprint\|milestone <value>` · `milestones` · `close-milestone <name>` |
+| sprint, milestone | `split LBA-12` · `set-field LBA-12 sprint\|milestone <value>` · `milestones` · `create-milestone <name>` · `close-milestone <name>` |
 | record a dependency | `depend LBA-12 --on LBA-3` |
 | take / give back a ticket | `claim LBA-12 grilling\|coding`, then `release LBA-12 <phase> [--reset-to <state>]` |
 | comment on a card | `comment LBA-12 "…"` |
