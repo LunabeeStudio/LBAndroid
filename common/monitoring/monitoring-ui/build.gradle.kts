@@ -58,6 +58,9 @@ kotlin {
 
             implementation(projects.monitoringCore)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlinTest)
+        }
     }
 }
 
