@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres    
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-25
+
+```
+monitoring 4.10.0
+bom 4.21.0
+```
+
+- `monitoring-ui`: share button on the network request detail screen. It opens the native share sheet (Android chooser,
+  iOS `UIActivityViewController`) with the request and its response as Markdown-friendly text (method, URL, query,
+  status, duration, date, headers and bodies in code blocks), ready to paste in Slack. Each body is capped at 100 000
+  characters to stay under the platform share limits
+
 ## 2026-11-19
 
 ```
