@@ -42,9 +42,12 @@ import studio.lunabee.monitoring.core.LBRequest
 import studio.lunabee.monitoring.ui.res.CoreDrawable
 import studio.lunabee.monitoring.ui.res.CoreString
 import studio.lunabee.monitoring.ui.res.ic_bin
+import studio.lunabee.monitoring.ui.res.ic_share
 import studio.lunabee.monitoring.ui.res.networkRequestDetailReceivedTitle
 import studio.lunabee.monitoring.ui.res.networkRequestDetailSentTitle
 import studio.lunabee.monitoring.ui.res.networkRequestDetailTitle
+import studio.lunabee.monitoring.ui.share.rememberTextSharer
+import studio.lunabee.monitoring.ui.share.toShareText
 import studio.lunabee.monitoring.ui.theme.CorePayload
 import studio.lunabee.monitoring.ui.theme.CoreRequest
 import studio.lunabee.monitoring.ui.theme.CoreRequestConfig
@@ -56,6 +59,7 @@ internal fun NetworkRequestDetailScreen(
     viewmodel: NetworkRequestDetailViewModel = koinViewModel(),
 ) {
     val request: LBRequest? by viewmodel.request.collectAsStateWithLifecycle()
+    val shareText = rememberTextSharer()
 
     LazyColumn(
         modifier = Modifier
@@ -69,6 +73,16 @@ internal fun NetworkRequestDetailScreen(
                 title = stringResource(CoreString.networkRequestDetailTitle),
                 onBackClicked = navScope.navigateBack,
                 actions = {
+                    request?.let { safeRequest ->
+                        IconButton(
+                            onClick = { shareText(safeRequest.toShareText()) },
+                        ) {
+                            Icon(
+                                painter = painterResource(CoreDrawable.ic_share),
+                                contentDescription = "Share request",
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = {
                             viewmodel.deleteRequest()
