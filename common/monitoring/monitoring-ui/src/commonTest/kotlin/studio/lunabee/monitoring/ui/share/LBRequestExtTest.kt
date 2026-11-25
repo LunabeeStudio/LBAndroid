@@ -76,7 +76,30 @@ class LBRequestExtTest {
         val longBody = "a".repeat(n = ShareBodyMaxLength + 10)
         val text = request.copy(incomingPayload = LBPayload(body = longBody)).toShareText()
         assertTrue(text.contains("… (truncated, ${longBody.length} characters)"))
-        assertFalse(text.contains("a".repeat(n = ShareBodyMaxLength + 1)))
+        assertFalse(text.contains("a".repeat(n = ShareBodyMaxLength)))
+        assertTrue(text.endsWith("```"))
+    }
+
+    @Test
+    fun toShareText_caps_whole_text_when_headers_and_url_are_large_test() {
+        val huge = "h".repeat(n = ShareTextMaxLength)
+        val text = request.copy(
+            path = huge,
+            queryParams = huge,
+            outgoingPayload = LBPayload(headers = huge, body = huge),
+            incomingPayload = LBPayload(headers = huge, body = huge),
+        ).toShareText()
+        assertEquals(expected = ShareTextMaxLength, actual = text.length)
+        assertTrue(text.endsWith(" characters)"))
+    }
+
+    @Test
+    fun toShareText_does_not_split_surrogate_pair_test() {
+        val emojis = "😀".repeat(n = ShareTextMaxLength)
+        val text = request.copy(incomingPayload = LBPayload(headers = emojis)).toShareText()
+        val cut = text.substringBefore(delimiter = "\n… (truncated")
+        assertFalse(cut.last().isHighSurrogate())
+        assertTrue(text.length <= ShareTextMaxLength)
     }
 
     @Test

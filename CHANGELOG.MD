@@ -14,8 +14,8 @@ bom 4.21.0
 
 - `monitoring-ui`: share button on the network request detail screen. It opens the native share sheet (Android chooser,
   iOS `UIActivityViewController`) with the request and its response as Markdown-friendly text (method, URL, query,
-  status, duration, date, headers and bodies in code blocks), ready to paste in Slack. Each body is capped at 100 000
-  characters to stay under the platform share limits
+  status, duration, date, headers and bodies in code blocks), ready to paste in Slack. The whole text is capped at
+  50 000 characters, and each body at 20 000, to stay under the platform share limits
 
 ## 2026-11-19
 
